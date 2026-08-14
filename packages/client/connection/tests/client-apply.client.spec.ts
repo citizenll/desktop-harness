@@ -7,10 +7,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apply, type ConnectionHandle } from '../src/client/index.ts'
 import type { RpcMessage } from '../src/client/api.ts'
 import { RpcId } from '../src/client/api.ts'
+import { EmbeddedApiClient } from '../src/client/embedded-api-client.ts'
 import { FixtureApiClient } from '../src/client/fixture.ts'
 import { WebApiClient } from '../src/client/web-api-client.ts'
 
-type Win = { location?: { hostname: string; search: string; origin?: string } }
+type Win = { location?: { hostname: string; search: string; origin?: string; protocol?: string } }
 type WebSocketGlobal = { WebSocket?: typeof WebSocket }
 
 const originalWebSocket = globalThis.WebSocket
@@ -82,6 +83,34 @@ describe('connection client apply', () => {
   it('reports non-loopback page authority through the connection handle', async () => {
     ;(globalThis as Win).location = { hostname: '192.0.2.20', search: '' }
     expect((await mount()).isLoopback).toBe(false)
+  })
+
+  it('selects the embedded carrier and fixes generic RPC to the desktop origin', async () => {
+    ;(globalThis as Win).location = {
+      protocol: 'dsh:', hostname: 'app', search: '', origin: 'dsh://app',
+    }
+    const handle = await mount()
+    expect(handle.api).toBeInstanceOf(EmbeddedApiClient)
+    expect(handle.isLoopback).toBe(true)
+
+    const original = globalThis.fetch
+    let requestUrl: string | undefined
+    globalThis.fetch = async (input: URL | RequestInfo, init?: RequestInit) => {
+      requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (typeof init?.body !== 'string') throw new TypeError('expected a JSON body')
+      const body = JSON.parse(init.body) as { rpcId: string }
+      return Response.json({
+        type: 'server-response',
+        rpcId: body.rpcId,
+        result: { ok: true, value: null },
+      })
+    }
+    try {
+      await expect(handle.rpc.call('/rpc', 'goals/create', {})).resolves.toEqual({ ok: true, value: null })
+    } finally {
+      globalThis.fetch = original
+    }
+    expect(requestUrl).toBe('dsh://app/rpc/goals/create')
   })
 
   it('start() hands out one loop, rejects a second consumer, and stop() aborts the streams', async () => {

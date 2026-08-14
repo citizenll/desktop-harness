@@ -26,11 +26,18 @@ import { createRequire } from 'node:module'
 import {
   existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, unlinkSync, writeFileSync,
 } from 'node:fs'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import type { EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import { applyEntryPatches, type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { loadOverlayPatches } from './index.ts'
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /** Active launcher profile name available to profile-scoped providers. */
+    activeProfile: string
+  }
+}
 
 /** Directory under the Harness home holding every profile. */
 export const PROFILES_DIR = 'profiles'
@@ -63,9 +70,15 @@ export interface DshManifestSection {
 
 /** The slice of package.json both profiles and bundles use. */
 export interface ProfileManifest {
+  /** Package name when this manifest belongs to an installed dependency. */
   name?: string
+  /** Installed package version when declared. */
+  version?: string
+  /** Profile-managed package specs by dependency key. */
   dependencies?: Record<string, string>
+  /** Peer requirements used while healing the shared module fallback. */
   peerDependencies?: Record<string, string>
+  /** Harness-owned bundle or profile metadata. */
   dsh?: DshManifestSection
 }
 
@@ -113,6 +126,7 @@ export function resolveProfileDir(name: string, home: string = resolveDshHome())
 /** The shipped profile templates auto-initialized on first use, by name. */
 export const PROFILE_TEMPLATES: Record<string, readonly string[]> = {
   web: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'],
+  desktop: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@deepseek-ai/dsh-desktop-app'],
   headless: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless'],
 }
 
@@ -330,6 +344,16 @@ function packageDirFromAnchor(anchor: string, packageName: string): string | und
 }
 
 /**
+ * Resolve one dependency from the profile's own module graph.
+ * @param packageName - dependency key from the profile manifest.
+ * @param profileDir - absolute profile directory.
+ * @returns the installed package directory, or undefined when unresolved.
+ */
+export function resolveProfilePackageDir(packageName: string, profileDir: string): string | undefined {
+  return packageDirFromAnchor(join(profileDir, 'package.json'), packageName)
+}
+
+/**
  * Resolve one bundle package's directory: installation anchor first, then the
  * profile directory. The installation-first order is the contract that
  * `@deepseek-ai/dsh-base` (and every other in-box bundle) always comes from
@@ -352,6 +376,95 @@ export function resolveBundleDir(
     `${binName}: cannot resolve profile bundle ${JSON.stringify(packageName)} from the dsh installation or ${profileDir}; `
     + `run 'dsh plugin --profile ${basename(profileDir)} install' if its dependency is not installed`,
   )
+}
+
+/** Result of reconciling dependency-managed bundles into a profile manifest. */
+export interface ProfileBundleReconciliation {
+  /** Manifest after reconciliation. */
+  manifest: ProfileManifest
+  /** Newly installed dependencies that do not export a bundle patch. */
+  addedLibraries: string[]
+  /** Whether the profile bundle list was rewritten. */
+  changed: boolean
+}
+
+function exportsProfilePatch(
+  binName: string,
+  packageName: string,
+  installAnchor: string,
+  profileDir: string,
+): boolean {
+  let dir: string
+  try {
+    dir = resolveBundleDir(binName, packageName, installAnchor, profileDir)
+  } catch {
+    return false
+  }
+  const manifest = readProfileManifest(binName, dir)
+  return manifest.dsh?.bundle?.patch !== undefined
+}
+
+/**
+ * Reconcile dependency-managed packages with `dsh.profile.bundles`.
+ * @param binName - diagnostic prefix for manifest and resolution errors.
+ * @param before - profile manifest captured before the package-manager operation.
+ * @param profileDir - absolute profile directory.
+ * @param installAnchor - installation package manifest used for in-box resolution.
+ * @returns the reconciled manifest, library additions, and write status.
+ */
+export function reconcileProfileBundles(
+  binName: string,
+  before: ProfileManifest,
+  profileDir: string,
+  installAnchor: string,
+): ProfileBundleReconciliation {
+  const after = readProfileManifest(binName, profileDir)
+  const beforeDependencies = new Set(Object.keys(before.dependencies ?? {}))
+  const dependencies = Object.keys(after.dependencies ?? {})
+  const bundles = [...after.dsh?.profile?.bundles ?? []]
+  const addedLibraries: string[] = []
+  let changed = false
+  for (const packageName of dependencies) {
+    const bundle = exportsProfilePatch(binName, packageName, installAnchor, profileDir)
+    if (bundle && !bundles.includes(packageName)) {
+      bundles.push(packageName)
+      changed = true
+    } else if (!bundle && !beforeDependencies.has(packageName)) {
+      addedLibraries.push(packageName)
+    }
+  }
+  const dependencySet = new Set(dependencies)
+  for (const packageName of [...bundles]) {
+    const wasDependency = beforeDependencies.has(packageName) || dependencySet.has(packageName)
+    const remainsBundle = dependencySet.has(packageName)
+      && exportsProfilePatch(binName, packageName, installAnchor, profileDir)
+    if (wasDependency && !remainsBundle) {
+      bundles.splice(bundles.indexOf(packageName), 1)
+      changed = true
+    }
+  }
+  if (!changed) return { manifest: after, addedLibraries, changed: false }
+  const manifest: ProfileManifest = {
+    ...after,
+    dsh: {
+      ...after.dsh,
+      profile: { ...after.dsh?.profile, bundles },
+    },
+  }
+  writeProfileManifest(profileDir, manifest)
+  return { manifest, addedLibraries, changed: true }
+}
+
+/**
+ * Anchor a relative filesystem package spec to the invoking directory.
+ * @param argument - package-manager argument from a launcher invocation.
+ * @param cwd - directory that relative paths were entered against.
+ * @returns the original argument or an absolute filesystem spec.
+ */
+export function anchorProfilePackageSpec(argument: string, cwd: string): string {
+  const match = /^(?<prefix>(?:file|link):)?(?<path>\.{1,2}(?:[/\\].*)?)$/.exec(argument)
+  if (match?.groups?.path === undefined) return argument
+  return `${match.groups.prefix ?? ''}${resolve(cwd, match.groups.path)}`
 }
 
 /**

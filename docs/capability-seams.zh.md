@@ -192,6 +192,13 @@ flowchart LR
   pkg_lsp_local["lsp-local"]
   pkg_tool_lsp["tool-lsp"]
   svc_apiProxy["ctx.apiProxy<br/>Host API dispatch"]
+  pkg_source_repository["source-repository"]
+  svc_sourceRepository["ctx.sourceRepository<br/>Managed Harness source repository"]
+  pkg_source_repository_git["source-repository-git"]
+  pkg_evolution_control["evolution-control"]
+  pkg_profile_plugins["profile-plugins"]
+  svc_profilePlugins["ctx.profilePlugins<br/>Profile dependency management"]
+  pkg_profile_plugins_pnpm["profile-plugins-pnpm"]
   pkg_cordis_host_runner["cordis-host-runner"]
   svc_dynamicCordisRunner["ctx.dynamicCordisRunner<br/>Dynamic Cordis package host runner"]
   svc_cordisInspect["ctx.cordisInspect<br/>Dynamic Cordis inspect registry"]
@@ -239,6 +246,8 @@ flowchart LR
   pkg_modules --> svc_clientModules
   pkg_permission_presets --> svc_permissionPresets
   pkg_plan_mode --> svc_planMode
+  pkg_profile_plugins --> svc_profilePlugins
+  pkg_profile_plugins_pnpm --> svc_profilePlugins
   pkg_pwsh_local --> svc_shell
   pkg_sandbox --> svc_sandbox
   pkg_sandbox_local --> svc_sandbox
@@ -264,6 +273,8 @@ flowchart LR
   pkg_skill --> svc_skills
   pkg_skill_badge --> svc_skills
   pkg_skill_filesystem --> svc_skills
+  pkg_source_repository --> svc_sourceRepository
+  pkg_source_repository_git --> svc_sourceRepository
   pkg_spill --> svc_spillStore
   pkg_spill_local --> svc_spillStore
   pkg_storage --> svc_storage
@@ -330,6 +341,7 @@ flowchart LR
   svc_llm --> pkg_agent_loop
   svc_llm --> pkg_compaction_basic
   svc_lsp --> pkg_tool_lsp
+  svc_profilePlugins --> pkg_evolution_control
   svc_sandbox --> pkg_bash_sandbox
   svc_sandbox --> pkg_terminal_bash
   svc_sandboxPolicy --> pkg_bash_sandbox
@@ -366,6 +378,7 @@ flowchart LR
   svc_shellEnv --> pkg_tool_bash
   svc_shellEnv --> pkg_tool_pwsh
   svc_skills --> pkg_tool_skill
+  svc_sourceRepository --> pkg_evolution_control
   svc_spillStore --> pkg_spill_policy
   svc_storage --> pkg_storage_domain
   svc_storageDomain --> pkg_message_feedback
@@ -467,6 +480,8 @@ flowchart LR
 | `ctx.workflowEngine` | `seam` | [`workflow`](../packages/workflow/workflow) | [`workflow-worker-thread`](../packages/workflow/workflow-worker-thread) | [`tool-workflow`](../packages/workflow/tool-workflow), [`tool-ralph`](../packages/workflow/tool-ralph) | - | 每个上下文使用一个引擎，与 bash 相同，且没有具名提供方注册表；通用工作流与固定 Ralph 消费方启动运行，其中的 agent() 调用通过 ctx.subagents 扇出。 |
 | `ctx.lsp` | `seam` | [`lsp`](../packages/lsp/lsp) | `lsp-local` | [`tool-lsp`](../packages/lsp/tool-lsp) | - | 提供方注册与选择，加上恰好四种操作的标准化查询执行；该 seam 不提供协议逃生口，后端必须转换为标准化请求和结果。 |
 | `ctx.apiProxy` | `core` | `apiproxy` | - | `connection` | - | 与传输无关的 Host 网关接口：它分派浏览器 API 调用，每条打开的 Host 流自行订阅转发事件，而不是由广播方法向其推送。 |
+| `ctx.sourceRepository` | `seam` | [`source-repository`](../packages/extensions/source-repository) | [`source-repository-git`](../packages/extensions/source-repository-git) | `evolution-control` | - | Git Provider 负责物化打包源码胶囊、分离官方 fetch 与用户 push remote，并拥有有界且串行的仓库修改；evolution 网关是具备特权的 GUI Consumer。 |
+| `ctx.profilePlugins` | `seam` | [`profile-plugins`](../packages/extensions/profile-plugins) | [`profile-plugins-pnpm`](../packages/extensions/profile-plugins-pnpm) | `evolution-control` | - | pnpm Provider 只管理当前 profile 依赖，把 `dsh.bundle` 导出同步到 profile bundle 列表，并发布重组事件；evolution 网关是具备特权的 GUI Consumer。 |
 | `ctx.dynamicCordisRunner` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | 拥有内存定义注册表、Host 半的 vm 沙箱和 request-run 往返流程；浏览器页面通过其 Remote 命名空间在线访问同一服务。 |
 | `ctx.cordisInspect` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | 注册 Host inspect 提供方、镜像 Client 提供方 manifest，并通过动态 Cordis 传输路由 Client 查询。 |
 

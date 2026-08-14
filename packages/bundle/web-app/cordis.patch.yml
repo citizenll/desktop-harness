@@ -94,6 +94,29 @@
     - id: plugin-inventory
       name: '@deepseek-ai/dsh-host-plugin-inventory'
 
+    # Mutable source workspace and profile package manager. The gateway is
+    # loopback-pinned by client-connection; the providers never expose raw
+    # shell strings and serialize every mutation.
+    - id: source-repository
+      name: '@deepseek-ai/dsh-source-repository-git'
+      config:
+        root: !!js process.env.DSH_SOURCE_WORKSPACE ?? dshHomePath('source', 'deepseek-harness')
+        capsuleDir: !!js process.env.DSH_SOURCE_CAPSULE_DIR
+        officialUrl: https://github.com/deepseek-ai/deepseek-harness.git
+        officialRemote: upstream
+        officialBranch: master
+        userRemote: origin
+        allowOfficialClone: true
+
+    - id: profile-plugins
+      name: '@deepseek-ai/dsh-profile-plugins-pnpm'
+      inject: [activeProfile]
+      config:
+        profile: !!js ctx.activeProfile
+
+    - id: evolution-control
+      name: '@deepseek-ai/dsh-host-evolution-control'
+
     # The API gateway: the transport-agnostic dispatch face every client shape
     # shares. The base layer's agent-default-model service owns the default model.
     - id: api-gateway

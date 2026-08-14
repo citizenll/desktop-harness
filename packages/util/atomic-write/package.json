@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-atomic-write",
-  "description": "Zero-dependency atomic file replacement: exclusive-create random-suffix temp + rename carrying the caller-stated permissions (writeFileAtomic)",
+  "description": "Zero-dependency atomic file replacement with bounded Windows contention recovery and caller-stated permissions",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"

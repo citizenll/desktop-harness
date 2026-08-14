@@ -623,6 +623,17 @@ describe('boot', () => {
     } finally {
       await ctx.fiber.dispose()
     }
+    const withoutInternalLoader = await boot(NAME, hostOwnedPath, undefined, (hostCtx) => {
+      hostCtx.loader.internal = undefined
+    }, harnessBaseUrl)
+    try {
+      expect(withoutInternalLoader.get('harnessPluginLoaded')).toBe(true)
+      expect(withoutInternalLoader.get('shadowPluginLoaded')).toBeUndefined()
+      expect(withoutInternalLoader.get('relativePluginLoaded')).toBe(true)
+      expect(withoutInternalLoader.get('absolutePluginLoaded')).toBe(true)
+    } finally {
+      await withoutInternalLoader.fiber.dispose()
+    }
   })
 
   it('runs host preparation before the Loader tree mounts', async () => {

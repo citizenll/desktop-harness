@@ -2,7 +2,7 @@
 
 English | [中文](extensions.zh.md)
 
-The extensions subsystem lets an agent define versioned Cordis packages, run their host and browser halves, and query approved runtime metadata before writing code. Package lifecycle and sandbox behavior belong to the [`packages/extensions`](../../packages/extensions/README.md) package group.
+The extensions subsystem lets an agent define versioned Cordis packages, run their host and browser halves, and query approved runtime metadata before writing code. It also defines the managed source-repository and profile-package capabilities used by the GUI evolution controls. Package lifecycle, source authority, and provider behavior belong to the [`packages/extensions`](../../packages/extensions/README.md) package group.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -256,6 +256,92 @@ Types: [Agent](core.md)
 
 Source: [`packages/extensions/cordis-host-runner/src/index.ts:124`](../../packages/extensions/cordis-host-runner/src/index.ts)
 
+<a id="ctxprofileplugins--profileplugins-abstract-seam"></a>
+
+### `ctx.profilePlugins` — `ProfilePlugins` (abstract seam)
+
+Profile dependency manager. Providers own package-manager execution, manifest reconciliation, limits, and mutation serialization.
+
+```ts cordis-catalog
+/**
+ * Inspect the current profile package composition.
+ * @returns current system layers and installed user dependencies.
+ */
+abstract list(): Promise<ProfilePluginsSnapshot>
+
+/**
+ * Install one npm, Git, tarball, or absolute filesystem package spec.
+ * @param spec - exact package-manager dependency spec.
+ * @returns the reconciled profile state.
+ */
+abstract install(spec: string): Promise<ProfilePluginMutationReceipt>
+
+/**
+ * Update one user-managed profile dependency to its latest available version.
+ * @param packageName - dependency name from the profile manifest.
+ * @returns the reconciled profile state.
+ */
+abstract update(packageName: string): Promise<ProfilePluginMutationReceipt>
+
+/**
+ * Remove one user-managed profile dependency.
+ * @param packageName - dependency name from the profile manifest.
+ * @returns the reconciled profile state.
+ */
+abstract remove(packageName: string): Promise<ProfilePluginMutationReceipt>
+```
+
+Source: [`packages/extensions/profile-plugins/src/index.ts:18`](../../packages/extensions/profile-plugins/src/index.ts)
+
+<a id="ctxsourcerepository--sourcerepository-abstract-seam"></a>
+
+### `ctx.sourceRepository` — `SourceRepository` (abstract seam)
+
+Managed source repository capability. Providers own Git mechanics, command limits, source-capsule materialization, and mutation serialization.
+
+```ts cordis-catalog
+/**
+ * Inspect the configured source root without materializing or fetching it.
+ * @returns current repository state.
+ */
+abstract inspect(): Promise<SourceRepositorySnapshot>
+
+/**
+ * Materialize the configured source capsule or official repository.
+ * @returns the ready repository and unchanged-runtime receipt.
+ */
+abstract initialize(): Promise<SourceRepositoryMutationReceipt>
+
+/**
+ * Fetch the configured official branch without integrating it.
+ * @returns the refreshed repository and unchanged-runtime receipt.
+ */
+abstract fetchOfficial(): Promise<SourceRepositoryMutationReceipt>
+
+/**
+ * Fetch and integrate the configured official branch.
+ * @param strategy - normal merge or fast-forward-only integration.
+ * @returns the updated repository and unchanged-runtime receipt.
+ */
+abstract updateOfficial(strategy: SourceUpdateStrategy): Promise<SourceRepositoryMutationReceipt>
+
+/**
+ * Configure the user-owned push remote.
+ * @param url - credential-free Git remote URL.
+ * @returns the repository with the configured user remote.
+ */
+abstract configureUserRemote(url: string): Promise<SourceRepositoryMutationReceipt>
+
+/**
+ * Push committed customization to the configured user remote without force.
+ * @param branch - destination branch; absent uses the current branch.
+ * @returns the repository after the push.
+ */
+abstract pushUser(branch?: string): Promise<SourceRepositoryMutationReceipt>
+```
+
+Source: [`packages/extensions/source-repository/src/index.ts:22`](../../packages/extensions/source-repository/src/index.ts)
+
 <a id="cordis-events"></a>
 
 ### `cordis/*` events
@@ -361,4 +447,25 @@ A pending Client activation request left the answerable state.
 ```
 
 Source: [`packages/extensions/cordis-host-runner/src/types.ts:373`](../../packages/extensions/cordis-host-runner/src/types.ts)
+
+<a id="profile-plugins-events"></a>
+
+### `profile-plugins/*` events
+
+<a id="profile-pluginschanged--parallel"></a>
+
+#### `profile-plugins/changed` — parallel
+
+One profile's package graph and reconciled bundle list changed.
+
+```ts cordis-catalog
+/**
+ * One profile's package graph and reconciled bundle list changed.
+ * @param profile - profile name whose inputs are ready to recompose.
+ * @mode parallel
+ */
+'profile-plugins/changed'(profile: string): Promise<void> | void
+```
+
+Source: [`packages/extensions/profile-plugins/src/types.ts:44`](../../packages/extensions/profile-plugins/src/types.ts)
 <!-- END GENERATED cordis-surface -->

@@ -7,7 +7,8 @@
  */
 
 import { pathToFileURL } from 'node:url'
-import { readFileSync } from 'node:fs'
+import { readFileSync, unwatchFile, watchFile } from 'node:fs'
+import { createRequire } from 'node:module'
 import { parseEnv } from 'node:util'
 import { basename, dirname, isAbsolute, resolve } from 'node:path'
 import * as yaml from 'js-yaml'
@@ -29,6 +30,7 @@ declare module '@deepseek-ai/cordis' {
 }
 
 export {
+  anchorProfilePackageSpec,
   composeEntries,
   DEFAULT_PROFILE_BUNDLES,
   healProfilesModuleFallback,
@@ -38,13 +40,16 @@ export {
   PROFILE_TEMPLATES,
   PROFILES_DIR,
   readProfileManifest,
+  reconcileProfileBundles,
   resolveBundleDir,
+  resolveProfilePackageDir,
   resolveProfileDir,
   writeProfileManifest,
   type DshBundleManifest,
   type DshManifestSection,
   type DshProfileManifest,
   type Profile,
+  type ProfileBundleReconciliation,
   type ProfileLayer,
   type ProfileManifest,
 } from './profile.ts'
@@ -198,6 +203,8 @@ export function loadLayeredEnv(
 }
 
 const bootstrapIncludes = new WeakMap<Context, Entry>()
+const portableConfigWatchPaths = new WeakMap<Context, Set<string>>()
+const bootPatchRefreshTails = new WeakMap<Context, Promise<void>>()
 
 // The include's YAML dialect (`!!js` scalars become expression nodes the
 // Loader interpolates against each entry's injection-ready context), imported
@@ -222,46 +229,153 @@ export interface UserPatchWatchOptions {
   compose?: (userPatches: PatchOptions[]) => PatchOptions[]
 }
 
+/** Options for one effect-owned exact-file config watcher. */
+export interface ConfigPathWatchOptions {
+  /** Absolute file path to observe, including an initially absent file. */
+  filename: string
+  /** Transactional refresh invoked after the path changes. */
+  refresh: () => Promise<void>
+}
+
 /**
- * Watch the user patch layer through Cordis HMR and transactionally reapply it to the boot include.
- * @param ctx - settled app context containing the root Include and an active HMR service.
+ * Reapply a complete patch composition to the root Include entry.
+ * @param ctx - settled app context containing the root Include.
+ * @param binName - diagnostic prefix when the root Include is absent.
+ * @param compose - fresh complete patch list for this generation.
+ * @returns after the Include transaction settles.
+ */
+export async function refreshBootPatches(
+  ctx: Context,
+  binName: string,
+  compose: () => PatchOptions[],
+): Promise<void> {
+  const entry = bootstrapIncludes.get(ctx)
+  if (entry === undefined) throw new Error(`${binName}: patch refresh requires the root Include entry`)
+  const previous = bootPatchRefreshTails.get(ctx) ?? Promise.resolve()
+  const refresh = previous.then(async () => {
+    const { patches: _previousPatches, ...includeConfig } = entry.options.config as Include.Config
+    await entry.update({
+      config: {
+        ...includeConfig,
+        patches: compose(),
+      },
+    })
+  })
+  bootPatchRefreshTails.set(ctx, refresh.then(() => {}, () => {}))
+  await refresh
+}
+
+/**
+ * Watch an exact config input through Cordis HMR or the portable polling fallback.
+ * @param ctx - effect owner and failure-event dispatcher.
+ * @param options - path and refresh callback.
+ * @returns an asynchronous disposer after the watcher is ready.
+ */
+export async function watchConfigPath(
+  ctx: Context,
+  options: ConfigPathWatchOptions,
+): Promise<() => Promise<void>> {
+  const hmr = ctx.get('hmr')
+  const register = hmr === undefined
+    ? registerPortableConfigWatch(ctx, options.filename, options.refresh)
+    : hmr.registerConfig(options.filename, options.refresh)
+  try {
+    return await register
+  } catch (error) {
+    if ((error as { code?: string } | null)?.code === 'INACTIVE_EFFECT') return async () => {}
+    throw error
+  }
+}
+
+/**
+ * Watch the user patch layer and transactionally reapply it to the boot include. Cordis HMR owns
+ * the watcher when available; embedded runtimes without Node's internal ESM loader use a portable
+ * exact-file polling watcher with the same serialized refresh and failure event behavior.
+ * @param ctx - settled app context containing the root Include and an optional HMR service.
  * @param options - diagnostic, file, and patch-composition inputs.
  * @returns an asynchronous disposer after the exact-path watcher is ready.
- * @throws when HMR or the root Include is absent, watcher setup fails, or initial path resolution fails.
+ * @throws when the root Include is absent, the path is already watched, or watcher setup fails.
  */
 export async function watchUserPatches(
   ctx: Context,
   options: UserPatchWatchOptions,
 ): Promise<() => Promise<void>> {
   const { binName, filename, compose = (patches: PatchOptions[]) => patches } = options
-  const hmr = ctx.get('hmr')
-  if (hmr === undefined) throw new Error(`${binName}: user patch-layer watching requires the Cordis HMR service`)
   const entry = bootstrapIncludes.get(ctx)
   if (entry === undefined) throw new Error(`${binName}: user patch-layer watching requires the root Include entry`)
-  const register = hmr.registerConfig(filename, async () => {
+  const refresh = async (): Promise<void> => {
     // Re-read the include's non-patch options per refresh: a writer that
     // updates the root Include's other options between refreshes (none exists
     // today) must not have them silently reverted by a user-layer reload.
-    const { patches: _previousPatches, ...includeConfig } = entry.options.config as Include.Config
     const userPatches = loadOptionalPatches(binName, filename) ?? []
-    const patches = compose(userPatches)
-    await entry.update({
-      config: {
-        ...includeConfig,
-        patches,
-      },
-    })
-  })
-  try {
-    return await register
-  } catch (error) {
-    // A surface can dispose the whole tree while the watcher is still opening;
-    // the HMR effect registration then fails with INACTIVE_EFFECT. That is the
-    // app exiting exactly as asked, not a watch failure, so return a no-op
-    // disposer instead of crashing.
-    if ((error as { code?: string } | null)?.code === 'INACTIVE_EFFECT') return async () => {}
-    throw error
+    await refreshBootPatches(ctx, binName, () => compose(userPatches))
   }
+  return watchConfigPath(ctx, { filename, refresh })
+}
+
+/**
+ * Register an exact-file polling watcher for runtimes where Cordis HMR cannot start.
+ * Refreshes are coalesced and serialized; disposal closes notifications before awaiting the
+ * last refresh so no late callback escapes the owning fiber.
+ * @param ctx - effect owner and failure-event dispatcher.
+ * @param filename - absolute file path to observe, including an initially absent file.
+ * @param refresh - transactional refresh callback.
+ * @returns the effect-owned asynchronous disposer.
+ */
+function registerPortableConfigWatch(
+  ctx: Context,
+  filename: string,
+  refresh: () => Promise<void>,
+): () => Promise<void> {
+  const absoluteFilename = resolve(filename)
+  const watchedPaths = portableConfigWatchPaths.get(ctx) ?? new Set<string>()
+  portableConfigWatchPaths.set(ctx, watchedPaths)
+  return ctx.effect(() => {
+    if (watchedPaths.has(absoluteFilename)) {
+      throw new Error(`config path already registered: ${absoluteFilename}`)
+    }
+    let closing = false
+    let pending = false
+    let running: Promise<void> | undefined
+    const schedule = (): void => {
+      if (closing) return
+      if (running !== undefined) {
+        pending = true
+        return
+      }
+      const task = (async () => {
+        try {
+          await refresh()
+        } catch (reason) {
+          const error = reason instanceof Error ? reason : new Error(String(reason), { cause: reason })
+          ctx.logger.warn('config reload at %C failed', absoluteFilename)
+          ctx.logger.warn(error)
+          try {
+            await ctx.parallel('hmr/config-update-failed', absoluteFilename, error)
+          } catch (rejection) {
+            ctx.logger.warn(rejection)
+          }
+        }
+      })().finally(() => {
+        running = undefined
+        if (pending && !closing) {
+          pending = false
+          schedule()
+        }
+      })
+      running = task
+    }
+    const listener = (): void => { schedule() }
+    watchFile(absoluteFilename, { interval: 100 }, listener)
+    watchedPaths.add(absoluteFilename)
+    schedule()
+    return async () => {
+      closing = true
+      watchedPaths.delete(absoluteFilename)
+      unwatchFile(absoluteFilename, listener)
+      await running
+    }
+  }, `app-boot: watch ${absoluteFilename}`)
 }
 
 /**
@@ -489,19 +603,23 @@ export async function mountRootInclude(
   patches: readonly PatchOptions[] = [],
   bareModuleBaseUrl?: string,
 ): Promise<Entry | undefined> {
-  ctx.loader.builtins.include = bareModuleBaseUrl === undefined
-    ? Include
-    : class HostResolvedRootInclude extends Include {
+  if (bareModuleBaseUrl === undefined) {
+    ctx.loader.builtins.include = Include
+  } else {
+    const hostRequire = createRequire(bareModuleBaseUrl)
+    ctx.loader.builtins.include = class HostResolvedRootInclude extends Include {
       override import(name: string, getOuterStack?: () => string[]): unknown {
         const specifier = isAbsolute(name) ? pathToFileURL(name).href : name
         if (name.startsWith('.') || name.startsWith('cordis:')) return super.import(specifier, getOuterStack)
         const internal = this.ctx.loader.internal
-        /* v8 ignore next -- Node supplies the internal loader; this preserves the
-           original diagnostic for hypothetical embedders without it. */
-        if (internal === undefined) return super.import(specifier, getOuterStack)
-        return internal.import(specifier, bareModuleBaseUrl, {})
+        if (internal !== undefined) return internal.import(specifier, bareModuleBaseUrl, {})
+        if (isAbsolute(name)) return import(specifier)
+        // Electron does not expose Node's internal ESM loader. Resolve through
+        // the installed host's package tree, then import the selected export.
+        return import(pathToFileURL(hostRequire.resolve(name)).href)
       }
     }
+  }
   // `cordis:group` alongside it: a group row is how a composition gives one
   // `isolate` realm to a provider and its consumers together, and an agent
   // preset living outside this workspace cannot resolve `@deepseek-ai/cordis-plugin-group`

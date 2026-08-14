@@ -24,7 +24,9 @@ import { ZH_BROWSER_LOCALE, saveFailureShot } from './support.ts'
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/settings-chrome', import.meta.url))
 const DIALOG_EXPECTED = join(SNAPSHOT_DIR, 'dialog.expected.md')
 const PLUGINS_EXPECTED = join(SNAPSHOT_DIR, 'plugins.expected.md')
+const SOURCE_EXPECTED = join(SNAPSHOT_DIR, 'source.expected.md')
 const PLUGIN_ROW_SELECTOR = '[data-plugin-entry$="ui-settings"]'
+const SOURCE_SELECTOR = '[data-source-evolution]'
 const MODE = webSnapshotMode()
 
 describe('web e2e: settings modal and General preferences', () => {
@@ -35,7 +37,8 @@ describe('web e2e: settings modal and General preferences', () => {
 
   beforeAll(async () => {
     scaffold = await launchWebScaffold({})
-    browser = await chromium.launch()
+    const executablePath = process.env.DSH_PLAYWRIGHT_EXECUTABLE_PATH
+    browser = await chromium.launch(executablePath === undefined ? {} : { executablePath })
     // Chinese browser: the shared page asserts the localized settings surface
     // the client derives from it (the English default has its own spec below).
     page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
@@ -94,12 +97,15 @@ describe('web e2e: settings modal and General preferences', () => {
     await dialog.getByRole('button', { name: '模型' }).click()
     await expect.poll(() => dialog.getByRole('button', { name: '模型' }).getAttribute('aria-current'), { timeout: 5_000 }).toBe('true')
     expect(await dialog.getByRole('button', { name: '通用设置' }).getAttribute('aria-current')).toBeNull()
-    // Plugins is a read-only projection of the same assembled Loader tree.
-    // Capture one stable shipped row rather than the whole inventory so adding
-    // an unrelated plugin does not rewrite this surface's golden.
+    // The plugin center combines the active profile package graph with the
+    // assembled Loader tree. Capture one stable shipped runtime row rather
+    // than the whole inventory so unrelated plugins do not rewrite the golden.
     await dialog.getByRole('button', { name: '插件', exact: true }).click()
     await dialog.getByRole('heading', { name: '插件', exact: true }).waitFor({ timeout: 10_000 })
-    await dialog.getByRole('tab', { name: '插件列表', exact: true }).click()
+    await dialog.getByRole('tab', { name: '插件中心', exact: true }).click()
+    await dialog.getByRole('heading', { name: '安装扩展', exact: true }).waitFor({ timeout: 10_000 })
+    await dialog.getByRole('heading', { name: '配置档扩展', exact: true }).waitFor({ timeout: 10_000 })
+    await dialog.getByRole('heading', { name: '当前运行时', exact: true }).waitFor({ timeout: 10_000 })
     const pluginRow = dialog.locator(PLUGIN_ROW_SELECTOR)
     await pluginRow.waitFor({ timeout: 10_000 })
     const expectedPluginCount = [...scaffold.ctx.loader.entries()]
@@ -110,7 +116,7 @@ describe('web e2e: settings modal and General preferences', () => {
     expect(await dialog.locator('[data-plugin-count]').getAttribute('data-plugin-count'))
       .toBe(String(expectedPluginCount))
     expect(await dialog.getByRole('button', { name: '插件', exact: true }).getAttribute('aria-current')).toBe('true')
-    expect(await dialog.getByRole('tab', { name: '插件列表', exact: true }).getAttribute('aria-selected')).toBe('true')
+    expect(await dialog.getByRole('tab', { name: '插件中心', exact: true }).getAttribute('aria-selected')).toBe('true')
     expect(await dialog.getByRole('button', { name: '模型' }).getAttribute('aria-current')).toBeNull()
     const pluginsSnapshot = await captureStableAria(
       page,
@@ -118,6 +124,19 @@ describe('web e2e: settings modal and General preferences', () => {
       scaffold.workspaceCwd,
     )
     await compareOrRefreshGolden(PLUGINS_EXPECTED, pluginsSnapshot, MODE)
+    // The managed source tab is backed by the same privileged evolution
+    // Remote on Web and Desktop. The isolated scaffold starts without a
+    // checkout, so this snapshot proves the non-destructive initialization
+    // state without performing network or repository mutations.
+    await dialog.getByRole('tab', { name: '源码与更新', exact: true }).click()
+    const source = dialog.locator(SOURCE_SELECTOR)
+    await source.waitFor({ timeout: 10_000 })
+    await dialog.getByRole('heading', { name: '源码工作区尚未初始化', exact: true }).waitFor({ timeout: 10_000 })
+    expect(await dialog.getByRole('button', { name: '初始化源码', exact: true }).count()).toBe(1)
+    expect(await dialog.getByRole('tab', { name: '源码与更新', exact: true }).getAttribute('aria-selected')).toBe('true')
+    expect(await dialog.getByRole('tab', { name: '插件中心', exact: true }).getAttribute('aria-selected')).toBe('false')
+    const sourceSnapshot = await captureStableAria(page, SOURCE_SELECTOR, scaffold.workspaceCwd)
+    await compareOrRefreshGolden(SOURCE_EXPECTED, sourceSnapshot, MODE)
     // Close path 1: Escape.
     await page.keyboard.press('Escape')
     await expect.poll(() => page.getByRole('dialog', { name: '设置' }).count(), { timeout: 5_000 }).toBe(0)
@@ -480,6 +499,6 @@ describe('web e2e: settings modal and General preferences', () => {
 
   it.skipIf(MODE === 'record')('keeps the fixture inventory closed', async () => {
     expect(tripwire.warnings).toEqual([])
-    await assertFixtureInventory(SNAPSHOT_DIR, ['dialog.expected.md', 'plugins.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['dialog.expected.md', 'plugins.expected.md', 'source.expected.md'])
   })
 })

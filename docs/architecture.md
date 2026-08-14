@@ -16,13 +16,13 @@ There is no privileged core to patch: you extend dsh by mounting a plugin beside
 
 A running `dsh` is a plugin tree composed at boot from ordered layers.
 
-A **profile** is a named composition stored in the Harness home. It lists the bundles it stacks, holds any out-of-tree plugins it installs, and keeps the user's own `cordis.patch.yml`. `web` and `headless` ship as templates.
+A **profile** is a named composition stored in the Harness home. It lists the bundles it stacks, holds any out-of-tree plugins it installs, and keeps the user's own `cordis.patch.yml`. `web`, `desktop`, and `headless` ship as templates.
 
 A **bundle** is a distribution format for Cordis config rows and the code they mount, so whatever it inserts stays patchable by the layers above it.
 
 Each declares itself in its own `package.json` under a `dsh` field: `dsh.profile` lists a profile's bundles, and `dsh.bundle` points at a bundle's patch file.
 
-[`dsh-base`](../packages/bundle/base/README.md) is the first layer of every profile: model adapters, tools, persistence, sandbox and approval policy, settings, credentials, telemetry. [`dsh-web-app`](../packages/bundle/web-app/README.md) adds the browser application; [`dsh-headless`](../packages/bundle/headless/README.md) adds a one-shot runner with no server at all.
+[`dsh-base`](../packages/bundle/base/README.md) is the first layer of every profile: model adapters, tools, persistence, sandbox and approval policy, settings, credentials, telemetry. [`dsh-web-app`](../packages/bundle/web-app/README.md) adds the shared GUI roster and browser carrier. [`dsh-desktop-app`](../packages/bundle/desktop-app/README.md) layers over it to retain the same Host/Client graph while replacing browser startup and HTTP/WebSocket carriage with Electron's zero-port `dsh://app` custom protocol. [`dsh-headless`](../packages/bundle/headless/README.md) adds a one-shot runner with no server at all.
 
 Layers apply to an empty entry list in this order: each bundle in the profile's listed order, then the profile's `cordis.patch.yml`, then the home-level one, then any `--patch` overlay. A patch targets a row by id and replaces its whole config, or inserts new rows.
 
@@ -35,6 +35,14 @@ dsh --profile web --dump-config
 Any row it prints can be replaced by a patch of your own.
 
 Composition mechanics are in [app-boot](../packages/boot/app-boot/README.md#profiles); config fields are in the generated [config catalog](config-catalog.md).
+
+## Managed source and profile evolution
+
+The GUI profiles mount two management capabilities without introducing a second extension format. `ctx.sourceRepository` owns a complete Git working copy under the Harness home: `upstream` is the configurable fetch-only official repository, while `origin` is an explicitly configured user-owned push target. `ctx.profilePlugins` owns the active profile's dependency set and reconciles installed packages that export `dsh.bundle` into the profile's ordered bundle list.
+
+The privileged `evolution` Remote projects those capabilities into the Web and Desktop settings surfaces. Browser access remains loopback-only, while Desktop uses the internal `dsh://app` origin. Package changes trigger a fresh profile composition; source fetch, merge, and push operations change only the managed working copy in the current implementation. They do not change the active Host or Client runtime until a verified runtime generation is built and activated.
+
+The complete design for source capsules, separated official and user remotes, immutable runtime generations, rollback, safe mode, and future catalog policy is recorded in the [live-source desktop evolution proposal](../.agents/notes/proposed/architecture/2026-08-14-live-source-desktop-evolution.md).
 
 ## Core packages
 

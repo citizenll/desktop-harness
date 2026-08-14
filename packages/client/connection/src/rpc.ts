@@ -54,6 +54,15 @@ export interface HostConnectionRpc {
 
 /** Host `ctx.connection` shape consumed by transport-independent adapters. */
 export interface HostConnectionHandle {
+  /**
+   * Dispatch one already-authorized Request through the Connection registry.
+   * Browser carriers must apply their Host/origin policy before calling this
+   * method; same-process carriers establish trust by controlling who can reach
+   * the adapter itself.
+   * @param request - request whose pathname selects `/api` or a dedicated RPC channel.
+   * @returns the channel response, or 404 when no channel owns the pathname.
+   */
+  fetch(request: Request): Promise<Response>
   /** Generic RPC channel registry. */
   readonly rpc: HostConnectionRpc
 }

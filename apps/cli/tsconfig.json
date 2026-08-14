@@ -24,6 +24,9 @@
       "path": "../../packages/boot/cmdline"
     },
     {
+      "path": "../../packages/extensions/profile-plugins"
+    },
+    {
       "path": "../../packages/bundle/base"
     },
     {

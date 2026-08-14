@@ -2,10 +2,12 @@
  * Node half of the client module system (`dsh.client` dual-face package): scans
  * the host Loader's entries for packages declaring `dsh.client`, composes the
  * `window.__DSH_BOOT__` entry graph (wire single source: {@link WebBootEntry}
- * in `./client/manifest.ts`), serves `/plugins/<id>/client.js` and its source
- * map, taps the index render to inject the boot manifest, and provides the
- * `clientModuleHost` service (the HMR node half's registration/notification
- * face).
+ * in `./client/manifest.ts`), and provides the `clientModules` service (the HMR
+ * node half's registration/notification face). When an HTTP carrier is
+ * composed, this package also serves `/plugins/<id>/client.js` plus its source
+ * map and taps the index render to inject the boot manifest. Other
+ * applications consume {@link ClientModuleRegistry.graph} and
+ * {@link ClientModuleRegistry.clientPath} through their own carrier.
  *
  * Scanning is incremental per package — there is no full-rescan code path.
  * Every cordis `internal/plugin` emission (fiber construction/disposal) marks
@@ -38,7 +40,7 @@ export type {
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
-    /** The web plugin table (provided by the client-modules node half). */
+    /** The client plugin graph and resolved bundle table. */
     clientModules: ClientModuleRegistry
   }
 }
@@ -166,8 +168,7 @@ function graphRow(id: string, rev: string, injectEdges: string[] | undefined, im
  * @returns the html with the graph script injected.
  */
 export function injectBootManifest(html: string, graph: WebBootGraph): string {
-  const json = JSON.stringify(graph).replaceAll('<', '\\u003c')
-  const script = `<script>window.__DSH_BOOT__ = ${json}</script>`
+  const script = `<script>${serializeBootManifest(graph).trimEnd()}</script>`
   const head = html.indexOf('<head>')
   if (head !== -1) return `${html.slice(0, head + 6)}${script}${html.slice(head + 6)}`
   // Headless fixture pages may lack <head>; prepending keeps the read-before-shell ordering.
@@ -175,14 +176,26 @@ export function injectBootManifest(html: string, graph: WebBootGraph): string {
 }
 
 /**
- * The web plugin table service: incremental `dsh.client` scan + wire composition
- * + bundle route + index tap. Construction runs the activation scan
- * synchronously — a malformed declaration or missing bundle among the
- * already-loaded entries aggregates into one loud throw (FAILED fiber; the
- * boot activation audit reports it).
+ * Serialize the boot graph as an external-script body. `<` is escaped so a
+ * package-controlled id cannot terminate a surrounding script element when a
+ * carrier chooses to inline the result.
+ * @param graph - the composed client entry graph.
+ * @returns JavaScript assigning the graph to `window.__DSH_BOOT__`.
+ */
+export function serializeBootManifest(graph: WebBootGraph): string {
+  const json = JSON.stringify(graph).replaceAll('<', '\\u003c')
+  return `window.__DSH_BOOT__ = ${json};\n`
+}
+
+/**
+ * The client plugin table service: incremental `dsh.client` scan and wire
+ * composition, plus the optional browser HTTP adapter. Construction runs the
+ * activation scan synchronously — a malformed declaration or missing bundle
+ * among the already-loaded entries aggregates into one loud throw (FAILED
+ * fiber; the boot activation audit reports it).
  */
 export class ClientModuleRegistry extends Service {
-  static inject = ['webServer', 'loader']
+  static inject = ['loader']
 
   private readonly table = new Map<string, WebPluginRecord>()
   // Negative verdicts (unresolvable specifier — builtins like cordis:include,
@@ -198,7 +211,7 @@ export class ClientModuleRegistry extends Service {
 
   /**
    * Build the service: subscribe, seed, and run the activation flush.
-   * @param ctx - plugin context carrying webServer and loader.
+   * @param ctx - plugin context carrying Loader and optionally an HTTP carrier.
    */
   constructor(ctx: Context) {
     super(ctx, 'clientModules')
@@ -238,14 +251,16 @@ export class ClientModuleRegistry extends Service {
       throw new ClientPackageCompositionError(failures)
     }
 
-    ctx.effect(
-      () => ctx.webServer.register({ kind: 'prefix', path: '/plugins', handler: this.serveBundle }),
-      'client-modules: bundle route',
-    )
-    ctx.effect(
-      () => ctx.webServer.tapIndex(html => injectBootManifest(html, this.composed)),
-      'client-modules: boot manifest injection',
-    )
+    ctx.inject(['webServer'], (httpCtx) => {
+      httpCtx.effect(
+        () => httpCtx.webServer.register({ kind: 'prefix', path: '/plugins', handler: this.serveBundle }),
+        'client-modules: bundle route',
+      )
+      httpCtx.effect(
+        () => httpCtx.webServer.tapIndex(html => injectBootManifest(html, this.composed)),
+        'client-modules: boot manifest injection',
+      )
+    })
   }
 
   /**

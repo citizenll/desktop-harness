@@ -12,8 +12,9 @@
  */
 
 import { writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { FiberState, type Context } from '@deepseek-ai/cordis'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import type { EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
@@ -26,10 +27,13 @@ import {
   loadOverlayPatches,
   loadProfile,
   PROFILE_PATCH_FILENAME,
+  refreshBootPatches,
+  watchConfigPath,
   watchUserPatches,
   type Profile,
 } from '@deepseek-ai/dsh-app-boot'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
+import type {} from '@deepseek-ai/dsh-profile-plugins/types'
 
 /** Shipped agent-preset root: beside this app's own config, in both source and built layouts. */
 const SHIPPED_PRESET_ROOT = fileURLToPath(new URL('../config/agent-presets/', import.meta.url))
@@ -225,6 +229,7 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
   })
 
   const rootConfig = join(composed.profile.dir, PROFILE_ROOT_FILENAME)
+  const profileRequire = createRequire(rootConfig)
   // Recomposition for the live user layers: bundle layers below, overlays
   // above, so a user edit can never displace them. Parsed app arguments are
   // not in here at all — they live in app-provided services that survive a
@@ -237,26 +242,30 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
   // objects in place. Reusing one parsed patch object across applications
   // would bake a user override into the bundle's in-memory insert row, so
   // removing the override could never revert the row to the bundle default.
-  const composeLive = (): PatchOptions[] => structuredClone([
-    ...composed.bundlePatches,
-    ...loadOptionalPatches(NAME, composed.profile.patchPath) ?? [],
-    ...loadOptionalPatches(NAME, homePatchPath()) ?? [],
-    ...composed.overlays,
-  ])
+  const composeLive = (): PatchOptions[] => structuredClone(allPatches(
+    composeProfile(options.profile, options.patchFiles),
+  ))
   // Cloned for the same insert-aliasing reason as composeLive: the boot
   // application must not mutate the objects later reloads recompose from.
-  const ctx = await boot(NAME, rootConfig, structuredClone(allPatches(composed)), (hostCtx) => {
-    app.current = hostCtx
-    // Before any config-tree entry mounts, so plugins resolve all launch-time
-    // environment values from the same immutable provenance snapshot.
-    hostCtx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, options.environment)
-    // The command line and bounded exit request are launcher facts available
-    // to every app plugin that injects the argument snapshot.
-    provideCmdline(hostCtx, {
-      args: options.args,
-      exit: code => void shutdown.shutdown(code),
-    })
-  })
+  const ctx = await boot(
+    NAME,
+    rootConfig,
+    structuredClone(allPatches(composed)),
+    (hostCtx) => {
+      app.current = hostCtx
+      hostCtx.provide('activeProfile', options.profile)
+      // Before any config-tree entry mounts, so plugins resolve all launch-time
+      // environment values from the same immutable provenance snapshot.
+      hostCtx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, options.environment)
+      // The command line and bounded exit request are launcher facts available
+      // to every app plugin that injects the argument snapshot.
+      provideCmdline(hostCtx, {
+        args: options.args,
+        exit: code => void shutdown.shutdown(code),
+      })
+    },
+    pathToFileURL(rootConfig).href,
+  )
   app.current = ctx
   // A surface can dispose the whole tree while boot or this post-boot watcher
   // setup is still in flight — a signal, or a fast one-shot's appExit. Loader
@@ -276,16 +285,33 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
       // live on every long-lived surface. A silent skip would break the
       // documented hot-reload contract. HMR injects the timer service, which a
       // bare custom profile may not mount either.
-      if (ctx.get('hmr') === undefined) {
+      if (ctx.get('hmr') === undefined && ctx.loader.internal !== undefined) {
+        const loaderName = (name: string): string => ctx.loader.internal === undefined
+          ? pathToFileURL(profileRequire.resolve(name)).href
+          : name
         if (ctx.get('timer') === undefined) {
-          await ctx.loader.create({ name: '@deepseek-ai/cordis-plugin-timer' })
+          await ctx.loader.create({ name: loaderName('@deepseek-ai/cordis-plugin-timer') })
         }
-        await ctx.loader.create({ name: '@deepseek-ai/cordis-plugin-hmr', config: { root: [] } })
+        await ctx.loader.create({ name: loaderName('@deepseek-ai/cordis-plugin-hmr'), config: { root: [] } })
       }
       await watchUserPatches(ctx, {
         binName: NAME,
         filename: composed.profile.patchPath,
         compose: composeLive,
+      })
+      const refreshProfile = async (): Promise<void> => {
+        await refreshBootPatches(ctx, NAME, composeLive)
+      }
+      await watchConfigPath(ctx, {
+        filename: join(composed.profile.dir, 'package.json'),
+        refresh: refreshProfile,
+      })
+      await watchConfigPath(ctx, {
+        filename: join(composed.profile.dir, 'pnpm-lock.yaml'),
+        refresh: refreshProfile,
+      })
+      ctx.on('profile-plugins/changed', async (profile) => {
+        if (profile === options.profile) await refreshProfile()
       })
       await watchUserPatches(ctx, {
         binName: NAME,

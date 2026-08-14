@@ -2,13 +2,15 @@
 
 English | [中文](README.zh.md)
 
-Read-only **Plugin list** tab for Web Settings. The browser plugin registers one localized `settings.plugins.tab` contribution with id `all`; the Plugins section owns the navigation entry and tab chrome. It performs no Remote read during plugin activation. Selecting the tab for the first time mounts it and lazily calls `ctx.remote.pluginInventory.list()` through [`api-remotes`](../../api/remotes/README.md).
+Browser Settings surface for profile extensions and managed Harness source. The plugin registers two lazy `settings.plugins.tab` contributions: **Plugin center** (`center`) and **Source & updates** (`source`). Activation performs no Remote reads; each component requests its current state only when the Plugins section mounts that tab. Both registrations use `ctx.slots.inject()`, so they follow late declaration, redeclaration, locale changes, and teardown without importing the section owner.
 
-The tab renders a searchable two-column catalog of compact disclosure cards. Each collapsed card uses the short module name as its title and a small effective-enablement tag; enabled entries also show a colored root-fiber status dot. Expanding one card reveals its Loader-tree entry id without a redundant field label, followed by the effective configuration and, for enabled entries, Cordis status. Disabled entries omit the redundant unmounted runtime state. The entry id remains the React key, disclosure identity, detail value, and an additional search target; it is never classified by string shape. Loading, empty, no-match, and generic failure states stay local to the mounted component, and a failed read can be retried without exposing transport details. The registration uses `ctx.slots.inject()`, so it follows late tab declaration, redeclaration, locale changes, and teardown without importing the section owner.
+The plugin center combines two existing authorities. `evolution/pluginsList` supplies installation-owned system bundles, mutable profile extension bundles, and installed libraries; `pluginInventory/list` supplies the current Cordis Loader entries and Fiber phases. Users may install an explicit npm, Git, tarball, or absolute filesystem package spec, update or remove mutable dependencies, and confirm removal before it executes. A successful package mutation has already recomposed the Host; the tab reloads the renderer so a changed Client roster is discovered. Load failures remain generic, while explicit mutation failures preserve the provider diagnostic needed to fix the package or repository input.
+
+The source tab shows missing, invalid, and ready repository states. It can initialize the packaged source capsule, fetch the official branch, integrate it by fast-forward-only or normal merge, configure a separate user-owned remote, and perform a normal non-force push. Dirty, detached, or in-progress repositories disable integration and publication controls. The interface states that successful source operations update the working copy only and do not yet switch the active runtime.
 
 ## Model Experience
 
-None, as this package only visualizes a Host-owned deployment snapshot in browser Settings and registers nothing model-facing.
+None, as this package only presents privileged Host configuration in browser Settings and registers nothing model-facing.
 
 #### KV Cache effect
 
@@ -16,5 +18,6 @@ None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 
-- **One snapshot per Settings mount or retry** — the tab does not subscribe to Loader changes or automatically refetch after reconnect; switching tabs preserves the current snapshot, while reopening Settings obtains a new one.
-- **Read-only Loader view** — local search does not add provenance, current-browser activation diagnosis, grouping by source, or plugin mutation controls.
+- **Explicit package specs only** — signed catalogs, publisher metadata, compatibility ranges, organization policy, reviews, and pricing are future catalog-provider work.
+- **Point-in-time Loader inventory** — the runtime list refreshes when Settings remounts or the client reloads; it does not subscribe to every Fiber transition.
+- **Source activation is deferred** — fetch, merge, and push are implemented, but verified generation build, atomic activation, rollback, and safe mode are not yet exposed by this Client package.

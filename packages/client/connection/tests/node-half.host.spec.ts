@@ -3,7 +3,7 @@ import { EventEmitter, once } from 'node:events'
 import { createServer, request as httpRequest } from 'node:http'
 import { PassThrough, Readable } from 'node:stream'
 import { Context } from '@deepseek-ai/cordis'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { AddressInfo } from 'node:net'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { ApiProxy } from '@deepseek-ai/dsh-host-apiproxy/api'
@@ -228,6 +228,9 @@ describe('connection node half', () => {
       calls.push({ endpoint, payload })
       return { ok: true, value: { accepted: true } }
     }, { authority: 'trusted-host' })
+    await vi.waitFor(() => {
+      expect(routes.some(candidate => candidate.path === '/rpc')).toBe(true)
+    })
     const route = routes.find(candidate => candidate.path === '/rpc')
     expect(route).toBeDefined()
 
@@ -252,7 +255,7 @@ describe('connection node half', () => {
 
     expect(() => connection.rpc.handle('/rpc', async () => ({ ok: true, value: null }), {
       authority: 'trusted-host',
-    })).toThrow(/duplicate route/)
+    })).toThrow(/already has a handler/)
     await remove()
     expect(routes.map(candidate => candidate.path)).toEqual([API_PATH])
     await fiber.dispose()
@@ -350,6 +353,9 @@ describe('connection node half', () => {
     }, {
       authority: 'trusted-host',
     })
+    await vi.waitFor(() => {
+      expect(routes.some(candidate => candidate.path === '/rpc')).toBe(true)
+    })
     const route = routes.find(candidate => candidate.path === '/rpc')!
 
     const denied = fakeResponse()
@@ -407,6 +413,9 @@ describe('connection node half', () => {
     const removeLoopback = connection.rpc.handle('/loopback', async () => ({ ok: true, value: null }), {
       authority: 'loopback',
     })
+    await vi.waitFor(() => {
+      expect(routes.some(candidate => candidate.path === '/loopback')).toBe(true)
+    })
     const loopbackRoute = routes.find(candidate => candidate.path === '/loopback')!
     const publicResponse = fakeResponse()
     await loopbackRoute.handler(fakePost({ host: 'harness.example' }, '/loopback/read', {
@@ -415,6 +424,45 @@ describe('connection node half', () => {
     expect(publicResponse.state.status).toBe(403)
     await removeLoopback()
     await remove()
+    await fiber.dispose()
+  })
+
+  it('dispatches dedicated channels without composing a listening server', async () => {
+    const ctx = new Context()
+    const fiber = ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    const connection = ctx.get('connection') as HostConnectionHandle
+    const remove = connection.rpc.handle('/rpc', async (endpoint, payload) => ({
+      ok: true,
+      value: { endpoint, payload },
+    }), { authority: 'loopback' })
+    const request: ClientRequest = {
+      type: 'client-request',
+      rpcId: RpcId('rpc-embedded'),
+      method: 'goals/create',
+      payload: { args: { agentId: 'agent-1' } },
+    }
+
+    const response = await connection.fetch(new Request('dsh://app/rpc/goals/create', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    }))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      type: 'server-response',
+      rpcId: 'rpc-embedded',
+      result: {
+        ok: true,
+        value: {
+          endpoint: 'goals/create',
+          payload: { args: { agentId: 'agent-1' } },
+        },
+      },
+    })
+
+    await remove()
+    expect((await connection.fetch(new Request('dsh://app/rpc/goals/create'))).status).toBe(404)
     await fiber.dispose()
   })
 })

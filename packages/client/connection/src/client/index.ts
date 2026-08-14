@@ -1,11 +1,12 @@
 /**
- * Browser wire client. The plugin selects fixture or HTTP transport, provides
- * the shared API client, and lets the runtime object layer start the stream
- * controller with its sinks.
+ * Renderer wire client. The plugin selects fixture, browser HTTP/WebSocket, or
+ * embedded custom-protocol fetch/SSE transport, provides the shared API client,
+ * and lets the runtime object layer start the stream controller with its sinks.
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { HostDescription, IApiClient } from './api.ts'
 import { ConnectionController, type ConnectionConfig, type ConnectionSinks, type ConnectionState } from './connection.ts'
+import { DESKTOP_ORIGIN, EmbeddedApiClient } from './embedded-api-client.ts'
 import { FixtureApiClient } from './fixture.ts'
 import { WebApiClient } from './web-api-client.ts'
 import { createWebConnectionRpc } from './rpc.ts'
@@ -35,6 +36,7 @@ export {
   AbstractApiClient,
   transportError,
 } from './api.ts'
+export { DESKTOP_ORIGIN, EmbeddedApiClient } from './embedded-api-client.ts'
 
 // Connection loop types are public through ConnectionHandle.start; the
 // controller remains package-internal.
@@ -58,7 +60,7 @@ export const inject: string[] = []
  * is ready — connection stays consumer-agnostic).
  */
 export interface ConnectionHandle {
-  /** Shared api client (fixture or real, decided at boot from the page URL). */
+  /** Shared api client (fixture, browser, or embedded, decided at boot from the page URL). */
   readonly api: IApiClient
   /** Whether the current page authority is loopback; non-browser contexts default to true. */
   readonly isLoopback: boolean
@@ -84,9 +86,10 @@ export interface ConnectionHandle {
 export function apply(ctx: Context): void {
   const pageLocation = typeof location === 'undefined' ? undefined : location
   const fixture = pageLocation !== undefined && new URLSearchParams(pageLocation.search).has('fixture')
+  const embedded = pageLocation?.protocol === 'dsh:'
   const fixtureClient = fixture ? new FixtureApiClient() : undefined
-  const api: IApiClient = fixtureClient ?? new WebApiClient()
-  const rpc = fixtureClient?.rpc ?? createWebConnectionRpc()
+  const api: IApiClient = fixtureClient ?? (embedded ? new EmbeddedApiClient() : new WebApiClient())
+  const rpc = fixtureClient?.rpc ?? createWebConnectionRpc(embedded ? DESKTOP_ORIGIN : undefined)
   let started = false
   let description: HostDescription | undefined
   const descriptionListeners = new Set<() => void>()
@@ -97,13 +100,13 @@ export function apply(ctx: Context): void {
       try {
         listener()
       } catch (error) {
-        console.error('[web-runtime] host-description listener threw:', error)
+        console.error('[client-runtime] host-description listener threw:', error)
       }
     }
   }
   const handle: ConnectionHandle = {
     api,
-    isLoopback: pageLocation === undefined || isLoopbackHostname(pageLocation.hostname),
+    isLoopback: pageLocation === undefined || embedded || isLoopbackHostname(pageLocation.hostname),
     hostDescription: {
       getSnapshot: () => description,
       subscribe: (listener) => {

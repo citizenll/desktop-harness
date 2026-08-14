@@ -120,6 +120,18 @@
         "tests/**/*.{ts,tsx}"
       ]
     },
+    "packages/host/evolution-control": {
+      "entry": [
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "zod"
+      ]
+    },
     "packages/client/web-ui": {
       "entry": [
         "tests/**/*.spec.{ts,tsx}"
@@ -356,6 +368,16 @@
       ]
     },
     "packages/util/brand": {
+      "project": [
+        "src/**/*.ts"
+      ]
+    },
+    "packages/extensions/profile-plugins": {
+      "project": [
+        "src/**/*.ts"
+      ]
+    },
+    "packages/extensions/source-repository": {
       "project": [
         "src/**/*.ts"
       ]
@@ -740,6 +762,19 @@
         "@deepseek-ai/.+"
       ]
     },
+    "apps/desktop": {
+      "entry": [
+        "src/main.ts",
+        "tests/**/*.spec.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
     "packages/client/modules": {
       "entry": [
         "tests/**/*.spec.ts"
@@ -769,6 +804,11 @@
       ]
     },
     "packages/bundle/base": {
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
+    },
+    "packages/bundle/desktop-app": {
       "ignoreDependencies": [
         "@deepseek-ai/.+"
       ]

@@ -190,6 +190,13 @@ flowchart LR
   pkg_lsp_local["lsp-local"]
   pkg_tool_lsp["tool-lsp"]
   svc_apiProxy["ctx.apiProxy<br/>Host API dispatch"]
+  pkg_source_repository["source-repository"]
+  svc_sourceRepository["ctx.sourceRepository<br/>Managed Harness source repository"]
+  pkg_source_repository_git["source-repository-git"]
+  pkg_evolution_control["evolution-control"]
+  pkg_profile_plugins["profile-plugins"]
+  svc_profilePlugins["ctx.profilePlugins<br/>Profile dependency management"]
+  pkg_profile_plugins_pnpm["profile-plugins-pnpm"]
   pkg_cordis_host_runner["cordis-host-runner"]
   svc_dynamicCordisRunner["ctx.dynamicCordisRunner<br/>Dynamic Cordis package host runner"]
   svc_cordisInspect["ctx.cordisInspect<br/>Dynamic Cordis inspect registry"]
@@ -237,6 +244,8 @@ flowchart LR
   pkg_modules --> svc_clientModules
   pkg_permission_presets --> svc_permissionPresets
   pkg_plan_mode --> svc_planMode
+  pkg_profile_plugins --> svc_profilePlugins
+  pkg_profile_plugins_pnpm --> svc_profilePlugins
   pkg_pwsh_local --> svc_shell
   pkg_sandbox --> svc_sandbox
   pkg_sandbox_local --> svc_sandbox
@@ -262,6 +271,8 @@ flowchart LR
   pkg_skill --> svc_skills
   pkg_skill_badge --> svc_skills
   pkg_skill_filesystem --> svc_skills
+  pkg_source_repository --> svc_sourceRepository
+  pkg_source_repository_git --> svc_sourceRepository
   pkg_spill --> svc_spillStore
   pkg_spill_local --> svc_spillStore
   pkg_storage --> svc_storage
@@ -328,6 +339,7 @@ flowchart LR
   svc_llm --> pkg_agent_loop
   svc_llm --> pkg_compaction_basic
   svc_lsp --> pkg_tool_lsp
+  svc_profilePlugins --> pkg_evolution_control
   svc_sandbox --> pkg_bash_sandbox
   svc_sandbox --> pkg_terminal_bash
   svc_sandboxPolicy --> pkg_bash_sandbox
@@ -364,6 +376,7 @@ flowchart LR
   svc_shellEnv --> pkg_tool_bash
   svc_shellEnv --> pkg_tool_pwsh
   svc_skills --> pkg_tool_skill
+  svc_sourceRepository --> pkg_evolution_control
   svc_spillStore --> pkg_spill_policy
   svc_storage --> pkg_storage_domain
   svc_storageDomain --> pkg_message_feedback
@@ -465,6 +478,8 @@ flowchart LR
 | `ctx.workflowEngine` | `seam` | [`workflow`](../packages/workflow/workflow) | [`workflow-worker-thread`](../packages/workflow/workflow-worker-thread) | [`tool-workflow`](../packages/workflow/tool-workflow), [`tool-ralph`](../packages/workflow/tool-ralph) | - | One engine per context, as in bash, with no named-provider registry; the general workflow and fixed Ralph consumers start runs whose agent() calls fan out through ctx.subagents. |
 | `ctx.lsp` | `seam` | [`lsp`](../packages/lsp/lsp) | `lsp-local` | [`tool-lsp`](../packages/lsp/tool-lsp) | - | Provider registration and selection plus normalized query execution over exactly four operations; the seam offers no protocol escape hatch, so a backend translates into the normalized request and result. |
 | `ctx.apiProxy` | `core` | `apiproxy` | - | `connection` | - | The transport-agnostic host gateway face: it dispatches browser API calls, and each open host stream subscribes to the events it forwards rather than being pushed to through a broadcast verb. |
+| `ctx.sourceRepository` | `seam` | [`source-repository`](../packages/extensions/source-repository) | [`source-repository-git`](../packages/extensions/source-repository-git) | `evolution-control` | - | The Git provider materializes the packaged source capsule, keeps official fetch and user push remotes separate, and owns bounded serialized repository mutations; the evolution gateway is the privileged GUI consumer. |
+| `ctx.profilePlugins` | `seam` | [`profile-plugins`](../packages/extensions/profile-plugins) | [`profile-plugins-pnpm`](../packages/extensions/profile-plugins-pnpm) | `evolution-control` | - | The pnpm provider manages only active-profile dependencies, reconciles dsh.bundle exports into the profile bundle list, and publishes recomposition events; the evolution gateway is the privileged GUI consumer. |
 | `ctx.dynamicCordisRunner` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | Owns the in-memory definition registry, the vm sandbox for host halves, and the request-run round trip; browser pages reach the same service over the wire through its remote namespace. |
 | `ctx.cordisInspect` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | Registers host inspect providers, mirrors the client provider manifest, and routes client queries through the dynamic Cordis transport. |
 

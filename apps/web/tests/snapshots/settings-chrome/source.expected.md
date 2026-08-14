@@ -1,0 +1,10 @@
+- paragraph: 这是可持续演化的 Harness 源码工作区。官方仓库只用于获取更新，你的定制仓库只用于推送。
+- heading "源码工作区尚未初始化" [level=3]
+- paragraph: 未找到内置源码胶囊，将从官方仓库克隆。
+- term: 工作区
+- definition:
+  - code: {{cwd}}\.dsh-home\source\deepseek-harness
+- term: 官方仓库
+- definition:
+  - code: https://github.com/deepseek-ai/deepseek-harness.git
+- button "初始化源码"

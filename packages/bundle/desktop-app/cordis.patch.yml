@@ -1,0 +1,36 @@
+# Electron reuses the browser GUI roster from dsh-web-app, then replaces only
+# the physical carrier and the bind-dependent interaction rows. The main
+# process serves the same dist, client bundles, RPC, and SSE streams through
+# dsh://app, so no listening socket or browser WebSocket adapter is mounted.
+
+- id: web-startup
+  disabled: true
+
+- id: webserver
+  disabled: true
+
+- id: web-runtime
+  disabled: true
+
+- id: client-hmr
+  disabled: true
+
+- id: directory-picker
+  disabled: true
+
+- id: connection
+  inject: []
+  config:
+    trustedHosts: []
+
+- insert:
+    - id: desktop-runtime
+      name: '@deepseek-ai/dsh-desktop-app'
+
+    # Desktop is local by construction, so the native interaction is fixed
+    # instead of sampling an HTTP bind address through directory-picker-auto.
+    - id: directory-picker-native
+      name: '@deepseek-ai/dsh-host-directory-picker-native'
+
+    - id: directory-picker-native-ui
+      name: '@deepseek-ai/dsh-client-ui-directory-picker-native'

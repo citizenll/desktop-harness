@@ -380,8 +380,8 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   },
   {
     key: 'clientModules',
-    summary: 'The web plugin table service: incremental `dsh.client` scan + wire composition + bundle route + index tap.',
-    description: 'The web plugin table service: incremental `dsh.client` scan + wire composition + bundle route + index tap. Construction runs the activation scan synchronously — a malformed declaration or missing bundle among the already-loaded entries aggregates into one loud throw (FAILED fiber; the boot activation audit reports it).',
+    summary: 'The client plugin table service: incremental `dsh.client` scan and wire composition, plus the optional browser HTTP adapter.',
+    description: 'The client plugin table service: incremental `dsh.client` scan and wire composition, plus the optional browser HTTP adapter. Construction runs the activation scan synchronously — a malformed declaration or missing bundle among the already-loaded entries aggregates into one loud throw (FAILED fiber; the boot activation audit reports it).',
     methods: [
       {
         signature: 'graph(): WebBootGraph',
@@ -964,6 +964,37 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'profilePlugins',
+    summary: 'Profile dependency manager.',
+    description: 'Profile dependency manager. Providers own package-manager execution, manifest reconciliation, limits, and mutation serialization.',
+    methods: [
+      {
+        signature: 'abstract list(): Promise<ProfilePluginsSnapshot>',
+        description: 'Inspect the current profile package composition.',
+        parameters: [],
+        returns: 'current system layers and installed user dependencies.',
+      },
+      {
+        signature: 'abstract install(spec: string): Promise<ProfilePluginMutationReceipt>',
+        description: 'Install one npm, Git, tarball, or absolute filesystem package spec.',
+        parameters: [{ name: 'spec', description: 'exact package-manager dependency spec.' }],
+        returns: 'the reconciled profile state.',
+      },
+      {
+        signature: 'abstract update(packageName: string): Promise<ProfilePluginMutationReceipt>',
+        description: 'Update one user-managed profile dependency to its latest available version.',
+        parameters: [{ name: 'packageName', description: 'dependency name from the profile manifest.' }],
+        returns: 'the reconciled profile state.',
+      },
+      {
+        signature: 'abstract remove(packageName: string): Promise<ProfilePluginMutationReceipt>',
+        description: 'Remove one user-managed profile dependency.',
+        parameters: [{ name: 'packageName', description: 'dependency name from the profile manifest.' }],
+        returns: 'the reconciled profile state.',
+      },
+    ],
+  },
+  {
     key: 'sandbox',
     summary: 'Abstract process-sandbox service.',
     description: 'Abstract process-sandbox service. confine must return enforcing argv or fail closed at wrap or runner-execution time; silent unconfined passthrough is forbidden. Functional probes arbitrate multi-runner chains and may be skipped for a sole candidate, whose own refusal remains the fail-closed end.',
@@ -1518,6 +1549,49 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Load and validate the winning candidate, passing its opaque discovery locator back to the provider. Cancellation is rechecked after selection, including cache hits, and raced against loading so an uncooperative provider cannot hang the caller.',
         parameters: [{ name: 'name', description: 'kebab-case skill name.' }, { name: 'options', description: 'view options; `scope` selects the viewing agent\'s layers, `cwd` selects workspace-sensitive skills, and `signal` cancels work.' }],
         returns: 'the full skill, including body content, or `undefined`.',
+      },
+    ],
+  },
+  {
+    key: 'sourceRepository',
+    summary: 'Managed source repository capability.',
+    description: 'Managed source repository capability. Providers own Git mechanics, command limits, source-capsule materialization, and mutation serialization.',
+    methods: [
+      {
+        signature: 'abstract inspect(): Promise<SourceRepositorySnapshot>',
+        description: 'Inspect the configured source root without materializing or fetching it.',
+        parameters: [],
+        returns: 'current repository state.',
+      },
+      {
+        signature: 'abstract initialize(): Promise<SourceRepositoryMutationReceipt>',
+        description: 'Materialize the configured source capsule or official repository.',
+        parameters: [],
+        returns: 'the ready repository and unchanged-runtime receipt.',
+      },
+      {
+        signature: 'abstract fetchOfficial(): Promise<SourceRepositoryMutationReceipt>',
+        description: 'Fetch the configured official branch without integrating it.',
+        parameters: [],
+        returns: 'the refreshed repository and unchanged-runtime receipt.',
+      },
+      {
+        signature: 'abstract updateOfficial(strategy: SourceUpdateStrategy): Promise<SourceRepositoryMutationReceipt>',
+        description: 'Fetch and integrate the configured official branch.',
+        parameters: [{ name: 'strategy', description: 'normal merge or fast-forward-only integration.' }],
+        returns: 'the updated repository and unchanged-runtime receipt.',
+      },
+      {
+        signature: 'abstract configureUserRemote(url: string): Promise<SourceRepositoryMutationReceipt>',
+        description: 'Configure the user-owned push remote.',
+        parameters: [{ name: 'url', description: 'credential-free Git remote URL.' }],
+        returns: 'the repository with the configured user remote.',
+      },
+      {
+        signature: 'abstract pushUser(branch?: string): Promise<SourceRepositoryMutationReceipt>',
+        description: 'Push committed customization to the configured user remote without force.',
+        parameters: [{ name: 'branch', description: 'destination branch; absent uses the current branch.' }],
+        returns: 'the repository after the push.',
       },
     ],
   },
@@ -2398,6 +2472,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'options', description: 'the full request. A LOOP-built request carries the process-local {@link markAgentLoopRequest} identity and arrives deep-frozen (mutation throws): its content is a pure function of the session log (the reconstructability Agent Note), so listeners read it, never rewrite it. Hand-built calls do not carry that marker; their messages already obey the immutable creation contract.' }],
   },
   {
+    name: 'profile-plugins/changed',
+    mode: 'parallel',
+    signature: '\'profile-plugins/changed\'(profile: string): Promise<void> | void',
+    summary: 'One profile\'s package graph and reconciled bundle list changed.',
+    description: 'One profile\'s package graph and reconciled bundle list changed.',
+    parameters: [{ name: 'profile', description: 'profile name whose inputs are ready to recompose.' }],
+  },
+  {
     name: 'session-telemetry/record',
     mode: 'waterfall',
     signature: '\'session-telemetry/record\'(record: SessionTelemetryRecord, next: () => SessionTelemetryRecord): SessionTelemetryRecord',
@@ -3158,6 +3240,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type InboxTarget = \'next-turn\' | \'next-step\';',
   },
   {
+    name: 'InvalidSourceRepositorySnapshot',
+    declaration: 'export interface InvalidSourceRepositorySnapshot {\n    readonly state: \'invalid\';\n    readonly root: string;\n    readonly reason: \'not-a-git-working-tree\';\n    readonly official: SourceRemoteView & {\n        readonly branch: string;\n    };\n}',
+  },
+  {
     name: 'InvariantFailure',
     declaration: 'export type InvariantFailure = (message: string) => never;',
   },
@@ -3454,6 +3540,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface MessageSourceMap {\n    user: {\n        kind: \'user\';\n    };\n    plugin: {\n        kind: \'plugin\';\n        plugin: string;\n    } & ContextFormed;\n    model: ModelMessageSource;\n    tool: ToolMessageSource;\n}',
   },
   {
+    name: 'MissingSourceRepositorySnapshot',
+    declaration: 'export interface MissingSourceRepositorySnapshot {\n    readonly state: \'missing\';\n    readonly root: string;\n    readonly capsuleAvailable: boolean;\n    readonly official: SourceRemoteView & {\n        readonly branch: string;\n    };\n}',
+  },
+  {
     name: 'ModelMessageSource',
     declaration: 'export interface ModelMessageSource extends AssistantProvenance {\n    kind: \'model\';\n}',
   },
@@ -3514,6 +3604,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type PreToolDecision = {\n    kind: \'allow\';\n} | {\n    kind: \'deny\';\n    reason: string;\n} | {\n    kind: \'ask\';\n    reason?: string;\n};',
   },
   {
+    name: 'ProfilePluginEntry',
+    declaration: 'export interface ProfilePluginEntry {\n    readonly packageName: string;\n    readonly requestedSpec: string | null;\n    readonly installedVersion: string | null;\n    readonly kind: ProfilePluginKind;\n    readonly active: boolean;\n    readonly mutable: boolean;\n}',
+  },
+  {
+    name: 'ProfilePluginKind',
+    declaration: 'export type ProfilePluginKind = \'system-bundle\' | \'extension-bundle\' | \'library\';',
+  },
+  {
+    name: 'ProfilePluginMutationReceipt',
+    declaration: 'export interface ProfilePluginMutationReceipt {\n    readonly plugins: ProfilePluginsSnapshot;\n    readonly activation: \'host-recomposed\';\n}',
+  },
+  {
+    name: 'ProfilePluginsSnapshot',
+    declaration: 'export interface ProfilePluginsSnapshot {\n    readonly profile: string;\n    readonly profileDir: string;\n    readonly entries: readonly ProfilePluginEntry[];\n}',
+  },
+  {
     name: 'ProjectionChangeListener',
     declaration: 'export type ProjectionChangeListener = (session: Session, key: Extract<keyof SessionProjectionMap, string>, value: unknown, seq: number) => void;',
   },
@@ -3564,6 +3670,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ReadResultView',
     declaration: 'export interface ReadResultView {\n    card: \'read\';\n    title?: string;\n    path: string;\n    offset: number;\n    lines: ReadFileLine[];\n    totalLines: number;\n    lang?: string;\n    content?: ContentBlock[];\n}',
+  },
+  {
+    name: 'ReadySourceRepositorySnapshot',
+    declaration: 'export interface ReadySourceRepositorySnapshot {\n    readonly state: \'ready\';\n    readonly root: string;\n    readonly branch: string | null;\n    readonly head: SourceCommitId;\n    readonly clean: boolean;\n    readonly operation: SourceRepositoryOperation | null;\n    readonly official: SourceRemoteView & {\n        readonly branch: string;\n    };\n    readonly user: SourceRemoteView | null;\n    readonly ahead: number | null;\n    readonly behind: number | null;\n}',
   },
   {
     name: 'ReasoningBlock',
@@ -4060,6 +4170,30 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SkillViewOptions',
     declaration: 'export interface SkillViewOptions extends SkillLookupOptions {\n    readonly scope?: ScopeKey | undefined;\n}',
+  },
+  {
+    name: 'SourceCommitId',
+    declaration: 'export type SourceCommitId = Branded<\'SourceCommitId\'>;',
+  },
+  {
+    name: 'SourceRemoteView',
+    declaration: 'export interface SourceRemoteView {\n    readonly name: string;\n    readonly url: string;\n}',
+  },
+  {
+    name: 'SourceRepositoryMutationReceipt',
+    declaration: 'export interface SourceRepositoryMutationReceipt {\n    readonly repository: ReadySourceRepositorySnapshot;\n    readonly runtime: \'unchanged\';\n}',
+  },
+  {
+    name: 'SourceRepositoryOperation',
+    declaration: 'export type SourceRepositoryOperation = \'merge\' | \'rebase\' | \'cherry-pick\' | \'revert\';',
+  },
+  {
+    name: 'SourceRepositorySnapshot',
+    declaration: 'export type SourceRepositorySnapshot = MissingSourceRepositorySnapshot | InvalidSourceRepositorySnapshot | ReadySourceRepositorySnapshot;',
+  },
+  {
+    name: 'SourceUpdateStrategy',
+    declaration: 'export type SourceUpdateStrategy = \'merge\' | \'ff-only\';',
   },
   {
     name: 'SpillLocator',

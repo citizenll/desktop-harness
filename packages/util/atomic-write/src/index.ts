@@ -3,10 +3,12 @@
  * `writeFileAtomic` writes a random-suffix sibling with exclusive create and
  * the caller's permission bits, then renames it over the target, so readers
  * observe either the old or the new complete content and a replaced file ends
- * up with exactly the stated mode. `withFileLock` serializes cross-process
- * writers of one file through a `wx`-created `<file>.lock` sibling, so a
- * read-modify-write cycle can never resurrect a state another writer just
- * replaced; readers stay lock-free because the rename commit is atomic.
+ * up with exactly the stated mode. Windows replacement retries bounded
+ * `EACCES`/`EPERM`/`EBUSY` contention without unlinking the target, preserving
+ * the same atomic commit. `withFileLock` serializes cross-process writers of
+ * one file through a `wx`-created `<file>.lock` sibling, so a read-modify-write
+ * cycle can never resurrect a state another writer just replaced; readers
+ * stay lock-free because the rename commit is atomic.
  * @module @deepseek-ai/dsh-atomic-write
  */
 
@@ -32,6 +34,38 @@ export interface WriteFileAtomicOptions {
   dirMode?: number
 }
 
+/** Whether Windows rejected a rename because the path may be temporarily busy. */
+function isWindowsRenameContention(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | null)?.code
+  return process.platform === 'win32' && (code === 'EACCES' || code === 'EPERM' || code === 'EBUSY')
+}
+
+/**
+ * Windows replacement retry constants. These are robustness invariants of
+ * the atomic publication protocol, not deployment tunables: ordinary readers,
+ * indexers, and antivirus scanners release transient handles within the
+ * deadline, while a persistent permission failure still reaches the caller.
+ */
+const WINDOWS_RENAME_RETRY_INITIAL_MS = 10
+const WINDOWS_RENAME_RETRY_MAX_MS = 100
+const WINDOWS_RENAME_RETRY_TIMEOUT_MS = 2_000
+
+/** Rename one staged file over its target, retrying only transient Windows contention. */
+async function renameReplacing(temp: string, filename: string): Promise<void> {
+  const deadline = Date.now() + WINDOWS_RENAME_RETRY_TIMEOUT_MS
+  let delay = WINDOWS_RENAME_RETRY_INITIAL_MS
+  for (;;) {
+    try {
+      await rename(temp, filename)
+      return
+    } catch (error) {
+      if (!isWindowsRenameContention(error) || Date.now() >= deadline) throw error
+    }
+    await new Promise(resolve => setTimeout(resolve, delay))
+    delay = Math.min(delay * 2, WINDOWS_RENAME_RETRY_MAX_MS)
+  }
+}
+
 /**
  * Replace `filename` with `content` in one atomic step, creating parent
  * directories. The content is first written to a random-suffix sibling opened
@@ -40,8 +74,11 @@ export interface WriteFileAtomicOptions {
  * rename, so replacing a wider-permission file narrows it without a chmod
  * race. The rename also replaces a symlinked target itself instead of writing
  * through to its referent, and the same-directory sibling keeps the rename on
- * one filesystem. On any failure the temp file is removed and the failure
- * rethrown. Crash durability (fsync) is out of scope.
+ * one filesystem. Windows retries `EACCES`, `EPERM`, and `EBUSY` from that same
+ * rename for at most two seconds because readers and security software can
+ * transiently hold the path; it never deletes the target or falls back to a
+ * non-atomic copy. On any final failure the temp file is removed and the
+ * failure rethrown. Crash durability (fsync) is out of scope.
  * @param filename - final path receiving the content.
  * @param content - complete next file content.
  * @param options - permission bits for the replacement inode.
@@ -56,7 +93,7 @@ export async function writeFileAtomic(filename: string, content: string, options
   const temp = `${filename}.${randomBytes(6).toString('hex')}.tmp`
   try {
     await writeFile(temp, content, { mode: options.mode, flag: 'wx' })
-    await rename(temp, filename)
+    await renameReplacing(temp, filename)
   } catch (error) {
     await rm(temp, { force: true })
     throw error

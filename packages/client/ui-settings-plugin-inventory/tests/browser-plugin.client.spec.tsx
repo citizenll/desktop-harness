@@ -9,13 +9,22 @@ import { usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply, inject, NS } from '../src/client/index.ts'
 import { PluginInventorySettingsTab } from '../src/client/PluginInventorySettingsTab.tsx'
 import type { PluginInventorySettingsTabInjected } from '../src/client/PluginInventorySettingsTab.tsx'
+import { SourceEvolutionSettingsTab } from '../src/client/SourceEvolutionSettingsTab.tsx'
+import type { SourceEvolutionSettingsTabInjected } from '../src/client/SourceEvolutionSettingsTab.tsx'
 
 usePinnedBrowserLanguages('zh-CN')
 afterEach(cleanup)
 
-const EMPTY = { entries: [] }
-type ListResult =
-  | { readonly ok: true; readonly value: typeof EMPTY }
+const EMPTY_RUNTIME = { entries: [] }
+const EMPTY_PROFILE = { profile: 'web', profileDir: 'C:\\profile', entries: [] }
+const MISSING_SOURCE = {
+  state: 'missing' as const,
+  root: 'C:\\source',
+  capsuleAvailable: true,
+  official: { name: 'upstream', url: 'https://github.com/deepseek-ai/deepseek-harness.git', branch: 'master' },
+}
+type Result<T> =
+  | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }
 
 async function bench() {
@@ -29,10 +38,30 @@ async function bench() {
     }
   }
   new RemoteService(ctx)
-  const list = vi.fn<() => Promise<ListResult>>()
-    .mockResolvedValue({ ok: true, value: EMPTY })
-  ctx.provide('remote.pluginInventory', { list })
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, list }
+  const runtimeList = vi.fn<() => Promise<Result<typeof EMPTY_RUNTIME>>>()
+    .mockResolvedValue({ ok: true, value: EMPTY_RUNTIME })
+  const profileList = vi.fn<() => Promise<Result<typeof EMPTY_PROFILE>>>()
+    .mockResolvedValue({ ok: true, value: EMPTY_PROFILE })
+  const sourceInspect = vi.fn<() => Promise<Result<typeof MISSING_SOURCE>>>()
+    .mockResolvedValue({ ok: true, value: MISSING_SOURCE })
+  const mutation = vi.fn().mockResolvedValue({
+    ok: false,
+    error: { code: 'NOT_CALLED', message: 'fixture mutation was not configured' },
+  })
+  ctx.provide('remote.pluginInventory', { list: runtimeList })
+  ctx.provide('remote.evolution', {
+    pluginsList: profileList,
+    pluginsInstall: mutation,
+    pluginsUpdate: mutation,
+    pluginsRemove: mutation,
+    sourceInspect,
+    sourceInitialize: mutation,
+    sourceFetchOfficial: mutation,
+    sourceUpdateOfficial: mutation,
+    sourceConfigureUserRemote: mutation,
+    sourcePushUser: mutation,
+  })
+  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, runtimeList, profileList, sourceInspect }
 }
 
 function declare(slots: SlotRegistry): () => void {
@@ -43,47 +72,53 @@ function declare(slots: SlotRegistry): () => void {
 }
 
 describe('ui-settings-plugin-inventory browser plugin', () => {
-  it('declares only the services used by the Settings Remote contribution', () => {
-    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.pluginInventory'])
+  it('declares the Loader and evolution Remote namespaces it uses', () => {
+    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.pluginInventory', 'remote.evolution'])
   })
 
-  it('registers a localized tab without reading the Remote eagerly', async () => {
+  it('registers localized plugin-center and source tabs without eager reads', async () => {
     const b = await bench()
     declare(b.slots)
     await b.ctx.plugin({ inject: [...inject], apply }).await()
 
-    const entry = b.slots.entries('settings.plugins.tab')[0]!
-    expect(entry.component).toBe(PluginInventorySettingsTab)
-    expect(entry.options).toMatchObject({ id: 'all', order: 10 })
-    expect(entry.locale).toBe(NS)
-    expect(resolveSlotLabel(entry.options.label)).toBe('插件列表')
-    expect(b.list).not.toHaveBeenCalled()
+    const entries = b.slots.entries('settings.plugins.tab')
+    expect(entries).toHaveLength(2)
+    expect(entries[0]!.component).toBe(PluginInventorySettingsTab)
+    expect(entries[0]!.options).toMatchObject({ id: 'center', order: 10 })
+    expect(entries[1]!.component).toBe(SourceEvolutionSettingsTab)
+    expect(entries[1]!.options).toMatchObject({ id: 'source', order: 20 })
+    expect(entries.every(entry => entry.locale === NS)).toBe(true)
+    expect(entries.map(entry => resolveSlotLabel(entry.options.label))).toEqual(['插件中心', '源码与更新'])
+    expect(b.runtimeList).not.toHaveBeenCalled()
+    expect(b.profileList).not.toHaveBeenCalled()
+    expect(b.sourceInspect).not.toHaveBeenCalled()
 
-    const injected = (entry.inject as unknown as () => PluginInventorySettingsTabInjected)()
-    await expect(injected.list()).resolves.toEqual(EMPTY)
-    expect(b.list).toHaveBeenCalledOnce()
-    b.list.mockResolvedValueOnce({ ok: false, error: { code: 'REMOTE_ERROR', message: 'unavailable' } })
-    await expect(injected.list()).rejects.toThrow('pluginInventory.list failed: REMOTE_ERROR: unavailable')
+    const center = (entries[0]!.inject as unknown as () => PluginInventorySettingsTabInjected)()
+    await expect(center.listRuntime()).resolves.toEqual(EMPTY_RUNTIME)
+    await expect(center.listProfile()).resolves.toEqual(EMPTY_PROFILE)
+    const source = (entries[1]!.inject as unknown as () => SourceEvolutionSettingsTabInjected)()
+    await expect(source.inspect()).resolves.toEqual(MISSING_SOURCE)
+    b.profileList.mockResolvedValueOnce({ ok: false, error: { code: 'REMOTE_ERROR', message: 'unavailable' } })
+    await expect(center.listProfile()).rejects.toThrow('evolution.pluginsList failed: REMOTE_ERROR: unavailable')
     await b.ctx.fiber.dispose()
   })
 
-  it('follows locale and recovers across late declaration and declarer reload', async () => {
+  it('follows locale and recovers both tabs across declarer reload', async () => {
     const b = await bench()
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
     expect(b.slots.entries('settings.plugins.tab')).toHaveLength(0)
 
     const stop = declare(b.slots)
-    await vi.waitFor(() => { expect(b.slots.entries('settings.plugins.tab')).toHaveLength(1) })
+    await vi.waitFor(() => { expect(b.slots.entries('settings.plugins.tab')).toHaveLength(2) })
     b.locale.setLocale('en')
-    expect(resolveSlotLabel(b.slots.entries('settings.plugins.tab')[0]!.options.label)).toBe('Plugin list')
+    expect(b.slots.entries('settings.plugins.tab').map(entry => resolveSlotLabel(entry.options.label)))
+      .toEqual(['Plugin center', 'Source & updates'])
 
     stop()
     expect(b.slots.entries('settings.plugins.tab')).toHaveLength(0)
     declare(b.slots)
-    await vi.waitFor(() => {
-      expect(b.slots.entries('settings.plugins.tab')[0]?.component).toBe(PluginInventorySettingsTab)
-    })
+    await vi.waitFor(() => { expect(b.slots.entries('settings.plugins.tab')).toHaveLength(2) })
 
     await fiber.dispose()
     expect(b.slots.entries('settings.plugins.tab')).toHaveLength(0)

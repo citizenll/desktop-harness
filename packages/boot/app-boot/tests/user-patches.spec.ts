@@ -371,17 +371,35 @@ describe('boot with user patches', () => {
     }
   })
 
-  it('fails loud when the exact watcher lacks HMR or a root Include', async () => {
+  it('uses the portable exact-path watcher when HMR is absent', { timeout: 20_000 }, async () => {
     const dir = tmp()
-    const withoutHmr = await boot(NAME, writeTree(dir))
-    await expect(watchUserPatches(withoutHmr, { binName: NAME, filename: join(tmp(), PROFILE_PATCH_FILENAME) })).rejects.toThrow('requires the Cordis HMR service')
-    await withoutHmr.fiber.dispose()
+    const userDir = tmp()
+    const filename = join(userDir, PROFILE_PATCH_FILENAME)
+    const ctx = await boot(NAME, writeTree(dir))
+    const failures: Error[] = []
+    ctx.on('hmr/config-update-failed', (_failedFilename, error) => { failures.push(error) })
+    const dispose = await watchUserPatches(ctx, { binName: NAME, filename })
+    try {
+      await expect(watchUserPatches(ctx, { binName: NAME, filename })).rejects.toThrow('already registered')
+      writeFileSync(filename, '- id: noop\n  config:\n    value: portable\n')
+      await eventually(() => (entryConfig(ctx, 'noop') as { value?: string }).value === 'portable', 'portable watcher did not apply the patch')
 
+      writeFileSync(filename, 'invalid: [unclosed\n')
+      await eventually(() => failures.length === 1, 'portable watcher did not broadcast the parse failure')
+      expect((entryConfig(ctx, 'noop') as { value?: string }).value).toBe('portable')
+
+      writeFileSync(filename, '- id: noop\n  config:\n    value: recovered\n')
+      await eventually(() => (entryConfig(ctx, 'noop') as { value?: string }).value === 'recovered', 'portable watcher did not recover')
+    } finally {
+      await dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('fails loud when the exact watcher lacks a root Include', async () => {
     const withoutInclude = new Context()
     withoutInclude.baseUrl = pathToFileURL(`${tmp()}/`).href
     await withoutInclude.plugin(Loader)
-    await withoutInclude.plugin(Timer)
-    await withoutInclude.plugin(Hmr, { root: [], ignored: [], debounce: 0 })
     await expect(watchUserPatches(withoutInclude, { binName: NAME, filename: join(tmp(), PROFILE_PATCH_FILENAME) })).rejects.toThrow('requires the root Include entry')
     await withoutInclude.fiber.dispose()
   })

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WebServer, WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { ClientModuleRegistry } from '../src/index.ts'
 
@@ -38,7 +38,10 @@ function writePackage(
 }
 
 /** Construct the node-half service and capture its plugin-bundle route. */
-function constructWithRoute(packageNames: string[]): { service: ClientModuleRegistry; route: WebRoute } {
+async function constructWithRoute(packageNames: string[]): Promise<{
+  service: ClientModuleRegistry
+  route: WebRoute
+}> {
   const ctx = new Context()
   ctx.baseUrl = pathToFileURL(root!).href + '/'
   ctx.provide('loader', {
@@ -59,13 +62,23 @@ function constructWithRoute(packageNames: string[]): { service: ClientModuleRegi
   }
   ctx.provide('webServer', webServer as WebServer)
   const service = new ClientModuleRegistry(ctx)
+  await vi.waitFor(() => { expect(route).toBeDefined() })
   if (route === undefined) throw new Error('client bundle route was not registered')
   return { service, route }
 }
 
 /** Construct the node-half service over the enabled fixture entries. */
 function construct(packageNames: string[]): ClientModuleRegistry {
-  return constructWithRoute(packageNames).service
+  const ctx = new Context()
+  ctx.baseUrl = pathToFileURL(root!).href + '/'
+  ctx.provide('loader', {
+    *entries() {
+      for (const packageName of packageNames) {
+        yield { options: { name: packageName }, fiber: {}, disabled: false }
+      }
+    },
+  })
+  return new ClientModuleRegistry(ctx)
 }
 
 describe('client bundle activation', () => {
@@ -121,7 +134,7 @@ describe('client bundle activation', () => {
     writeFileSync(clientPath, 'module.exports = {}\n')
     const map = '{"version":3,"sources":["src/client/index.tsx"]}\n'
     writeFileSync(`${clientPath}.map`, map)
-    const { route } = constructWithRoute([packageName])
+    const { route } = await constructWithRoute([packageName])
     let status = 0
     let headers: Record<string, string> | undefined
     let body = ''

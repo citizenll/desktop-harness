@@ -16,13 +16,13 @@
 
 运行中的 `dsh` 是一棵插件树，由启动时按序叠加的各层组合而成。
 
-**profile** 是存放在 Harness home 中的具名组装。它列出自己叠放的组合包，存放自己安装的树外插件，并保存用户自己的 `cordis.patch.yml`。`web` 和 `headless` 作为模板随发行版交付。
+**profile** 是存放在 Harness home 中的具名组装。它列出自己叠放的组合包，存放自己安装的树外插件，并保存用户自己的 `cordis.patch.yml`。`web`、`desktop` 和 `headless` 作为模板随发行版交付。
 
 **组合包**是 Cordis 配置项及其挂载代码的分发格式，因此它插入的内容始终可被其上各层 patch。
 
 两者都在各自的 `package.json` 中通过 `dsh` 字段声明自己：`dsh.profile` 列出一个 profile 的组合包，`dsh.bundle` 指向一个组合包的 patch 文件。
 
-[`dsh-base`](../packages/bundle/base/README.md) 是每个 profile 的第一层：模型适配器、工具、持久化、沙箱与审批策略、设置、凭据、遥测。[`dsh-web-app`](../packages/bundle/web-app/README.md) 增加浏览器应用；[`dsh-headless`](../packages/bundle/headless/README.md) 增加一次性运行器，且完全不带服务器。
+[`dsh-base`](../packages/bundle/base/README.md) 是每个 profile 的第一层：模型适配器、工具、持久化、沙箱与审批策略、设置、凭据、遥测。[`dsh-web-app`](../packages/bundle/web-app/README.md) 增加共享 GUI 名册和浏览器载体。[`dsh-desktop-app`](../packages/bundle/desktop-app/README.md) 叠加在它之上，保留同一 Host／Client 图，同时以 Electron 不开放端口的 `dsh://app` 自定义协议替换浏览器启动与 HTTP／WebSocket 承载。[`dsh-headless`](../packages/bundle/headless/README.md) 增加一次性运行器，且完全不带服务器。
 
 各层按此顺序应用在空条目列表之上：先按 profile 列出的顺序应用每个组合包，然后是 profile 的 `cordis.patch.yml`，然后是 home 级的那份，最后是任意 `--patch` overlay。一条 patch 按 id 定位某个条目并替换其整个 config，或插入新条目。
 
@@ -35,6 +35,14 @@ dsh --profile web --dump-config
 它打印出的任何条目，都可以由你自己的 patch 替换。
 
 组装机制见 [app-boot](../packages/boot/app-boot/README.md#profiles)；配置字段见生成的[配置目录](config-catalog.md)。
+
+## 托管源码与 Profile 演进
+
+GUI profile 挂载两项管理能力，但不引入第二套扩展格式。`ctx.sourceRepository` 负责 Harness home 下的完整 Git 工作副本：`upstream` 是可配置且仅允许 fetch 的官方仓库，`origin` 是用户明确配置并拥有写权限的 push 目标。`ctx.profilePlugins` 负责当前 profile 的依赖集合，并把已安装且导出 `dsh.bundle` 的包同步到 profile 的有序 bundle 列表。
+
+具备特权的 `evolution` Remote 把这些能力投影到 Web 与 Desktop 设置界面。浏览器访问仍只允许 loopback，Desktop 则使用内部 `dsh://app` origin。包变更会触发全新的 profile 组合；当前实现中的源码 fetch、merge 与 push 操作只修改托管工作副本。在已验证 runtime generation 构建并激活前，它们不会改变当前 Host 或 Client runtime。
+
+源码胶囊、官方与用户 remote 分离、不可变 runtime generation、回滚、safe mode 和后续 catalog 策略的完整设计，记录在[可演进源码桌面方案](../.agents/notes/proposed/architecture/2026-08-14-live-source-desktop-evolution.md)中。
 
 ## 核心包
 

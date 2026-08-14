@@ -30,6 +30,7 @@ interface ComWorld {
   /** Contexts `SetThreadDpiAwarenessContext` accepts; others return NULL. */
   supportedDpiContexts: number[]
   enumThrows: boolean
+  decodeNameThrows: boolean
   path: string
   titles: string[]
   options: number[]
@@ -45,7 +46,7 @@ interface ComWorld {
 function comWorld(overrides: Partial<ComWorld> = {}): ComWorld {
   return {
     coInitHr: 0, coCreateHr: 0, showHr: 0, getResultHr: 0, getDisplayNameHr: 0,
-    hasThreadDpi: true, supportedDpiContexts: [-4], enumThrows: false,
+    hasThreadDpi: true, supportedDpiContexts: [-4], enumThrows: false, decodeNameThrows: false,
     path: 'C:\\选中\\directory',
     titles: [], options: [], dpiContexts: [], freed: [], released: [], posted: [],
     registered: 0, unregistered: 0, uninitialized: 0,
@@ -61,6 +62,26 @@ function installFakeKoffi(world: ComWorld): void {
   const itemPtr: FakePtr = { kind: 'item' }
   const namePtr: FakePtr = { kind: 'name', text: world.path }
   const outBuffers = new Map<unknown, FakePtr>()
+
+  const decode = Object.assign(
+    (value: unknown, offsetOrType: unknown): unknown => {
+      if (typeof offsetOrType === 'number') {
+        // Vtable slot read: offsets must be multiples of the fake width.
+        if (offsetOrType % FAKE_POINTER_SIZE !== 0) throw new Error(`vtable offset ${offsetOrType} is not pointer-aligned`)
+        const owner = (value as { owner: FakePtr }).owner
+        return { call: (args: unknown[]) => dispatch(owner, offsetOrType / FAKE_POINTER_SIZE, args) }
+      }
+      // decode(x, 'void *'): out-buffer read or vtable read.
+      if (outBuffers.has(value)) return outBuffers.get(value)
+      return { owner: value as FakePtr }
+    },
+    {
+      string16: (value: unknown): string => {
+        if (world.decodeNameThrows) throw new Error('UTF-16 decode failed')
+        return (value as FakePtr).text as string
+      },
+    },
+  )
 
   const dispatch = (self: FakePtr, slot: number, args: unknown[]): number => {
     if (self.kind === 'dialog') {
@@ -127,25 +148,9 @@ function installFakeKoffi(world: ComWorld): void {
       proto: (declaration: string) => ({ declaration }),
       pointer: (type: unknown) => type,
       sizeof: (type: string) => { void type; return FAKE_POINTER_SIZE },
-      view: (value: unknown, len: number): ArrayBuffer => {
-        const bytes = Buffer.alloc(len)
-        bytes.write((value as FakePtr).text as string, 'utf16le')
-        return bytes.buffer
-      },
       register: (fn: (hwnd: unknown, lparam: unknown) => number) => { world.registered += 1; return { fn } },
       unregister: () => { world.unregistered += 1 },
-      decode: (value: unknown, offsetOrType: unknown): unknown => {
-        if (offsetOrType === 'str16') return (value as FakePtr).text
-        if (typeof offsetOrType === 'number') {
-          // Vtable slot read: offsets must be multiples of the fake width.
-          if (offsetOrType % FAKE_POINTER_SIZE !== 0) throw new Error(`vtable offset ${offsetOrType} is not pointer-aligned`)
-          const owner = (value as { owner: FakePtr }).owner
-          return { call: (args: unknown[]) => dispatch(owner, offsetOrType / FAKE_POINTER_SIZE, args) }
-        }
-        // decode(x, 'void *'): out-buffer read or vtable read.
-        if (outBuffers.has(value)) return outBuffers.get(value)
-        return { owner: value as FakePtr }
-      },
+      decode,
       call: (fn: { call: (args: unknown[]) => number }, _proto: unknown, _self: unknown, ...args: unknown[]) => fn.call(args),
     },
   }))
@@ -238,6 +243,15 @@ describe('loadWin32DialogBindings over the fake COM world', () => {
     // The shell item is released even when its display name cannot be read.
     expect(nameWorld.released).toEqual(['item', 'dialog'])
     expect(nameWorld.freed).toHaveLength(0)
+
+    vi.doUnmock('koffi')
+    vi.resetModules()
+    const decodeWorld = comWorld({ decodeNameThrows: true })
+    installFakeKoffi(decodeWorld)
+    bindings = await (await loadBindingsModule()).loadWin32DialogBindings()
+    expect(() => runFolderDialog(bindings, 'Pick', vi.fn())).toThrow('UTF-16 decode failed')
+    expect(decodeWorld.freed).toHaveLength(1)
+    expect(decodeWorld.released).toEqual(['item', 'dialog'])
   })
 })
 
