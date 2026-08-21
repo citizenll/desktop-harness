@@ -221,6 +221,12 @@ async function pruneKnownPublishedBuildArtifacts() {
     path.join(runtimeModules, '@modelcontextprotocol', 'sdk', 'dist', 'esm', 'examples'),
     path.join(runtimeModules, 'ajv', 'lib'),
     path.join(runtimeModules, 'ajv-formats', 'src'),
+    path.join(runtimeModules, 'dsh-desktop-market', 'scripts'),
+    path.join(runtimeModules, 'dsh-desktop-market', 'src'),
+    path.join(runtimeModules, 'dsh-desktop-market', 'tsconfig.json'),
+    path.join(runtimeModules, 'dsh-desktop-market', 'tsconfig.client.json'),
+    path.join(runtimeModules, 'dsh-desktop-market', 'tsdown.config.ts'),
+    path.join(runtimeModules, 'dsh-desktop-market', 'UPSTREAM.md'),
     path.join(runtimeModules, 'dshmarket', 'src'),
     path.join(runtimeModules, 'openai', 'src'),
     path.join(runtimeModules, 'sharp', 'install'),
@@ -315,13 +321,19 @@ async function main() {
     path.join(runtimeRoot, 'packages', 'dsh-desktop-plugin-runtime'),
     { recursive: true }
   )
+  await cp(
+    path.join(projectRoot, 'packages', 'dsh-desktop-market'),
+    path.join(runtimeRoot, 'packages', 'dsh-desktop-market'),
+    { recursive: true }
+  )
 
   await installProductionDependencies()
   await applyRuntimePatches()
   await installBrandAssets({ packageRoot: runtimeRoot, assetRoot: projectRoot })
 
-  const localPackageVersion = await materializeLocalPackage('dsh-desktop-plugin-runtime')
-  runtimeManifest.dependencies['dsh-desktop-plugin-runtime'] = localPackageVersion
+  for (const packageName of ['dsh-desktop-market', 'dsh-desktop-plugin-runtime']) {
+    runtimeManifest.dependencies[packageName] = await materializeLocalPackage(packageName)
+  }
 
   await cp(path.join(projectRoot, 'out'), path.join(runtimeRoot, 'out'), { recursive: true })
   const resources = path.join(runtimeRoot, 'resources')
@@ -363,9 +375,9 @@ async function main() {
     'out/preload/index.cjs',
     'node_modules/@deepseek-ai/dsh/lib/bin.js',
     'node_modules/pnpm/bin/pnpm.cjs',
+    'node_modules/dsh-desktop-market/lib/index.js',
+    'node_modules/dsh-desktop-market/client/client.js',
     'node_modules/dsh-desktop-plugin-runtime/index.js',
-    'node_modules/dshmarket/lib/index.js',
-    'node_modules/dshmarket/client/client.js',
     'resources/harness-node-entry.mjs',
     'resources/runtime-module-fallback.mjs',
     'resources/dsh-desktop.patch.yml',

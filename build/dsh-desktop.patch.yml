@@ -8,15 +8,11 @@
     - id: directory-picker-electron-desktop-surface
       name: '@deepseek-ai/dsh-client-ui-directory-picker-native'
 
-    # The market is a first-party Desktop capability. Its server routes still
-    # use dsh-market upstream, while this small host bridge supplies the fixed
-    # Desktop profile and the packaged Node/pnpm execution boundary.
+    # The market is maintained as a first-party Desktop capability. This host
+    # bridge supplies the fixed profile and packaged Node/pnpm boundary.
     - id: dsh-desktop-plugin-runtime
       name: dsh-desktop-plugin-runtime
 
     - id: dsh-market
-      name: dshmarket
+      name: dsh-desktop-market
       inject: [desktopProfiles]
-      config:
-        profile: web
-        allowRestart: false

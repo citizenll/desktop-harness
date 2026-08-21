@@ -1,0 +1,58 @@
+{
+  "name": "dsh-desktop-market",
+  "version": "0.1.0",
+  "description": "The first-party plugin marketplace bundled with DSH Desktop.",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/citizenll/desktop-harness.git",
+    "directory": "packages/dsh-desktop-market"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "undici": "^7.29.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-theme"
+      ],
+      "platform": "web"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": "./client/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "src",
+    "client",
+    "scripts/normalize-client-banner.mjs",
+    "tsconfig.json",
+    "tsconfig.client.json",
+    "tsdown.config.ts",
+    "cordis.patch.yml",
+    "LICENSE",
+    "UPSTREAM.md"
+  ]
+}

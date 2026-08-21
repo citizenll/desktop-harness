@@ -68,9 +68,9 @@ const required = [
   '/out/preload/index.cjs',
   '/node_modules/@deepseek-ai/dsh/lib/bin.js',
   '/node_modules/pnpm/bin/pnpm.cjs',
+  '/node_modules/dsh-desktop-market/lib/index.js',
+  '/node_modules/dsh-desktop-market/client/client.js',
   '/node_modules/dsh-desktop-plugin-runtime/index.js',
-  '/node_modules/dshmarket/lib/index.js',
-  '/node_modules/dshmarket/client/client.js',
   '/resources/harness-node-entry.mjs',
   '/resources/runtime-module-fallback.mjs',
   '/resources/dsh-desktop.patch.yml',
@@ -91,6 +91,14 @@ const forbidden = entries.filter(
     entry.startsWith('/node_modules/@mixmark-io/domino/test/') ||
     entry.startsWith('/node_modules/dsh-desktop-market-installer/') ||
     entry === '/node_modules/dsh-desktop-market-installer' ||
+    entry.startsWith('/node_modules/dsh-desktop-market/src/') ||
+    entry === '/node_modules/dsh-desktop-market/src' ||
+    entry.startsWith('/node_modules/dsh-desktop-market/scripts/') ||
+    entry === '/node_modules/dsh-desktop-market/scripts' ||
+    entry === '/node_modules/dsh-desktop-market/tsconfig.json' ||
+    entry === '/node_modules/dsh-desktop-market/tsconfig.client.json' ||
+    entry === '/node_modules/dsh-desktop-market/tsdown.config.ts' ||
+    entry === '/node_modules/dsh-desktop-market/UPSTREAM.md' ||
     entry.startsWith('/node_modules/dshmarket/src/') ||
     entry === '/node_modules/dshmarket/src' ||
     entry.startsWith('/node_modules/openai/src/') ||

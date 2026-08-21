@@ -13,7 +13,7 @@ const settingsModelsClient = path.join(
 )
 
 /**
- * Harness took the select-all toggle upstream in 0.1.0-rc.8, so the desktop
+ * Harness took the select-all toggle upstream before 0.1.1-rc.1, so the desktop
  * patch no longer carries it. Assert against the composed package instead: the
  * behavior still has to be there, and the patch still has to stay out of it.
  */

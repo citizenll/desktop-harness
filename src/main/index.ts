@@ -27,6 +27,7 @@ import {
 import { secureWindow } from './security'
 import { ensureLaunchRoot } from './state/launch-root'
 import { migrateEmbeddedMarketProfile } from './state/embedded-market-migration'
+import { migrateDeepSeekVisionSettings } from './state/deepseek-vision-migration'
 import {
   resetPluginProfile,
   uninstallPluginFromProfile
@@ -987,6 +988,18 @@ async function bootstrap(): Promise<void> {
     // A stale or hand-edited profile must not prevent Desktop from opening.
     // The existing plugin-recovery flow can still diagnose it after startup.
     console.warn('[desktop] could not retire the old profile-installed dshmarket copy', error)
+  }
+  try {
+    const visionMigration = await migrateDeepSeekVisionSettings(dshHome)
+    if (visionMigration.changed) {
+      console.info(
+        `[desktop] repaired image capability metadata for ${visionMigration.repairedModels} DeepSeek Vision model(s)`
+      )
+    }
+  } catch (error) {
+    // A hand-edited settings document must remain user-owned. Report the
+    // migration failure and let Harness surface its normal configuration error.
+    console.warn('[desktop] could not migrate DeepSeek Vision model metadata', error)
   }
   registerUpdateHandlers()
   createWindow()

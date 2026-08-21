@@ -254,7 +254,7 @@ publisherEmail=name@example.com
     "sha256": "...",
     "sizeBytes": 12345,
     "formatVersion": 1,
-    "sourceDshVersion": "0.1.0-rc.7"
+    "sourceDshVersion": "0.1.1-rc.1"
   },
   "detailUrl": "https://square.dsh.example/p/tender-extract-a1b2c3",
   "downloadCount": 0,

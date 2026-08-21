@@ -28,7 +28,7 @@ DSH Desktop packages the local DeepSeek Harness web experience as a desktop appl
 > [!IMPORTANT]
 > DSH Desktop is not a simple repackaging of upstream DeepSeek Harness. It turns frequently used capabilities into maintained, built-in desktop features, including phone access over LAN or a temporary public tunnel, an integrated plugin marketplace, runtime preparation, automatic updates, and failure recovery. The goal is a genuinely ready-to-use Harness desktop app: install it and get to work without assembling plugins, configuring services, or managing the runtime yourself.
 >
-> The project is currently an early preview and tracks the rapidly evolving `@deepseek-ai/dsh@0.1.0-rc.8`. Installers and update metadata are published through this repository's GitHub Releases.
+> The project is currently an early preview and tracks the rapidly evolving `@deepseek-ai/dsh@0.1.1-rc.1`. Installers and update metadata are published through this repository's GitHub Releases.
 
 ## Download
 
@@ -156,7 +156,7 @@ build/                Application icons, installer resources, and runtime module
 
 ## Upstream version and patches
 
-The project currently pins `@deepseek-ai/dsh@0.1.0-rc.8`. The initial provider list and desktop preset-transfer surface are captured with [`patch-package`](https://github.com/ds300/patch-package) under [`patches/`](patches/) rather than relying on untracked changes in `node_modules`.
+The project currently pins `@deepseek-ai/dsh@0.1.1-rc.1`. The initial provider list and desktop preset-transfer surface are captured with [`patch-package`](https://github.com/ds300/patch-package) under [`patches/`](patches/) rather than relying on untracked changes in `node_modules`.
 
 When upgrading DSH:
 

@@ -176,7 +176,6 @@ window.addEventListener('unhandledrejection', (event) => {
 contextBridge.exposeInMainWorld(
   'dshDesktop',
   Object.freeze({
-    marketPlacement: 'plugins' as const,
     restartHarness: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('harness:restart')
   })
 )

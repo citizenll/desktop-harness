@@ -19,7 +19,7 @@ preset/
   "id": "my-agent",
   "name": "My agent",
   "description": "Optional display copy",
-  "sourceDshVersion": "0.1.0-rc.7",
+  "sourceDshVersion": "0.1.1-rc.1",
   "exportedAt": "2026-08-14T12:00:00.000Z"
 }
 ```

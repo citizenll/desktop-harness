@@ -1,25 +1,36 @@
 # 内置插件市场维护说明
 
-DSH Desktop 把插件市场视为应用能力，而不是用户需要安装的插件：
+DSH Desktop 把插件市场视为第一方产品能力，而不是用户需要安装或自行更新的插件。
 
-- `dshmarket` 以精确版本记录在根 `package.json`，正式构建和 CI 不依赖本机的相邻仓库。
-- `dsh-desktop-plugin-runtime` 只提供固定 Desktop profile 与随应用打包的 pnpm 执行边界。
-- `build/dsh-desktop.patch.yml` 先挂载运行时桥，再挂载 `dshmarket`。
-- Desktop 通过补丁把市场的 `发现 / 主题 / 已安装 / 高级` 投影到默认“插件”页面；非 Desktop 宿主仍保留上游独立市场页面。
-- 分组标签元数据挂在市场组件的 `settingsPluginViews` 上。不要放进 `slots.register()` 的自定义字段：SlotCore 只保留通用的 `id/order/label/priority`，未知字段会被有意丢弃。
-- 嵌入模式只在确有状态横幅或操作时渲染市场头部，并保持吸顶搜索区高度不随滚动状态变化，避免空白和 sticky 阈值反馈抖动。
-- 启动迁移只清除旧 profile 中的 `dshmarket` 注册和链接，不删除用户通过市场安装的插件，也不删除市场配置、备份或状态。
+## 组成
 
-## 跟随上游更新
+- `packages/dsh-desktop-market`：市场服务、浏览器客户端和商店目录适配。
+- `packages/dsh-desktop-plugin-runtime`：固定 Desktop profile 与随应用打包的 pnpm 执行边界。
+- `build/dsh-desktop.patch.yml`：先挂载 runtime，再挂载内置市场。
+- DSH 设置页补丁：把市场的“发现 / 主题 / 已安装 / 高级”视图投影到默认“插件”页面。
 
-1. 在独立的 dsh-market checkout/worktree 中切到目标发布版本，确认其 `package.json` 版本。
-2. 更新精确依赖：`npm install --save-exact dshmarket@<version> --ignore-scripts`。
-3. 把 Desktop 的嵌入适配移植到该版本源码并执行上游的 typecheck、test、build；不要直接依赖 `D:\Dev\self\dsh-market`。
-4. 只复制构建后的 `client/client.js` 与对应源码到本项目的 `node_modules/dshmarket`，然后运行：
-   `node node_modules/patch-package/index.js dshmarket --verbose`。
-5. 如果上游设置页契约变化，同步刷新以下宿主补丁：
-   - `patches/@deepseek-ai+dsh-client-ui-settings-plugins+*.patch`
-   - `patches/@deepseek-ai+dsh-client-ui-settings+*.patch`
-6. 运行 `npm test`、`npm run typecheck`、`npm run package:dir`。运行时 staging 会在补丁应用后移除 `dshmarket/src`，安装包只保留服务端产物与浏览器 bundle。
+根项目通过 `file:packages/dsh-desktop-market` 使用内置包。正式构建和 CI 不依赖 npm 上的 `dshmarket`，也不依赖 `D:\Dev\self\dsh-market` 相邻仓库。
 
-采用“精确 npm 版本 + 小型补丁”而不是 git submodule 或 `file:../dsh-market`，是为了让 Windows、macOS、Linux 和 GitHub Actions 使用完全相同、可复现的输入；上游升级也只需要显式处理真实冲突。
+## 稳定边界
+
+- 市场继续使用 `/dsh-market/*` 路由和当前商店目录数据格式。
+- 插件安装、更新和卸载只能调用 `desktopPnpm`，不能寻找系统 pnpm。
+- 市场不能更新、卸载或停用自身。
+- 市场只把 Cordis 作为运行时 peer，不声明 `@deepseek-ai/dsh-settings` 等 DSH peer dependency。
+- DSH 版本变化只允许影响市场入口适配；目录、筛选和安装业务不得依赖 DSH 私有实现。
+
+启动迁移仍会清除旧 profile 中安装过的 `dshmarket` 注册和链接，但不会删除用户通过市场安装的插件，也不会删除市场配置、备份、会话或模型数据。
+
+## 来源与更新
+
+初始代码来源和许可证记录在 `packages/dsh-desktop-market/UPSTREAM.md`。
+
+不跟随 dsh-market 上游版本。确需吸收代码时：
+
+1. 在独立 checkout 中定位需要的上游 commit 和文件；
+2. 只移植解决当前需求的源代码，并记录来源 commit；
+3. 在隔离环境重建 `lib/` 与 `client/`；
+4. 审核生成产物，确认没有恢复市场自更新和 DSH peer dependency；
+5. 运行 `npm test`、`npm run typecheck`、`npm run package:dir`。
+
+运行时 staging 会移除内置市场的 `src/`、构建配置与源码映射，安装包只保留服务端产物、浏览器 bundle、许可证和必要元数据。
