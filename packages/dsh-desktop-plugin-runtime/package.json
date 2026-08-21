@@ -1,0 +1,19 @@
+{
+  "name": "dsh-desktop-plugin-runtime",
+  "version": "0.1.0",
+  "description": "DSH Desktop services for profile-scoped plugin package operations.",
+  "private": true,
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "license": "MIT",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1"
+  },
+  "dependencies": {
+    "pnpm": "10.34.5"
+  }
+}

@@ -1,0 +1,193 @@
+{
+  "name": "dsh-desktop",
+  "version": "0.1.1",
+  "description": "A cross-platform desktop shell for DeepSeek Harness.",
+  "private": true,
+  "type": "module",
+  "main": "./out/main/index.js",
+  "desktopName": "io.dsh.desktop.desktop",
+  "author": "DataElement",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/citizenll/desktop-harness.git"
+  },
+  "bugs": {
+    "url": "https://github.com/citizenll/desktop-harness/issues"
+  },
+  "homepage": "https://github.com/citizenll/desktop-harness#readme",
+  "keywords": [
+    "deepseek",
+    "harness",
+    "electron",
+    "desktop",
+    "agent"
+  ],
+  "scripts": {
+    "postinstall": "patch-package && node scripts/install-brand-assets.mjs && install-electron --no",
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "build:runtime": "npm run build && npm run runtime:stage",
+    "runtime:stage": "node scripts/prepare-runtime.mjs",
+    "runtime:verify": "node scripts/verify-packaged-runtime.mjs dist",
+    "icons:generate": "node scripts/generate-app-icons.mjs",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "package:dir": "npm run build:runtime && electron-builder --dir && npm run runtime:verify",
+    "package:dev:dir": "npm run build:runtime && electron-builder --dir --config electron-builder.dev.cjs && node scripts/verify-packaged-runtime.mjs dist-dev",
+    "package:dev:win": "node scripts/verify-target.mjs win32 x64 && npm run build:runtime && electron-builder --win --x64 --publish never --config electron-builder.dev.cjs && node scripts/verify-packaged-runtime.mjs dist-dev",
+    "package:mac": "npm run build:runtime && electron-builder --mac --publish never && npm run runtime:verify",
+    "package:mac:arm64": "node scripts/verify-target.mjs darwin arm64 && npm run build:runtime && electron-builder --mac --arm64 --publish never && npm run runtime:verify",
+    "package:mac:x64": "node scripts/verify-target.mjs darwin x64 && npm run build:runtime && electron-builder --mac --x64 --publish never && npm run runtime:verify",
+    "package:win": "node scripts/verify-target.mjs win32 x64 && npm run build:runtime && electron-builder --win --x64 --publish never && npm run runtime:verify",
+    "package:linux": "node scripts/verify-target.mjs linux x64 && npm run build:runtime && electron-builder --linux --x64 --publish never && npm run runtime:verify"
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis-plugin-group": "1.0.1",
+    "@deepseek-ai/dsh": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-anonymous-user-id": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-atomic-write": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-bash-local": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-code-runtime": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-compaction": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-fs": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-invariants": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-output-retention": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-sandbox": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-scope": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-session-telemetry": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-session-title-llm": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-shell": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-spill": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-subagent-in-process-driver": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-subprocess": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-timeout": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-workflow": "0.1.0-rc.8",
+    "dsh-desktop-plugin-runtime": "file:packages/dsh-desktop-plugin-runtime",
+    "dshmarket": "1.17.0",
+    "pnpm": "10.34.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@electron/asar": "3.4.1",
+    "@types/node": "24.10.1",
+    "@types/qrcode": "^1.5.6",
+    "electron": "43.4.0",
+    "electron-builder": "26.15.3",
+    "electron-updater": "^6.8.9",
+    "electron-vite": "5.0.0",
+    "patch-package": "^8.0.1",
+    "qrcode": "^1.5.4",
+    "typescript": "5.9.3",
+    "vitest": "^4.1.10",
+    "yaml": "^2.8.3"
+  },
+  "overrides": {
+    "koffi": "3.1.5"
+  },
+  "build": {
+    "appId": "io.dsh.desktop",
+    "productName": "DSH Desktop",
+    "asar": {
+      "smartUnpack": false
+    },
+    "asarUnpack": [
+      "node_modules/**/*.node",
+      "node_modules/**/*.dll",
+      "node_modules/**/*.exe",
+      "node_modules/**/*.so",
+      "node_modules/**/*.dylib",
+      "node_modules/**/*.wasm"
+    ],
+    "npmRebuild": false,
+    "compression": "normal",
+    "electronLanguages": [
+      "en-US",
+      "zh-CN",
+      "zh_CN",
+      "zh-TW",
+      "zh_TW"
+    ],
+    "directories": {
+      "app": ".runtime",
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "out/**/*",
+      "resources/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "citizenll",
+        "repo": "desktop-harness"
+      }
+    ],
+    "artifactName": "dsh-desktop-${os}-${arch}.${ext}",
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "dmg": {
+      "format": "UDBZ"
+    },
+    "win": {
+      "icon": "build/icon.ico",
+      "verifyUpdateCodeSignature": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Development",
+      "maintainer": "citizenll",
+      "syncDesktopName": true,
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "appImage": {
+      "artifactName": "dsh-desktop-linux-x64.${ext}"
+    },
+    "deb": {
+      "artifactName": "dsh-desktop-linux-x64.${ext}"
+    },
+    "nsis": {
+      "artifactName": "dsh-desktop-windows-${arch}-setup.${ext}",
+      "include": "build/installer.nsh",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

@@ -1,0 +1,563 @@
+name: Release desktop installers
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      windows_prerelease_tag:
+        description: Optional non-v tag for a Windows Dev pre-release
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  macos-apple-silicon:
+    name: macOS Apple Silicon
+    runs-on: macos-15
+    outputs:
+      apple_signing_enabled: ${{ steps.apple_signing.outputs.enabled }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Set app version from release tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: npm version --no-git-tag-version --allow-same-version "${{ github.ref_name }}"
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - name: Detect Apple release signing configuration
+        id: apple_signing
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          CSC_LINK: ${{ secrets.DESKTOP_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.DESKTOP_CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_CONTENT: ${{ secrets.DESKTOP_APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.DESKTOP_APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.DESKTOP_APPLE_API_ISSUER }}
+          APPLE_TEAM_ID: ${{ secrets.DESKTOP_APPLE_TEAM_ID }}
+        run: |
+          required=(CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY_CONTENT APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_TEAM_ID)
+          configured=0
+          missing=()
+          for name in "${required[@]}"; do
+            if [ -n "${!name}" ]; then
+              configured=$((configured + 1))
+            else
+              missing+=("$name")
+            fi
+          done
+          if [ "$configured" -eq 0 ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Apple signing secrets are not configured; publishing an unsigned macOS build."
+          elif [ "$configured" -ne "${#required[@]}" ]; then
+            echo "::error::Apple signing configuration is incomplete. Missing: ${missing[*]}"
+            exit 1
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Prepare Apple notarization key
+        if: startsWith(github.ref, 'refs/tags/v') && steps.apple_signing.outputs.enabled == 'true'
+        env:
+          APPLE_API_KEY_CONTENT: ${{ secrets.DESKTOP_APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.DESKTOP_APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.DESKTOP_APPLE_API_ISSUER }}
+          APPLE_TEAM_ID: ${{ secrets.DESKTOP_APPLE_TEAM_ID }}
+        run: |
+          key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+          printf '%s' "$APPLE_API_KEY_CONTENT" > "$key_path"
+          chmod 600 "$key_path"
+          echo "APPLE_API_KEY=$key_path" >> "$GITHUB_ENV"
+          echo "APPLE_API_KEY_ID=$APPLE_API_KEY_ID" >> "$GITHUB_ENV"
+          echo "APPLE_API_ISSUER=$APPLE_API_ISSUER" >> "$GITHUB_ENV"
+          echo "APPLE_TEAM_ID=$APPLE_TEAM_ID" >> "$GITHUB_ENV"
+      - name: Prepare macOS signing keychain
+        if: startsWith(github.ref, 'refs/tags/v') && steps.apple_signing.outputs.enabled == 'true'
+        id: signing_keychain
+        env:
+          CSC_LINK: ${{ secrets.DESKTOP_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.DESKTOP_CSC_KEY_PASSWORD }}
+        run: node scripts/prepare-macos-signing-keychain.mjs
+      - name: Build signed Apple Silicon package
+        if: startsWith(github.ref, 'refs/tags/v') && steps.apple_signing.outputs.enabled == 'true'
+        env:
+          CSC_KEYCHAIN: ${{ steps.signing_keychain.outputs.keychain }}
+        run: npm run package:mac:arm64
+      - name: Build unsigned Apple Silicon verification package
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') || steps.apple_signing.outputs.enabled != 'true' }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run package:mac:arm64
+      - name: Preserve Apple Silicon update metadata
+        run: mv dist/latest-mac.yml dist/latest-mac-arm64.yml
+      - name: Sign, notarize, and staple Apple Silicon DMG
+        if: startsWith(github.ref, 'refs/tags/v') && steps.apple_signing.outputs.enabled == 'true'
+        env:
+          CSC_KEYCHAIN: ${{ steps.signing_keychain.outputs.keychain }}
+        run: |
+          dmg_path="dist/dsh-desktop-mac-arm64.dmg"
+          identity="$(security find-identity -v -p codesigning "$CSC_KEYCHAIN" | awk '/Developer ID Application/ { print $2; exit }')"
+          test -n "$identity" || { echo "::error::Developer ID Application identity not found"; exit 1; }
+          codesign --keychain "$CSC_KEYCHAIN" --sign "$identity" --timestamp --force "$dmg_path"
+          xcrun notarytool submit "$dmg_path" \
+            --key "$APPLE_API_KEY" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER" \
+            --wait \
+            --no-s3-acceleration
+          xcrun stapler staple "$dmg_path"
+      - name: Remove temporary signing keychain
+        if: always() && startsWith(github.ref, 'refs/tags/v') && steps.apple_signing.outputs.enabled == 'true'
+        env:
+          SIGNING_KEYCHAIN: ${{ steps.signing_keychain.outputs.keychain }}
+          SIGNING_CERTIFICATE: ${{ steps.signing_keychain.outputs.certificate }}
+          SIGNING_KEYCHAIN_LIST: ${{ steps.signing_keychain.outputs.keychain_list }}
+        run: |
+          if [ -n "$SIGNING_KEYCHAIN_LIST" ] && [ -f "$SIGNING_KEYCHAIN_LIST" ]; then
+            keychains=()
+            while IFS= read -r keychain; do
+              test -z "$keychain" || keychains+=("$keychain")
+            done < "$SIGNING_KEYCHAIN_LIST"
+            security list-keychains -d user -s "${keychains[@]}"
+            rm -f "$SIGNING_KEYCHAIN_LIST"
+          fi
+          test -z "$SIGNING_KEYCHAIN" || security delete-keychain "$SIGNING_KEYCHAIN" || rm -f "$SIGNING_KEYCHAIN"
+          test -z "$SIGNING_CERTIFICATE" || rm -f "$SIGNING_CERTIFICATE"
+          test -z "$APPLE_API_KEY" || rm -f "$APPLE_API_KEY"
+      - name: Verify signed and notarized Apple Silicon app
+        if: startsWith(github.ref, 'refs/tags/v') && steps.apple_signing.outputs.enabled == 'true'
+        run: |
+          app_path="dist/mac-arm64/DSH Desktop.app"
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+          spctl --assess --type execute --verbose=4 "$app_path"
+          xcrun stapler validate "$app_path"
+          codesign --verify --verbose=2 dist/dsh-desktop-mac-arm64.dmg
+          spctl --assess --type open --context context:primary-signature --verbose=4 dist/dsh-desktop-mac-arm64.dmg
+          xcrun stapler validate dist/dsh-desktop-mac-arm64.dmg
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-apple-silicon
+          retention-days: 1
+          path: |
+            dist/dsh-desktop-mac-arm64.dmg
+            dist/dsh-desktop-mac-arm64.zip
+            dist/dsh-desktop-mac-arm64.zip.blockmap
+            dist/latest-mac-arm64.yml
+          if-no-files-found: error
+
+  macos-intel:
+    name: macOS Intel
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: macos-15-intel
+    outputs:
+      apple_signing_enabled: ${{ steps.apple_signing.outputs.enabled }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Set app version from release tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: npm version --no-git-tag-version --allow-same-version "${{ github.ref_name }}"
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - name: Detect Apple release signing configuration
+        id: apple_signing
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          CSC_LINK: ${{ secrets.DESKTOP_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.DESKTOP_CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_CONTENT: ${{ secrets.DESKTOP_APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.DESKTOP_APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.DESKTOP_APPLE_API_ISSUER }}
+          APPLE_TEAM_ID: ${{ secrets.DESKTOP_APPLE_TEAM_ID }}
+        run: |
+          required=(CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY_CONTENT APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_TEAM_ID)
+          configured=0
+          missing=()
+          for name in "${required[@]}"; do
+            if [ -n "${!name}" ]; then
+              configured=$((configured + 1))
+            else
+              missing+=("$name")
+            fi
+          done
+          if [ "$configured" -eq 0 ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Apple signing secrets are not configured; publishing an unsigned macOS build."
+          elif [ "$configured" -ne "${#required[@]}" ]; then
+            echo "::error::Apple signing configuration is incomplete. Missing: ${missing[*]}"
+            exit 1
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Prepare Apple notarization key
+        if: startsWith(github.ref, 'refs/tags/v') && steps.apple_signing.outputs.enabled == 'true'
+        env:
+          APPLE_API_KEY_CONTENT: ${{ secrets.DESKTOP_APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.DESKTOP_APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.DESKTOP_APPLE_API_ISSUER }}
+          APPLE_TEAM_ID: ${{ secrets.DESKTOP_APPLE_TEAM_ID }}
+        run: |
+          key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+          printf '%s' "$APPLE_API_KEY_CONTENT" > "$key_path"
+          chmod 600 "$key_path"
+          echo "APPLE_API_KEY=$key_path" >> "$GITHUB_ENV"
+          echo "APPLE_API_KEY_ID=$APPLE_API_KEY_ID" >> "$GITHUB_ENV"
+          echo "APPLE_API_ISSUER=$APPLE_API_ISSUER" >> "$GITHUB_ENV"
+          echo "APPLE_TEAM_ID=$APPLE_TEAM_ID" >> "$GITHUB_ENV"
+      - name: Prepare macOS signing keychain
+        if: startsWith(github.ref, 'refs/tags/v') && steps.apple_signing.outputs.enabled == 'true'
+        id: signing_keychain
+        env:
+          CSC_LINK: ${{ secrets.DESKTOP_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.DESKTOP_CSC_KEY_PASSWORD }}
+        run: node scripts/prepare-macos-signing-keychain.mjs
+      - name: Build signed Intel package
+        if: startsWith(github.ref, 'refs/tags/v') && steps.apple_signing.outputs.enabled == 'true'
+        env:
+          CSC_KEYCHAIN: ${{ steps.signing_keychain.outputs.keychain }}
+        run: npm run package:mac:x64
+      - name: Build unsigned Intel verification package
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') || steps.apple_signing.outputs.enabled != 'true' }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run package:mac:x64
+      - name: Preserve Intel update metadata
+        run: mv dist/latest-mac.yml dist/latest-mac-x64.yml
+      - name: Sign, notarize, and staple Intel DMG
+        if: startsWith(github.ref, 'refs/tags/v') && steps.apple_signing.outputs.enabled == 'true'
+        env:
+          CSC_KEYCHAIN: ${{ steps.signing_keychain.outputs.keychain }}
+        run: |
+          dmg_path="dist/dsh-desktop-mac-x64.dmg"
+          identity="$(security find-identity -v -p codesigning "$CSC_KEYCHAIN" | awk '/Developer ID Application/ { print $2; exit }')"
+          test -n "$identity" || { echo "::error::Developer ID Application identity not found"; exit 1; }
+          codesign --keychain "$CSC_KEYCHAIN" --sign "$identity" --timestamp --force "$dmg_path"
+          xcrun notarytool submit "$dmg_path" \
+            --key "$APPLE_API_KEY" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER" \
+            --wait \
+            --no-s3-acceleration
+          xcrun stapler staple "$dmg_path"
+      - name: Remove temporary signing keychain
+        if: always() && startsWith(github.ref, 'refs/tags/v') && steps.apple_signing.outputs.enabled == 'true'
+        env:
+          SIGNING_KEYCHAIN: ${{ steps.signing_keychain.outputs.keychain }}
+          SIGNING_CERTIFICATE: ${{ steps.signing_keychain.outputs.certificate }}
+          SIGNING_KEYCHAIN_LIST: ${{ steps.signing_keychain.outputs.keychain_list }}
+        run: |
+          if [ -n "$SIGNING_KEYCHAIN_LIST" ] && [ -f "$SIGNING_KEYCHAIN_LIST" ]; then
+            keychains=()
+            while IFS= read -r keychain; do
+              test -z "$keychain" || keychains+=("$keychain")
+            done < "$SIGNING_KEYCHAIN_LIST"
+            security list-keychains -d user -s "${keychains[@]}"
+            rm -f "$SIGNING_KEYCHAIN_LIST"
+          fi
+          test -z "$SIGNING_KEYCHAIN" || security delete-keychain "$SIGNING_KEYCHAIN" || rm -f "$SIGNING_KEYCHAIN"
+          test -z "$SIGNING_CERTIFICATE" || rm -f "$SIGNING_CERTIFICATE"
+          test -z "$APPLE_API_KEY" || rm -f "$APPLE_API_KEY"
+      - name: Verify signed and notarized Intel app
+        if: startsWith(github.ref, 'refs/tags/v') && steps.apple_signing.outputs.enabled == 'true'
+        run: |
+          app_path="dist/mac/DSH Desktop.app"
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+          spctl --assess --type execute --verbose=4 "$app_path"
+          xcrun stapler validate "$app_path"
+          codesign --verify --verbose=2 dist/dsh-desktop-mac-x64.dmg
+          spctl --assess --type open --context context:primary-signature --verbose=4 dist/dsh-desktop-mac-x64.dmg
+          xcrun stapler validate dist/dsh-desktop-mac-x64.dmg
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-intel
+          retention-days: 1
+          path: |
+            dist/dsh-desktop-mac-x64.dmg
+            dist/dsh-desktop-mac-x64.zip
+            dist/dsh-desktop-mac-x64.zip.blockmap
+            dist/latest-mac-x64.yml
+          if-no-files-found: error
+
+  windows-x64:
+    name: Windows x64
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Set app version from release tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: npm version --no-git-tag-version --allow-same-version "${{ github.ref_name }}"
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - name: Build Windows release package
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: npm run package:win
+      - name: Build isolated Windows development package
+        if: github.event_name == 'workflow_dispatch'
+        run: npm run package:dev:win
+      - name: Smoke test packaged Windows Harness
+        if: github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        run: |
+          $userData = Join-Path $env:APPDATA 'dsh-desktop-dev'
+          $logPath = Join-Path $userData 'logs\harness.log'
+          $executable = 'dist-dev\win-unpacked\DSH Desktop Dev.exe'
+          if (Test-Path $userData) { Remove-Item -Recurse -Force $userData }
+          $desktop = Start-Process -FilePath $executable -PassThru
+          try {
+            $deadline = (Get-Date).AddSeconds(75)
+            $ready = $false
+            $endpoint = $null
+            $indexHtml = $null
+            while ((Get-Date) -lt $deadline) {
+              if ($desktop.HasExited) {
+                throw "DSH Desktop Dev exited before Harness was ready (exit code $($desktop.ExitCode))."
+              }
+              if (Test-Path $logPath) {
+                $log = Get-Content -Raw $logPath
+                $match = [regex]::Match($log, '\[desktop\] endpoint (http://127\.0\.0\.1:\d+)')
+                if ($match.Success) {
+                  try {
+                    $response = Invoke-WebRequest -UseBasicParsing -Uri $match.Groups[1].Value -TimeoutSec 2
+                    if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) {
+                      $endpoint = $match.Groups[1].Value
+                      $indexHtml = $response.Content
+                      $ready = $true
+                      break
+                    }
+                  } catch { }
+                }
+              }
+              Start-Sleep -Milliseconds 500
+            }
+            if (-not $ready) { throw 'Packaged Harness did not become ready within 75 seconds.' }
+            if ($indexHtml -notmatch '/plugins/(?:%40|@)deepseek-ai(?:%2F|/)dsh-client-modules/client\.js') {
+              throw 'Packaged Harness HTML did not preload the core client module system.'
+            }
+            if ($indexHtml -notmatch '/plugins/(?:%40|@)deepseek-ai(?:%2F|/)dsh-client-runtime/client\.js') {
+              throw 'Packaged Harness HTML did not preload the core client runtime.'
+            }
+
+            function Invoke-HarnessRpc([string]$method, [hashtable]$payload) {
+              $rpcId = [guid]::NewGuid().ToString()
+              $body = @{
+                type = 'client-request'
+                rpcId = $rpcId
+                method = $method
+                payload = $payload
+              } | ConvertTo-Json -Depth 8 -Compress
+              $response = Invoke-RestMethod `
+                -Method Post `
+                -Uri "$endpoint/api/$method" `
+                -ContentType 'application/json; charset=utf-8' `
+                -Body ([System.Text.Encoding]::UTF8.GetBytes($body)) `
+                -TimeoutSec 30
+              if ($response.rpcId -ne $rpcId) { throw "Harness RPC id mismatch for $method." }
+              if (-not $response.result.ok) {
+                throw "Harness RPC $method failed: $($response.result.error.code): $($response.result.error.message)"
+              }
+              return $response.result.value
+            }
+
+            $workspacePath = Join-Path $env:RUNNER_TEMP '数据项素-工作区'
+            New-Item -ItemType Directory -Force -Path $workspacePath | Out-Null
+            $workspace = Invoke-HarnessRpc 'workspace.create' @{ path = $workspacePath }
+            $session = Invoke-HarnessRpc 'session.create' @{ workspaceId = $workspace.workspace.workspaceId }
+            if ([string]::IsNullOrWhiteSpace($session.sessionId)) {
+              throw 'Harness did not return a session id for the selected workspace.'
+            }
+
+            Start-Sleep -Seconds 20
+            $stableLog = Get-Content -Raw $logPath
+            if ($stableLog -match '\[stderr\]') {
+              throw 'Harness reported stderr after workspace and session creation.'
+            }
+            if ($stableLog -match '\[node\] Harness process exited') {
+              throw 'Harness process exited after workspace and session creation.'
+            }
+            if ($desktop.HasExited) {
+              throw "DSH Desktop Dev exited after workspace and session creation (exit code $($desktop.ExitCode))."
+            }
+            Write-Host 'Packaged Windows Harness smoke test passed.'
+          } finally {
+            if (Test-Path $logPath) {
+              Write-Host '--- harness.log ---'
+              Get-Content $logPath
+            }
+            if (-not $desktop.HasExited) { Stop-Process -Id $desktop.Id -Force }
+          }
+      - name: Publish validated Windows development pre-release
+        if: github.event_name == 'workflow_dispatch' && inputs.windows_prerelease_tag != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE_TAG: ${{ inputs.windows_prerelease_tag }}
+        run: |
+          gh release create $env:PRERELEASE_TAG `
+            --repo $env:GITHUB_REPOSITORY `
+            --target $env:GITHUB_SHA `
+            --prerelease `
+            --title 'DSH Desktop Windows Workspace Test' `
+            --notes "Windows x64 development build for validating workspace selection and session startup on affected machines. This build pins Koffi 3.1.5 for the stable native Windows binaries, uses an isolated app identity and user data directory, and has passed a packaged Harness smoke test that creates a Unicode-path workspace and session." `
+            'dist-dev/dsh-desktop-dev-windows-x64-setup.exe#DSH Desktop Dev Windows x64 Setup'
+      - uses: actions/upload-artifact@v7
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: windows-x64
+          retention-days: 1
+          path: |
+            dist/dsh-desktop-windows-x64-setup.exe
+            dist/dsh-desktop-windows-x64-setup.exe.blockmap
+            dist/latest.yml
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          name: windows-x64-dev
+          retention-days: 7
+          path: |
+            dist-dev/dsh-desktop-dev-windows-x64-setup.exe
+            dist-dev/dsh-desktop-dev-windows-x64-setup.exe.blockmap
+            dist-dev/latest.yml
+          if-no-files-found: error
+
+  linux-x64:
+    name: Linux x64
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Set app version from release tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: npm version --no-git-tag-version --allow-same-version "${{ github.ref_name }}"
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - name: Build Linux release packages
+        run: npm run package:linux
+      - name: Verify Linux release assets
+        run: |
+          test -f dist/dsh-desktop-linux-x64.AppImage
+          test -f dist/dsh-desktop-linux-x64.deb
+          test -f dist/latest-linux.yml
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-x64
+          retention-days: 1
+          path: |
+            dist/dsh-desktop-linux-x64.AppImage
+            dist/dsh-desktop-linux-x64.deb
+            dist/latest-linux.yml
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    if: >-
+      always() &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      needs.macos-apple-silicon.result == 'success' &&
+      needs.macos-intel.result == 'success' &&
+      needs.windows-x64.result == 'success' &&
+      needs.linux-x64.result == 'success'
+    needs:
+      - macos-apple-silicon
+      - macos-intel
+      - windows-x64
+      - linux-x64
+    permissions:
+      contents: write
+      actions: write
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@v8
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Merge macOS update metadata
+        run: |
+          node scripts/merge-mac-update-metadata.mjs \
+            release-assets/latest-mac-arm64.yml \
+            release-assets/latest-mac-x64.yml \
+            release-assets/latest-mac.yml
+          find release-assets -maxdepth 1 \
+            \( -name latest-mac-arm64.yml -o -name latest-mac-x64.yml \) \
+            -delete
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          MACOS_ARM64_SIGNED: ${{ needs.macos-apple-silicon.outputs.apple_signing_enabled }}
+          MACOS_X64_SIGNED: ${{ needs.macos-intel.outputs.apple_signing_enabled }}
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release-assets/* --clobber --repo "$GITHUB_REPOSITORY"
+            notes_file="$RUNNER_TEMP/release-notes.md"
+            linux_note="Linux x64 users can choose the AppImage or Debian package."
+            gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > "$notes_file"
+            if ! grep -Fq "$linux_note" "$notes_file"; then
+              printf '\n\n%s\n' "$linux_note" >> "$notes_file"
+            fi
+            gh release edit "$RELEASE_TAG" \
+              --draft=false \
+              --latest \
+              --verify-tag \
+              --title "DSH Desktop $RELEASE_TAG" \
+              --notes-file "$notes_file" \
+              --repo "$GITHUB_REPOSITORY"
+          elif [ "$MACOS_ARM64_SIGNED" != "true" ] || [ "$MACOS_X64_SIGNED" != "true" ]; then
+            gh release create "$RELEASE_TAG" release-assets/* \
+              --verify-tag \
+              --generate-notes \
+              --notes "macOS packages in this release are unsigned because Apple signing credentials are not configured yet. Windows users can install the x64 setup package normally. Linux x64 users can choose the AppImage or Debian package." \
+              --title "DSH Desktop $RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$RELEASE_TAG" release-assets/* \
+              --verify-tag \
+              --generate-notes \
+              --title "DSH Desktop $RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY"
+          fi
+      - name: Remove intermediate release artifacts
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate "/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" \
+            --jq '.artifacts[].id' |
+            while read -r artifact_id; do
+              test -z "$artifact_id" || \
+                gh api --method DELETE "/repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id"
+            done

@@ -1,0 +1,361 @@
+diff --git a/node_modules/@deepseek-ai/dsh-client-ui-settings-models/lib/client.js b/node_modules/@deepseek-ai/dsh-client-ui-settings-models/lib/client.js
+index 12ebd55..76d09ba 100644
+--- a/node_modules/@deepseek-ai/dsh-client-ui-settings-models/lib/client.js
++++ b/node_modules/@deepseek-ai/dsh-client-ui-settings-models/lib/client.js
+@@ -64,6 +64,14 @@ window.__ModuleLoader__.load({
+ 			tag.textContent = css$3;
+ 			document.head.appendChild(tag);
+ 		}
++		const providerPickerTagId = "@deepseek-ai/dsh-client-ui-settings-models/ProviderPicker";
++		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(providerPickerTagId) + "]") === null) {
++			const tag = document.createElement("style");
++			tag.dataset.plugin = "@deepseek-ai/dsh-client-ui-settings-models";
++			tag.dataset.pluginCss = providerPickerTagId;
++			tag.textContent = ".dshProviderPicker{flex-direction:column;gap:10px;display:flex}.dshProviderSearch{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);width:100%;height:36px;font:inherit;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);border-radius:8px;padding:0 11px;font-size:13px}.dshProviderSearch:focus{border-color:var(--dsw-alias-border-l1);outline:none}.dshProviderSearch::placeholder{color:var(--dsw-alias-label-dimmed)}.dshProviderGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;display:grid}.dshProviderCard{box-sizing:border-box;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;flex-direction:column;align-items:flex-start;min-height:58px;padding:10px 12px;display:flex;cursor:pointer;text-align:left;font:inherit}.dshProviderCard:hover{background:var(--dsw-alias-interactive-bg-hover)}.dshProviderCard[aria-pressed=true]{border-color:var(--dsw-alias-border-l1);background:var(--dsw-alias-interactive-bg-hover)}.dshProviderCard:focus-visible{outline:none;box-shadow:0 0 0 2px var(--dsw-alias-border-l3)}.dshProviderName{font-size:14px;font-weight:500;line-height:20px}.dshProviderRoute{color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:16px}.dshProviderSummary{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);border-radius:8px;align-items:center;gap:12px;min-height:52px;padding:8px 10px 8px 12px;display:flex}.dshProviderSummaryText{flex-direction:column;min-width:0;display:flex}.dshProviderChange{color:var(--dsw-alias-label-secondary);background:transparent;border:1px solid var(--dsw-alias-border-l2);border-radius:14px;margin-left:auto;padding:4px 10px;font:inherit;font-size:12px;cursor:pointer}.dshProviderChange:hover{background:var(--dsw-alias-interactive-bg-hover)}@media (width<=620px){.dshProviderGrid{grid-template-columns:1fr}}";
++			document.head.appendChild(tag);
++		}
+ 		var ModelsSection_module_css_default = {
+ 			"addActions": "zGbnIq_addActions",
+ 			"addBlock": "zGbnIq_addBlock",
+@@ -1784,6 +1792,26 @@ window.__ModuleLoader__.load({
+ 		function providerCopy(template, target) {
+ 			return template.replace("{provider}", () => providerTargetLabel(target));
+ 		}
++		/** Common providers first; specialized routes follow alphabetically. */
++		const SETTINGS_PROVIDER_PRIORITY = [
++			"deepseek-official",
++			"deepseek",
++			"openai",
++			"anthropic",
++			"google",
++			"openrouter",
++			"xai",
++			"moonshotai-cn",
++			"moonshotai",
++			"minimax-cn",
++			"minimax",
++			"zai-coding-cn",
++			"zai",
++			"mistral",
++			"groq",
++			"together"
++		];
++		const SETTINGS_PROVIDER_RANK = new Map(SETTINGS_PROVIDER_PRIORITY.map((provider, index) => [provider, index]));
+ 		/**
+ 		* Render the Models section content column.
+ 		* @param props - slot-delivered injected dependencies.
+@@ -1810,6 +1838,8 @@ window.__ModuleLoader__.load({
+ 			const [deleteFailure, setDeleteFailure] = (0, react.useState)(void 0);
+ 			const [savedTarget, setSavedTarget] = (0, react.useState)(void 0);
+ 			const [declaring, setDeclaring] = (0, react.useState)(false);
++			const [providerPickerOpen, setProviderPickerOpen] = (0, react.useState)(false);
++			const [providerQuery, setProviderQuery] = (0, react.useState)("");
+ 			const [dismissedSetup, setDismissedSetup] = (0, react.useState)(() => /* @__PURE__ */ new Set());
+ 			const announceSaved = (target) => {
+ 				controller.load().then(() => {
+@@ -1879,10 +1909,16 @@ window.__ModuleLoader__.load({
+ 			};
+ 			const anyUsable = state.rows.some(providerUsable);
+ 			const configured = state.rows.filter((row) => row.configured);
+-			const addable = state.rows.filter((row) => !row.configured && row.entry.settingsNs !== "");
++			const addable = state.rows.filter((row) => !row.configured && row.entry.settingsNs !== "").sort((left, right) => {
++				const leftRank = SETTINGS_PROVIDER_RANK.get(left.entry.provider) ?? Number.MAX_SAFE_INTEGER;
++				const rightRank = SETTINGS_PROVIDER_RANK.get(right.entry.provider) ?? Number.MAX_SAFE_INTEGER;
++				return leftRank - rightRank || left.entry.displayName.localeCompare(right.entry.displayName);
++			});
+ 			const addTarget = adding ? editing : void 0;
+ 			const addNamespace = addTarget === void 0 ? void 0 : state.namespaces.get(addTarget.settingsNs);
+ 			const protocols = protocolChoices(state.namespaces.get("llm-pi-ai"), schema);
++			const normalizedProviderQuery = providerQuery.trim().toLowerCase();
++			const visibleAddable = normalizedProviderQuery.length === 0 ? addable : addable.filter((row) => `${row.entry.displayName} ${row.entry.provider}`.toLowerCase().includes(normalizedProviderQuery));
+ 			return (0, react_jsx_runtime.jsxs)("div", {
+ 				className: ModelsSection_module_css_default["section"],
+ 				children: [
+@@ -2001,24 +2037,66 @@ window.__ModuleLoader__.load({
+ 							className: ModelsSection_module_css_default["addCard"],
+ 							children: [(0, react_jsx_runtime.jsxs)("div", {
+ 								className: ModelsSection_module_css_default["field"],
+-								children: [(0, react_jsx_runtime.jsx)("span", {
+-									className: ModelsSection_module_css_default["fieldLabel"],
+-									children: t("provider")
+-								}), (0, react_jsx_runtime.jsx)("select", {
+-									className: `${ModelsSection_module_css_default["input"]} ${ModelsSection_module_css_default["selectInput"]}`,
+-									value: addTarget.provider,
+-									"aria-label": t("provider"),
++							children: [(0, react_jsx_runtime.jsx)("span", {
++								className: ModelsSection_module_css_default["fieldLabel"],
++								children: t("provider")
++							}), providerPickerOpen ? (0, react_jsx_runtime.jsxs)("div", {
++								className: "dshProviderPicker",
++								children: [(0, react_jsx_runtime.jsx)("input", {
++									className: "dshProviderSearch",
++									type: "search",
++									value: providerQuery,
++									placeholder: t("providerSearch"),
++									"aria-label": t("providerSearch"),
++									autoFocus: true,
+ 									onChange: (event) => {
+-										const row = addable.find((candidate) => candidate.entry.provider === event.target.value);
+-										/* v8 ignore next -- the select only lists addable rows */
+-										if (row === void 0) return;
+-										setEditing(targetOf(row));
++										setProviderQuery(event.target.value);
++									}
++								}), (0, react_jsx_runtime.jsx)("div", {
++									className: "dshProviderGrid",
++									role: "group",
++									"aria-label": t("provider"),
++									children: visibleAddable.map((row) => {
++									const active = row.entry.provider === addTarget.provider;
++									return (0, react_jsx_runtime.jsxs)("button", {
++										type: "button",
++										className: "dshProviderCard",
++										"aria-pressed": active,
++										onClick: () => {
++											setEditing(targetOf(row));
++											setProviderPickerOpen(false);
++											setProviderQuery("");
++										},
++										children: [(0, react_jsx_runtime.jsx)("span", {
++											className: "dshProviderName",
++											children: row.entry.displayName
++										}), (0, react_jsx_runtime.jsx)("span", {
++											className: "dshProviderRoute",
++											children: row.entry.provider
++										})]
++									}, row.entry.provider);
++									})
++								})]
++							}) : (0, react_jsx_runtime.jsxs)("div", {
++								className: "dshProviderSummary",
++								children: [(0, react_jsx_runtime.jsxs)("span", {
++									className: "dshProviderSummaryText",
++									children: [(0, react_jsx_runtime.jsx)("span", {
++										className: "dshProviderName",
++										children: addTarget.displayName
++									}), (0, react_jsx_runtime.jsx)("span", {
++										className: "dshProviderRoute",
++										children: addTarget.provider
++									})]
++								}), (0, react_jsx_runtime.jsx)("button", {
++									type: "button",
++									className: "dshProviderChange",
++									onClick: () => {
++										setProviderPickerOpen(true);
+ 									},
+-									children: addable.map((row) => (0, react_jsx_runtime.jsx)("option", {
+-										value: row.entry.provider,
+-										children: row.entry.displayName
+-									}, row.entry.provider))
++									children: t("changeProvider")
+ 								})]
++							})]
+ 							}), (0, react_jsx_runtime.jsx)(ProviderEditor, {
+ 								provider: addTarget.provider,
+ 								displayName: addTarget.displayName,
+@@ -2062,6 +2140,8 @@ window.__ModuleLoader__.load({
+ 									setDeclaring(false);
+ 									setAdding(true);
+ 									setEditing(targetOf(first));
++									setProviderPickerOpen(true);
++									setProviderQuery("");
+ 								},
+ 								children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconPlusOutline16, { size: 14 }), t("add")]
+ 							}), (0, react_jsx_runtime.jsxs)("button", {
+@@ -2170,7 +2250,7 @@ window.__ModuleLoader__.load({
+ 		}
+ 		//#endregion
+ 		//#region \0dsh-css:/home/runner/work/deepseek-harness/deepseek-harness/packages/client/ui-settings-models/src/client/DeepSeekOnboardingDialog.module.css.mjs
+-		const css$1 = ".GL8Viq_description{color:var(--dsw-alias-label-secondary);margin:0;font-size:14px;line-height:24px}.GL8Viq_editor{margin-top:24px}@media (width<=560px){.GL8Viq_editor{margin-top:20px}}";
++		const css$1 = ".GL8Viq_description{color:var(--dsw-alias-label-secondary);margin:0;font-size:14px;line-height:24px}.GL8Viq_selectionLabel{color:var(--dsw-alias-label-primary);margin:20px 0 10px;font-size:13px;font-weight:500}.GL8Viq_providerList{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;display:grid}.GL8Viq_providerButton{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;flex-direction:column;align-items:flex-start;min-height:58px;padding:10px 12px;display:flex;cursor:pointer;text-align:left}.GL8Viq_providerButton:hover{background:var(--dsw-alias-interactive-bg-hover)}.GL8Viq_providerButtonSelected{border-color:var(--dsw-alias-brand-primary);box-shadow:inset 0 0 0 1px var(--dsw-alias-brand-primary)}.GL8Viq_providerName{font-size:14px;font-weight:500;line-height:20px}.GL8Viq_providerKind{color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:16px}.GL8Viq_editor{border-top:1px solid var(--dsw-alias-border-l3);margin-top:20px;padding-top:20px}@media (width<=560px){.GL8Viq_providerList{grid-template-columns:1fr}.GL8Viq_editor{margin-top:18px;padding-top:18px}}";
+ 		const tagId$1 = "@deepseek-ai/dsh-client-ui-settings-models/DeepSeekOnboardingDialog.module.css";
+ 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$1) + "]") === null) {
+ 			const tag = document.createElement("style");
+@@ -2181,6 +2261,12 @@ window.__ModuleLoader__.load({
+ 		}
+ 		var DeepSeekOnboardingDialog_module_css_default = {
+ 			"description": "GL8Viq_description",
++			"selectionLabel": "GL8Viq_selectionLabel",
++			"providerList": "GL8Viq_providerList",
++			"providerButton": "GL8Viq_providerButton",
++			"providerButtonSelected": "GL8Viq_providerButtonSelected",
++			"providerName": "GL8Viq_providerName",
++			"providerKind": "GL8Viq_providerKind",
+ 			"editor": "GL8Viq_editor"
+ 		};
+ 		//#endregion
+@@ -2196,35 +2282,50 @@ window.__ModuleLoader__.load({
+ 		function assertNever$1(_value) {
+ 			throw new Error("unexpected DeepSeek onboarding state");
+ 		}
++		/** Mainstream catalog routes exposed during first-run setup. */
++		const ONBOARDING_PROVIDERS = [
++			{ provider: "deepseek-official", displayName: "DeepSeek", kind: "onboardingManufacturer" },
++			{ provider: "openai", displayName: "OpenAI", kind: "onboardingManufacturer" },
++			{ provider: "anthropic", displayName: "Anthropic", kind: "onboardingManufacturer" },
++			{ provider: "google", displayName: "Google Gemini", kind: "onboardingManufacturer" },
++			{ provider: "openrouter", displayName: "OpenRouter", kind: "onboardingAggregator" },
++			{ provider: "xai", displayName: "xAI", kind: "onboardingManufacturer" },
++			{ provider: "moonshotai-cn", displayName: "Moonshot / Kimi", kind: "onboardingManufacturer" },
++			{ provider: "minimax-cn", displayName: "MiniMax", kind: "onboardingManufacturer" },
++			{ provider: "zai-coding-cn", displayName: "智谱 GLM", kind: "onboardingManufacturer" },
++			{ provider: "mistral", displayName: "Mistral AI", kind: "onboardingManufacturer" },
++			{ provider: "groq", displayName: "Groq", kind: "onboardingInference" },
++			{ provider: "together", displayName: "Together AI", kind: "onboardingInference" }
++		];
+ 		/**
+-		* Prompt a first-run user for the official DeepSeek credential while no
+-		* provider can serve requests and that credential is writable.
++		* Prompt a first-run user to choose a supported mainstream provider and store
++		* its credential while no configured route can serve requests.
+ 		* @param props - settings-shell owner state and Models feature dependencies.
+ 		* @returns the onboarding modal or null when onboarding needs no intervention.
+ 		*/
+ 		function DeepSeekOnboardingDialog(props) {
+ 			const { complete, controller, useModels, api, schema, t } = props;
+ 			const state = useModels((snapshot) => snapshot);
+-			const readiness = onboardingReadiness(state);
++			const [selectedProvider, setSelectedProvider] = (0, react.useState)("deepseek-official");
++			const choices = ONBOARDING_PROVIDERS.flatMap((choice) => {
++				const row = state.rows.find((candidate) => candidate.entry.provider === choice.provider && candidate.entry.settingsNs !== "");
++				return row === void 0 || state.namespaces.get(row.entry.settingsNs) === void 0 ? [] : [{
++					...choice,
++					row
++				}];
++			});
++			const selected = choices.find((choice) => choice.provider === selectedProvider) ?? choices[0];
++			const anyUsable = state.rows.some(providerUsable);
+ 			(0, react.useEffect)(() => {
+ 				if (state.status === "idle") controller.load();
+ 			}, [controller, state.status]);
+ 			(0, react.useEffect)(() => {
+-				if (readiness.kind === "adapter-absent" || readiness.kind === "provider-ready" || readiness.kind === "unavailable") complete();
+-			}, [complete, readiness.kind]);
+-			switch (readiness.kind) {
+-				case "loading":
+-				case "adapter-absent":
+-				case "provider-ready":
+-				case "unavailable": return null;
+-				case "credential-missing": break;
+-				/* v8 ignore next -- every current readiness variant is handled above */
+-				default: return assertNever$1(readiness);
+-			}
+-			const row = state.rows.find((candidate) => candidate.entry.provider === "deepseek-official" && candidate.entry.settingsNs === "llm-deepseek" && candidate.entry.settingsPath.length === 0);
+-			const namespace = state.namespaces.get("llm-deepseek");
+-			/* v8 ignore next 2 -- credential-missing is derived only from this exact joined row. */
+-			if (row === void 0 || namespace === void 0) return null;
++				if (anyUsable || state.status === "error" || state.status === "ready" && (!state.writable || choices.length === 0)) complete();
++			}, [anyUsable, choices.length, complete, state.status, state.writable]);
++			if (state.status === "idle" || state.status === "loading" || anyUsable || selected === void 0 || !state.writable) return null;
++			const row = selected.row;
++			const namespace = state.namespaces.get(row.entry.settingsNs);
++			if (namespace === void 0) return null;
+ 			const finishCredential = (changed) => {
+ 				if (!changed) {
+ 					complete();
+@@ -2237,26 +2338,48 @@ window.__ModuleLoader__.load({
+ 				children: [(0, react_jsx_runtime.jsx)("p", {
+ 					className: DeepSeekOnboardingDialog_module_css_default.description,
+ 					children: t("onboardingDescription")
++				}), (0, react_jsx_runtime.jsx)("p", {
++					className: DeepSeekOnboardingDialog_module_css_default.selectionLabel,
++					children: t("onboardingProvider")
++				}), (0, react_jsx_runtime.jsx)("div", {
++					className: DeepSeekOnboardingDialog_module_css_default.providerList,
++					children: choices.map((choice) => {
++						const active = choice.provider === selected.provider;
++						return (0, react_jsx_runtime.jsxs)("button", {
++							type: "button",
++							className: `${DeepSeekOnboardingDialog_module_css_default.providerButton}${active ? ` ${DeepSeekOnboardingDialog_module_css_default.providerButtonSelected}` : ""}`,
++							"aria-pressed": active,
++							onClick: () => setSelectedProvider(choice.provider),
++							children: [(0, react_jsx_runtime.jsx)("span", {
++								className: DeepSeekOnboardingDialog_module_css_default.providerName,
++								children: choice.displayName
++							}), (0, react_jsx_runtime.jsx)("span", {
++								className: DeepSeekOnboardingDialog_module_css_default.providerKind,
++								children: t(choice.kind)
++							})]
++						}, choice.provider);
++					})
+ 				}), (0, react_jsx_runtime.jsx)("div", {
+ 					className: DeepSeekOnboardingDialog_module_css_default.editor,
+ 					children: (0, react_jsx_runtime.jsx)(ProviderEditor, {
+ 						provider: row.entry.provider,
+-						displayName: row.entry.displayName,
++						displayName: selected.displayName,
+ 						namespace,
+ 						schema,
+ 						settingsPath: row.entry.settingsPath,
++						...row.entry.declared === true ? { declared: true } : {},
+ 						api,
+ 						t,
+ 						readOnly: false,
+ 						hideTitle: true,
+-						credentialOnly: true,
++						credentialOnly: row.entry.settingsNs === "llm-deepseek",
+ 						credentialRequired: true,
+ 						autoFocusCredential: true,
+ 						cancelLabel: "onboardingLater",
+ 						submitLabel: "onboardingSave",
+ 						submitBusyLabel: "onboardingSaving",
+ 						onClose: finishCredential
+-					})
++					}, selected.provider)
+ 				})]
+ 			});
+ 		}
+@@ -2520,6 +2643,8 @@ window.__ModuleLoader__.load({
+ 			deleting: "Deleting {provider}…",
+ 			add: "Add provider",
+ 			provider: "Provider",
++			providerSearch: "Search providers",
++			changeProvider: "Change",
+ 			close: "Close",
+ 			cancel: "Cancel",
+ 			apply: "Apply",
+@@ -2595,10 +2720,14 @@ window.__ModuleLoader__.load({
+ 			welcomeBody: WELCOME_NOTICE_COPY.en.body,
+ 			welcomeContinue: WELCOME_NOTICE_COPY.en.continueLabel,
+ 			welcomeError: "The acknowledgement could not be saved. Please try again.",
+-			onboardingTitle: "Add an API key to get started",
+-			onboardingDescription: "Configure the official DeepSeek provider to start building.",
++			onboardingTitle: "Connect a model provider",
++			onboardingDescription: "Choose a provider and enter its API key. DSH will enable that provider's built-in model catalog automatically.",
++			onboardingProvider: "Model provider",
++			onboardingManufacturer: "Model developer",
++			onboardingAggregator: "Model aggregation platform",
++			onboardingInference: "Inference platform",
+ 			onboardingLater: "Configure later",
+-			onboardingSave: "Save and continue",
++			onboardingSave: "Connect and continue",
+ 			onboardingSaving: "Saving…",
+ 			keyRequired: "Enter an API key to continue."
+ 		};
+@@ -2618,6 +2747,8 @@ window.__ModuleLoader__.load({
+ 			deleting: "正在删除 {provider}…",
+ 			add: "添加提供方",
+ 			provider: "提供方",
++			providerSearch: "搜索提供方",
++			changeProvider: "更换",
+ 			close: "关闭",
+ 			cancel: "取消",
+ 			apply: "保存",
+@@ -2693,10 +2824,14 @@ window.__ModuleLoader__.load({
+ 			welcomeBody: WELCOME_NOTICE_COPY.zh.body,
+ 			welcomeContinue: WELCOME_NOTICE_COPY.zh.continueLabel,
+ 			welcomeError: "暂时无法保存确认状态，请重试。",
+-			onboardingTitle: "添加一个 API Key 开始使用",
+-			onboardingDescription: "配置 DeepSeek 官方模型，即可开始使用。",
++			onboardingTitle: "接入模型提供方",
++			onboardingDescription: "选择提供方并填写 API Key，DSH 会自动启用该提供方的内置模型目录。之后可在「设置 → 模型」中添加更多提供方。",
++			onboardingProvider: "选择模型提供方",
++			onboardingManufacturer: "模型厂商",
++			onboardingAggregator: "模型聚合平台",
++			onboardingInference: "推理服务平台",
+ 			onboardingLater: "稍后配置",
+-			onboardingSave: "保存并继续",
++			onboardingSave: "接入并继续",
+ 			onboardingSaving: "保存中…",
+ 			keyRequired: "请输入 API 密钥后继续。"
+ 		};
