@@ -4,23 +4,23 @@
  * the loader, and keeping exactly one theme active with the choice
  * persisted across restarts.
  */
-import { loadRegistry } from './registry.js';
-import { hotMount, hotUnmount, listHotMounts, writeDisabled } from './hot.js';
-import { logEvent } from './log.js';
-import { profileDir, readInstalled } from './profile.js';
-import { repoOf } from './sources.js';
+import { loadRegistry } from "./registry.js";
+import { hotMount, hotUnmount, listHotMounts, writeDisabled } from "./hot.js";
+import { logEvent } from "./log.js";
+import { profileDir, readInstalled } from "./profile.js";
+import { parseGitHubDependencySpec, repoOf } from "./sources.js";
 /**
  * Create the theme manager. `disabledThemes` is the live, shared set of
  * themes the user switched off — the caller owns reading it at boot and
  * replaying it; the manager mutates and persists it on switches.
  */
-export function createThemeManager(host, profile, disabledThemes, explicitDir) {
+export function createThemeManager(host, profile, disabledThemes, explicitDir, registryLoader = loadRegistry) {
     const activeProfileDir = profileDir(profile, explicitDir);
     /** Installed package names classified as themes by the registry's theme category. */
     async function installedThemeNames() {
         const names = new Set();
         try {
-            const registry = await loadRegistry();
+            const registry = await registryLoader();
             const themeEntries = registry.plugins.filter(p => p.category === 'theme');
             const themeNames = new Set(themeEntries.map(p => p.name));
             const themeRepos = new Set(themeEntries.map(p => repoOf(p.url)).filter((r) => r !== null).map(r => r.toLowerCase()));
@@ -29,8 +29,8 @@ export function createThemeManager(host, profile, disabledThemes, explicitDir) {
                     names.add(name);
                     continue;
                 }
-                const match = /github:([^#\s]+)/.exec(String(spec).toLowerCase());
-                if (match !== null && themeRepos.has(match[1]))
+                const source = parseGitHubDependencySpec(String(spec));
+                if (source !== null && themeRepos.has(source.repo.toLowerCase()))
                     names.add(name);
             }
         }

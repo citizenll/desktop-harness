@@ -36,6 +36,18 @@ Download DSH Desktop for macOS, Windows, or Linux x64 from [GitHub Releases](htt
 
 Installed macOS and Windows builds check this repository's GitHub Releases for updates automatically after startup and every six hours. Updates download in the background and prompt you to restart when they are ready. You can also choose **Check for Updates…** from the application menu.
 
+### Plugin installation entry points
+
+DSH Desktop routes all three forms below to its dedicated external-plugin installation flow. It shows the resolved source and asks for confirmation; it never modifies a profile silently:
+
+```text
+http://127.0.0.1:3080/#dsh-plugin-install=nexu-io%2Fopen-design
+dsh-desktop://plugin/install?source=nexu-io%2Fopen-design
+dsh plugin --profile web add github:le-soleil-se-couche/dsh-skin-claude-code
+```
+
+`dsh plugin add` accepts `github:owner/repository`, a GitHub HTTPS URL, or an npm package name. Port `3080` is DSH Desktop's stable browser-install bridge: while the app is running, the page securely forwards the fragment source to Desktop and the app shows its normal confirmation dialog. The Harness UI still uses a private random port to avoid collisions. The `dsh-desktop://` protocol supports both cold starts and an already-running app. The Windows installer also registers an app-backed `dsh` command in the user PATH; open a new terminal after installation to use it. macOS and Linux currently support the protocol and browser entry points without modifying the system PATH.
+
 ## Why this project exists
 
 DeepSeek Harness already provides a complete agent runtime and Web UI. DSH Desktop does not reimplement Harness; it supplies the host capabilities needed for a desktop product:

@@ -1,5 +1,5 @@
 import { listPackage } from '@electron/asar'
-import { readdir, stat } from 'node:fs/promises'
+import { readFile, readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 
 const outputRoot = path.resolve(process.argv[2] ?? 'dist')
@@ -126,6 +126,25 @@ if (unpacked.files > 500) {
 }
 
 const resourcesRoot = path.dirname(archive)
+if (process.platform === 'win32' && path.basename(outputRoot).toLowerCase() === 'dist') {
+  for (const file of ['dsh.cmd', 'dsh.ps1', 'dsh-path.ps1']) {
+    const target = path.join(resourcesRoot, 'dsh-cli', file)
+    const metadata = await stat(target).catch(() => undefined)
+    if (!metadata?.isFile()) {
+      throw new Error(`Packaged Windows runtime is missing resources/dsh-cli/${file}.`)
+    }
+  }
+  const launcher = await readFile(path.join(resourcesRoot, 'dsh-cli', 'dsh.ps1'), 'utf8')
+  for (const marker of [
+    'dsh-desktop://plugin/install?source=',
+    'Remove-Item Env:NODE_OPTIONS',
+    'Remove-Item Env:ELECTRON_RUN_AS_NODE'
+  ]) {
+    if (!launcher.includes(marker)) {
+      throw new Error(`Packaged Windows dsh launcher is missing: ${marker}`)
+    }
+  }
+}
 const applicationRoot = path.dirname(resourcesRoot)
 const installed = await collectStats(applicationRoot)
 console.log(`Verified packaged runtime: ${path.relative(process.cwd(), archive)}`)

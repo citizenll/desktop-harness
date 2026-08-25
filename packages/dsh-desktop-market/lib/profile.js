@@ -6,7 +6,7 @@
 import { existsSync, readdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
-import { githubRemoteIdentities, githubRepoIdentities } from './sources.js';
+import { githubRemoteIdentities, githubRepoIdentities, parseGitHubDependencySpec } from "./sources.js";
 /**
  * Resolve a profile name to its directory under DSH_HOME (default ~/.dsh).
  * An explicit directory is used by hosts, such as DSH Desktop, that own the
@@ -224,10 +224,11 @@ function checkoutSubpath(root, packageDir) {
     return value === '' || value === '.' || value.startsWith('../') ? null : value;
 }
 /**
- * Strong repository identities for a locally linked dependency (#141).
- * Explicit github: specs already carry this evidence; only link:/file: need
- * filesystem discovery. This compatibility wrapper returns only declared
- * package.json identities; Git origins are exposed separately as hints.
+ * Strong repository identities for an installed dependency (#141).
+ * Explicit GitHub specs (including Desktop's immutable archive pins) carry
+ * their own evidence; link:/file: dependencies need filesystem discovery.
+ * This compatibility wrapper returns only declared identities; Git origins
+ * are exposed separately as hints.
  */
 export function readInstalledRepoIdentities(profile, name, spec, explicitDir) {
     return readInstalledRepoEvidence(profile, name, spec, explicitDir).identities;
@@ -238,6 +239,14 @@ export function readInstalledRepoIdentities(profile, name, spec, explicitDir) {
  * disambiguation hint because a checkout may legitimately point at a fork.
  */
 export function readInstalledRepoEvidence(profile, name, spec, explicitDir) {
+    const github = parseGitHubDependencySpec(spec);
+    if (github !== null) {
+        const repo = github.repo.toLowerCase();
+        return {
+            identities: github.subpath === null ? [repo] : [repo, `${repo}#path:/${github.subpath.toLowerCase()}`],
+            hints: [],
+        };
+    }
     if (!PACKAGE_NAME_RE.test(name) || !/^(?:link|file):/i.test(spec))
         return { identities: [], hints: [] };
     const root = profileDir(profile, explicitDir);
@@ -261,13 +270,16 @@ export function readInstalledRepoEvidence(profile, name, spec, explicitDir) {
     // explicit local source directory is valid Git-origin evidence.
     return { identities: [], hints: [] };
 }
-/** Pinned commit per `owner/repo` from the profile lockfile's codeload tarball URLs. */
+/** Pinned commit per `owner/repo` from Git or immutable archive lockfile URLs. */
 export function readLockCommits(profile, explicitDir) {
     const commits = new Map();
     try {
         const lock = readFileSync(join(profileDir(profile, explicitDir), 'pnpm-lock.yaml'), 'utf8');
         for (const m of lock.matchAll(/codeload\.github\.com\/([^/\s]+\/[^/\s]+)\/tar\.gz\/([0-9a-f]{40})/g)) {
             commits.set(m[1].toLowerCase(), m[2]);
+        }
+        for (const m of lock.matchAll(/github\.com\/([^/\s]+\/[^/\s]+)\/archive\/([0-9a-f]{40,64})\.tar\.gz/gi)) {
+            commits.set(m[1].toLowerCase(), m[2].toLowerCase());
         }
     }
     catch { /* no lockfile — no git installs to report */ }
@@ -663,11 +675,14 @@ export function setAllowBuilds(profile, packages, explicitDir) {
             map[key] = m[2] ?? 'true';
         }
     }
-    // Bare package names, or the server-derived stable git form
-    // `name@git+https://github.com/owner/repo.git` (#68) — nothing else.
+    // Bare package names, the server-derived stable git form used by pnpm 11,
+    // or pnpm 10's exact commit-pinned codeload selector. The latter comes only
+    // from parsed package-manager output; accepting it here fixes the loop where
+    // the UI said "allowed" but pnpm kept rejecting the same prepare script.
     const GIT_KEY_RE = /^[A-Za-z0-9@/_.-]+@git\+https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\.git$/;
+    const EXACT_GIT_KEY_RE = /^(@[A-Za-z0-9-~][A-Za-z0-9._~-]*\/)?[A-Za-z0-9-~][A-Za-z0-9._~-]*@https:\/\/codeload\.github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/tar\.gz\/[0-9a-f]{40,64}(?:#path:\/[A-Za-z0-9_./-]+)?$/i;
     for (const pkg of packages) {
-        if (/^[A-Za-z0-9@/_.-]+$/.test(pkg) || GIT_KEY_RE.test(pkg))
+        if (/^[A-Za-z0-9@/_.-]+$/.test(pkg) || GIT_KEY_RE.test(pkg) || EXACT_GIT_KEY_RE.test(pkg))
             map[pkg] = 'true';
     }
     // Write back in the file's OWN line ending. Rewriting a CRLF workspace

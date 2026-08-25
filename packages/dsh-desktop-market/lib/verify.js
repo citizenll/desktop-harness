@@ -26,8 +26,8 @@
 import { readFileSync } from 'node:fs';
 import { Script } from 'node:vm';
 import { join } from 'node:path';
-import { listHotMounts, parseSimplePatch } from './hot.js';
-import { bundlePatchInsertedIds, hasDshManifest, hasLoadableEntry, profileDir } from './profile.js';
+import { listHotMounts, parseSimplePatch } from "./hot.js";
+import { bundlePatchInsertedIds, hasDshManifest, hasLoadableEntry, profileDir } from "./profile.js";
 /** The profile manifest's `dsh.profile.bundles` — what the CLI reconciled. */
 function readBundles(profile, explicitDir) {
     try {

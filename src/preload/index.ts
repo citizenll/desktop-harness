@@ -7,12 +7,21 @@ import {
   type UpdateLocale
 } from './update-view'
 import { isPluginLoadError } from './plugin-error-view'
+import { installAppDialog } from './app-dialog'
 import { installMobilePanel } from './mobile-panel'
 import { mountWindowsTitlebar } from './windows-titlebar'
+import {
+  DSH_DESKTOP_PLUGIN_INSTALL_CHANNEL,
+  DSH_DESKTOP_PLUGIN_INSTALL_EVENT,
+  DSH_DESKTOP_PLUGIN_INSTALL_STORAGE_KEY,
+  normalizePluginInstallSource
+} from '../shared/plugin-install-intent'
 
 const ROOT_ID = 'dsh-desktop-update-root'
 const MOBILE_BUTTON_ID = 'dsh-desktop-mobile-button'
 const locale: UpdateLocale = navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en'
+
+installAppDialog({ document, ipcRenderer, locale })
 
 let host: HTMLDivElement | undefined
 let content: HTMLDivElement | undefined
@@ -28,6 +37,32 @@ let bootFailureTimer: number | undefined
 const pendingBootFailureMessages: string[] = []
 
 const BOOT_FAILURE_SETTLE_MS = 400
+
+function publishPluginInstallRequest(payload: unknown): void {
+  const source = normalizePluginInstallSource(
+    typeof payload === 'object' && payload !== null && 'source' in payload
+      ? (payload as { source?: unknown }).source
+      : undefined
+  )
+  if (!source) return
+
+  try {
+    sessionStorage.setItem(
+      DSH_DESKTOP_PLUGIN_INSTALL_STORAGE_KEY,
+      JSON.stringify({ source })
+    )
+  } catch {
+    // The live event still opens an already-mounted direct-install dialog
+    // when storage is unavailable. Cold-start delivery uses sessionStorage.
+  }
+  window.dispatchEvent(
+    new CustomEvent(DSH_DESKTOP_PLUGIN_INSTALL_EVENT, { detail: { source } })
+  )
+}
+
+ipcRenderer.on(DSH_DESKTOP_PLUGIN_INSTALL_CHANNEL, (_event, payload: unknown) => {
+  publishPluginInstallRequest(payload)
+})
 
 function currentBootFailureText(): string | undefined {
   const root = document.body || document.documentElement

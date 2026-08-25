@@ -6,4 +6,4 @@ import type { Context } from '@deepseek-ai/cordis';
 export declare const name = "dsh-market";
 /** Desktop owns the profile and process lifecycle; loader configuration is intentionally empty. */
 export type Config = Record<string, never>;
-export declare function apply(ctx: Context, config?: Config): void;
+export declare function apply(ctx: Context, _config?: Config): void;

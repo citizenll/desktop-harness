@@ -16,8 +16,8 @@
  * Everything else stays informational: `*`, prerelease-vs-`*` artifacts,
  * unparseable ranges, and optional peers never produce a risk here.
  */
-import { analyzeProfile, compareSemver } from './check.js';
-import { profileDir, readInstalledManifest } from './profile.js';
+import { analyzeProfile, compareSemver } from "./check.js";
+import { profileDir, readInstalledManifest } from "./profile.js";
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 function parseComparator(part) {
     const p = part.trim();

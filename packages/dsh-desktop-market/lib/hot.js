@@ -26,8 +26,8 @@ var __rewriteRelativeImportExtension = (this && this.__rewriteRelativeImportExte
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { asChannel } from './channels.js';
-import { logEvent } from './log.js';
+import { asChannel } from "./channels.js";
+import { logEvent } from "./log.js";
 const HOT_DIR = '.dsh-market';
 /**
  * Ceiling for one hot-mount activation, env-overridable like the install

@@ -10,10 +10,11 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
-import { logEvent } from './log.js';
-import { createProgressTracker } from './ndjson.js';
-import { pluginArgsFor } from './pnpm-compat.js';
-import { profileDir } from './profile.js';
+import { logEvent } from "./log.js";
+import { createProgressTracker } from "./ndjson.js";
+import { InstallOutputBuffer, installOutputCandidates, } from "./install-progress.js";
+import { pluginArgsFor } from "./pnpm-compat.js";
+import { profileDir } from "./profile.js";
 // 15 min default (slow networks + git installs), overridable for CI/tests.
 // (#6 by @qichuang321.)
 /**
@@ -156,14 +157,15 @@ const COMSPEC = process.env.ComSpec ?? 'cmd.exe';
 function spawnShim(file, args, options) {
     const { viaShell = false, ...spawnOptions } = options;
     if (!viaShell) {
-        return spawn(file, [...args], { ...spawnOptions, shell: false });
+        return spawn(file, [...args], { ...spawnOptions, shell: false, windowsHide: true });
     }
     if (process.platform !== 'win32') {
-        return spawn(file, [...args], { ...spawnOptions, shell: false });
+        return spawn(file, [...args], { ...spawnOptions, shell: false, windowsHide: true });
     }
     return spawn(COMSPEC, ['/d', '/s', '/c', `"${cmdCommandLine([file, ...args])}"`], {
         ...spawnOptions,
         shell: false,
+        windowsHide: true,
         windowsVerbatimArguments: true,
     });
 }
@@ -193,7 +195,10 @@ export function dshArgv() {
 export function killChild(child) {
     if (process.platform === 'win32' && child.pid !== undefined) {
         try {
-            spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], { stdio: 'ignore' });
+            spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], {
+                stdio: 'ignore',
+                windowsHide: true,
+            });
             return;
         }
         catch { /* fall through */ }
@@ -213,7 +218,10 @@ let activeDesktopOperation = null;
 function killTree(child) {
     if (process.platform === 'win32' && child.pid !== undefined) {
         try {
-            spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], { stdio: 'ignore' });
+            spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], {
+                stdio: 'ignore',
+                windowsHide: true,
+            });
             return;
         }
         catch { /* fall through */ }
@@ -398,7 +406,53 @@ export const progress = {
     ndjson: false,
     error: null,
     cancelling: false,
+    outputSession: '',
+    output: [],
 };
+const installOutput = new InstallOutputBuffer();
+let aggregateOutputSession = false;
+let automaticOutputSession = 0;
+function syncInstallOutput() {
+    progress.output = installOutput.snapshot();
+}
+function pushInstallOutput(stream, text) {
+    installOutput.push(stream, text);
+    syncInstallOutput();
+}
+/**
+ * Start one route-wide output session. A direct install can run several pnpm
+ * commands (approval retry, prebuilt fallback, collection retargeting); their
+ * output must remain one continuous transcript instead of resetting at every
+ * child process.
+ */
+export function beginInstallOutputSession(session, target) {
+    aggregateOutputSession = true;
+    installOutput.clear();
+    progress.outputSession = session;
+    progress.output = [];
+    progress.target = target;
+    progress.startedAt = Date.now();
+    progress.active = false;
+    progress.lastLine = '';
+    progress.phase = null;
+    progress.done = 0;
+    progress.total = null;
+    progress.currentPackage = null;
+    progress.downloaded = null;
+    progress.size = null;
+    progress.ndjson = false;
+    progress.error = null;
+    progress.cancelling = false;
+}
+/** End aggregation while retaining the final transcript for the last poll. */
+export function finishInstallOutputSession(session) {
+    if (progress.outputSession !== session)
+        return;
+    aggregateOutputSession = false;
+    progress.active = false;
+    progress.cancelling = false;
+    syncInstallOutput();
+}
 /** Identifies this host process; the client scopes its pending-restart flags to it. */
 export const BOOT_ID = `${String(process.pid)}-${String(Date.now())}`;
 /**
@@ -422,15 +476,21 @@ function preparePluginArgs(profileDirectory, pluginArgs) {
     if (!TARGET_RE.test(target)) {
         return { error: `unsafe plugin target rejected: ${JSON.stringify(target)}` };
     }
-    if (NDJSON_COMMANDS.has(args[0]))
+    const command = args[0];
+    if (command !== undefined && NDJSON_COMMANDS.has(command))
         args = [...args, '--reporter=ndjson'];
     return { args, target };
 }
-/** Reset the singleton status snapshot before one operation starts. */
-function beginProgress(target) {
+/** Reset command metrics while preserving a route-wide direct-install transcript. */
+function beginProgress(target, profile, displayArgs) {
+    if (!aggregateOutputSession) {
+        automaticOutputSession += 1;
+        installOutput.clear();
+        progress.outputSession = `command-${String(automaticOutputSession)}`;
+        progress.startedAt = Date.now();
+    }
     progress.active = true;
     progress.target = target;
-    progress.startedAt = Date.now();
     progress.lastLine = '';
     progress.phase = null;
     progress.done = 0;
@@ -441,6 +501,7 @@ function beginProgress(target) {
     progress.ndjson = false;
     progress.error = null;
     progress.cancelling = false;
+    pushInstallOutput('command', `dsh plugin --profile ${profile} ${displayArgs.join(' ')}`);
     return createProgressTracker();
 }
 /**
@@ -448,35 +509,53 @@ function beginProgress(target) {
  * per line on stdout, and chunk boundaries can split a line. Human fallback
  * lines (older pnpm without structured events) still update `lastLine`.
  */
-function makeProgressFeeder(tracker) {
+function makeProgressFeeder(tracker, stream) {
     let lineBuffer = '';
-    return (chunk) => {
+    const consume = (line) => {
+        const trimmed = line.trim();
+        if (trimmed === '')
+            return;
+        tracker.feed(trimmed);
+        const candidates = installOutputCandidates(trimmed, stream);
+        for (const candidate of candidates)
+            installOutput.push(candidate.stream, candidate.text);
+        if (candidates.length > 0) {
+            progress.lastLine = candidates[candidates.length - 1].text.slice(0, 200);
+            syncInstallOutput();
+        }
+    };
+    const push = (chunk) => {
         lineBuffer += chunk;
         let nl;
         while ((nl = lineBuffer.indexOf('\n')) !== -1) {
             const line = lineBuffer.slice(0, nl);
             lineBuffer = lineBuffer.slice(nl + 1);
-            const trimmed = line.trim();
-            if (trimmed === '')
-                continue;
-            tracker.feed(trimmed);
-            // Human lines never start with '{'; JSON lines are consumed by the tracker.
-            if (!trimmed.startsWith('{'))
-                progress.lastLine = trimmed.slice(0, 200);
+            consume(line);
         }
+    };
+    return {
+        push,
+        flush: () => {
+            if (lineBuffer === '')
+                return;
+            consume(lineBuffer);
+            lineBuffer = '';
+        },
     };
 }
 /** Run one `dsh plugin --profile <p> …` command with timeout and progress tracking. */
 export function runDshPlugin(profile, pluginArgs) {
     const { file, args, cwd, viaShell } = dshArgv();
+    const displayArgs = [...pluginArgs];
     const prepared = preparePluginArgs(profileDir(profile), pluginArgs);
     if ('error' in prepared) {
         logEvent('error', 'install', prepared.error);
         return Promise.resolve({ exitCode: 1, timedOut: false, stdout: '', stderr: prepared.error, cancelled: false });
     }
     pluginArgs = prepared.args;
-    const tracker = beginProgress(prepared.target);
-    const feed = makeProgressFeeder(tracker);
+    const tracker = beginProgress(prepared.target, profile, displayArgs);
+    const stdoutFeed = makeProgressFeeder(tracker, 'stdout');
+    const stderrFeed = makeProgressFeeder(tracker, 'stderr');
     return new Promise((resolvePromise) => {
         const child = spawnShim(file, [...args, 'plugin', '--profile', profile, ...pluginArgs], {
             cwd,
@@ -502,17 +581,21 @@ export function runDshPlugin(profile, pluginArgs) {
         child.stdout?.on('data', (chunk) => {
             const text = chunk.toString();
             stdout = (stdout + text).slice(-256 * 1024);
-            feed(text);
+            stdoutFeed.push(text);
             syncProgress(tracker);
         });
         child.stderr?.on('data', (chunk) => {
             const text = chunk.toString();
             stderr = (stderr + text).slice(-64 * 1024);
-            feed(text);
+            stderrFeed.push(text);
             syncProgress(tracker);
         });
         child.on('error', (error) => {
             clearTimeout(timer);
+            stdoutFeed.flush();
+            stderrFeed.flush();
+            syncProgress(tracker);
+            pushInstallOutput('stderr', error.message);
             progress.active = false;
             progress.cancelling = false;
             if (activeChild === child)
@@ -521,6 +604,9 @@ export function runDshPlugin(profile, pluginArgs) {
         });
         child.on('close', (code) => {
             clearTimeout(timer);
+            stdoutFeed.flush();
+            stderrFeed.flush();
+            syncProgress(tracker);
             progress.active = false;
             progress.cancelling = false;
             if (activeChild === child)
@@ -554,7 +640,7 @@ export function createDesktopPluginRuntime(service, activeProfileDir, invokingDi
     }
     const owner = Symbol('dsh-market desktop runtime');
     let closed = false;
-    const runPlugin = async (_profile, pluginArgs) => {
+    const runPlugin = async (profile, pluginArgs) => {
         if (closed) {
             return {
                 exitCode: 127,
@@ -564,11 +650,15 @@ export function createDesktopPluginRuntime(service, activeProfileDir, invokingDi
                 cancelled: false,
             };
         }
+        const displayArgs = [...pluginArgs];
         const prepared = preparePluginArgs(activeProfileDir, pluginArgs);
         if ('error' in prepared) {
             logEvent('error', 'install', prepared.error);
             return { exitCode: 1, timedOut: false, stdout: '', stderr: prepared.error, cancelled: false };
         }
+        const tracker = beginProgress(prepared.target, profile, displayArgs);
+        const stdoutFeed = makeProgressFeeder(tracker, 'stdout');
+        const stderrFeed = makeProgressFeeder(tracker, 'stderr');
         const abort = new AbortController();
         let handle;
         try {
@@ -577,6 +667,8 @@ export function createDesktopPluginRuntime(service, activeProfileDir, invokingDi
         catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             const busy = /another desktop pnpm operation is already running/i.test(message);
+            pushInstallOutput('stderr', message);
+            progress.active = false;
             return {
                 exitCode: 127,
                 timedOut: false,
@@ -586,21 +678,19 @@ export function createDesktopPluginRuntime(service, activeProfileDir, invokingDi
                 ...(busy ? { busy: true } : {}),
             };
         }
-        const tracker = beginProgress(prepared.target);
-        const feed = makeProgressFeeder(tracker);
         let stdout = '';
         let stderr = '';
         let timedOut = false;
         const collectStdout = (chunk) => {
             const text = chunk.toString();
             stdout = (stdout + text).slice(-256 * 1024);
-            feed(text);
+            stdoutFeed.push(text);
             syncProgress(tracker);
         };
         const collectStderr = (chunk) => {
             const text = chunk.toString();
             stderr = (stderr + text).slice(-64 * 1024);
-            feed(text);
+            stderrFeed.push(text);
             syncProgress(tracker);
         };
         handle.stdout.on('data', collectStdout);
@@ -610,6 +700,9 @@ export function createDesktopPluginRuntime(service, activeProfileDir, invokingDi
         const done = (async () => {
             try {
                 const outcome = await handle.done;
+                stdoutFeed.flush();
+                stderrFeed.flush();
+                syncProgress(tracker);
                 const failed = outcome.exitCode !== 0 || outcome.signal !== null || timedOut;
                 if (failed)
                     progress.error = tracker.snapshot.error;
@@ -624,7 +717,11 @@ export function createDesktopPluginRuntime(service, activeProfileDir, invokingDi
                 };
             }
             catch (error) {
+                stdoutFeed.flush();
+                stderrFeed.flush();
+                syncProgress(tracker);
                 const message = error instanceof Error ? error.message : String(error);
+                pushInstallOutput('stderr', message);
                 progress.error = tracker.snapshot.error;
                 return {
                     exitCode: 127,

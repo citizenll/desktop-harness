@@ -4,6 +4,7 @@
  * the loader, and keeping exactly one theme active with the choice
  * persisted across restarts.
  */
+import { type Registry } from './registry.ts';
 /** The slice of a cordis loader entry the market needs for live enable/disable. */
 export interface LoaderEntry {
     options: {
@@ -37,4 +38,4 @@ export interface ThemeManager {
  * themes the user switched off — the caller owns reading it at boot and
  * replaying it; the manager mutates and persists it on switches.
  */
-export declare function createThemeManager(host: ThemeHost, profile: string, disabledThemes: Set<string>, explicitDir?: string): ThemeManager;
+export declare function createThemeManager(host: ThemeHost, profile: string, disabledThemes: Set<string>, explicitDir?: string, registryLoader?: () => Promise<Registry>): ThemeManager;

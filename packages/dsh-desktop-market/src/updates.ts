@@ -7,6 +7,7 @@
 import { DIST_TAG, type Channel } from './channels.ts'
 import { marketFetch } from './net.ts'
 import { profileDir, readInstalled, readInstalledVersion, readLockCommits } from './profile.ts'
+import { parseGitHubDependencySpec } from './sources.ts'
 
 export interface UpdateStatus {
   kind: 'github' | 'npm' | 'linked'
@@ -232,11 +233,11 @@ export async function checkUpdates(
       result[name] = { kind: 'linked', version, current: null, latest: null, updateAvailable: false }
       return
     }
-    const gh = /^(?:github:)?([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:#.*)?$/.exec(spec)
+    const github = parseGitHubDependencySpec(spec)
     try {
-      if (spec.startsWith('github:') && gh !== null) {
-        const current = lockCommits.get(gh[1].toLowerCase()) ?? null
-        const head = (await fetchJson(`https://api.github.com/repos/${gh[1]}/commits/HEAD`)) as { sha?: string }
+      if (github !== null) {
+        const current = github.commit ?? lockCommits.get(github.repo.toLowerCase()) ?? null
+        const head = (await fetchJson(`https://api.github.com/repos/${github.repo}/commits/HEAD`)) as { sha?: string }
         const latest = typeof head.sha === 'string' ? head.sha : null
         result[name] = {
           kind: 'github', version, current, latest,
@@ -259,7 +260,7 @@ export async function checkUpdates(
         }
       }
     } catch {
-      result[name] = { kind: spec.startsWith('github:') ? 'github' : 'npm', version, current: null, latest: null, updateAvailable: false }
+      result[name] = { kind: github === null ? 'npm' : 'github', version, current: null, latest: null, updateAvailable: false }
     }
   }))
   updatesCache = { key: cacheKey, at: Date.now(), data: result }

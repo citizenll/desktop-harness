@@ -14,7 +14,6 @@ import {
   IconChevronUpOutline14,
   IconCheckOutline16,
   IconCodeOutline16,
-  IconCordisPluginOutline14,
   IconDownloadOutline16,
   IconFolderOpen16,
   IconLinkOutline14,
@@ -645,6 +644,15 @@ let cachedInstalled: InstalledMap | null = null
 let cachedRepoIdentities: InstalledRepoIdentities | null = null
 let cachedRepoHints: InstalledRepoHints | null = null
 
+interface CatalogSyncStatus {
+  checking?: boolean
+  updateAvailable?: boolean
+  activeUpdated?: string | null
+  pendingUpdated?: string | null
+  lastCheckedAt?: string | null
+  error?: string | null
+}
+
 /** Discover grid page-size choices — the catalog grows daily, so cap each page. */
 const PAGE_SIZES = [24, 48, 96]
 const DEFAULT_PAGE_SIZE = 24
@@ -768,6 +776,10 @@ export function MarketSection(props: MarketSectionProps) {
   )
   const [data, setData] = useState<Registry | null>(cachedRegistry)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [catalogChecking, setCatalogChecking] = useState(false)
+  const [catalogUpdateAvailable, setCatalogUpdateAvailable] = useState(false)
+  const [catalogUpdating, setCatalogUpdating] = useState(false)
+  const [catalogUpdateError, setCatalogUpdateError] = useState<string | null>(null)
   const [installed, setInstalledState] = useState<InstalledMap>(cachedInstalled ?? {})
   const setInstalled = useCallback((value: InstalledMap) => { cachedInstalled = value; setInstalledState(value) }, [])
   const [repoIdentities, setRepoIdentitiesState] = useState<InstalledRepoIdentities>(cachedRepoIdentities ?? {})
@@ -971,13 +983,16 @@ export function MarketSection(props: MarketSectionProps) {
   const [refreshNames, setRefreshNames] = useState<string[]>([])
   const [envReady, setEnvReady] = useState(true)
   const [envFixing, setEnvFixing] = useState(false)
-  const [envFailed, setEnvFailed] = useState(false)
+  const [envDialogOpen, setEnvDialogOpen] = useState(false)
+  const [envRepairError, setEnvRepairError] = useState<string | null>(null)
   const [bootId, setBootId] = useState<string | null>(null)
   /** One-click restart (#14 by @ysyyhhh): server capability + in-flight state. */
   const [restartEnabled, setRestartEnabled] = useState(false)
   /** Supervisor the host detected around itself, when it named one (#229). */
   const [supervisor, setSupervisor] = useState<string | null>(null)
   const [restarting, setRestarting] = useState(false)
+  /** Confirmation shared by the banner icon and the web-host restart button. */
+  const [restartConfirmOpen, setRestartConfirmOpen] = useState(false)
   const [showTop, setShowTop] = useState(false)
   const [backupBusy, setBackupBusy] = useState(false)
   const [backupMessage, setBackupMessage] = useState<string | null>(null)
@@ -1085,11 +1100,17 @@ export function MarketSection(props: MarketSectionProps) {
     [disabledNames, patchDisabledNames],
   )
 
+  const applyCatalogStatus = useCallback((next: CatalogSyncStatus | undefined) => {
+    setCatalogChecking(next?.checking === true)
+    setCatalogUpdateAvailable(next?.updateAvailable === true)
+    if (next?.updateAvailable !== true) setCatalogUpdateError(null)
+  }, [])
+
   const loadCatalog = useCallback(() => {
     setLoadError(null)
     return fetch('/dsh-market/registry', { cache: 'no-store' })
       .then(async (res) => {
-        const body = (await res.json().catch(() => ({}))) as { registry?: Registry; error?: string }
+        const body = (await res.json().catch(() => ({}))) as { registry?: Registry; catalog?: CatalogSyncStatus; error?: string }
         if (!res.ok) throw new Error(typeof body.error === 'string' ? body.error : `HTTP ${String(res.status)}`)
         return body
       })
@@ -1097,21 +1118,71 @@ export function MarketSection(props: MarketSectionProps) {
         if (body.registry === undefined) throw new Error('the catalog response carried no data')
         cachedRegistry = body.registry
         setData(body.registry)
+        applyCatalogStatus(body.catalog)
         setLoadError(null)
       })
-      // Report WHY. An unreachable catalog used to be answered with a
-      // bundled copy, so "cannot reach the registry" and "the catalog is
-      // smaller today" looked identical on screen — and the second reading
-      // is the one users reached.
       .catch((error: unknown) => { setLoadError(error instanceof Error ? error.message : String(error)) })
-  }, [])
+  }, [applyCatalogStatus])
+
+  useEffect(() => {
+    if (!catalogChecking) return
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const poll = () => {
+      fetch('/dsh-market/registry/status', { cache: 'no-store' })
+        .then(async res => {
+          const body = (await res.json().catch(() => ({}))) as { catalog?: CatalogSyncStatus }
+          if (!res.ok) throw new Error(`HTTP ${String(res.status)}`)
+          if (cancelled) return
+          applyCatalogStatus(body.catalog)
+          if (body.catalog?.checking === true) timer = setTimeout(poll, 800)
+        })
+        .catch(() => {
+          if (!cancelled) timer = setTimeout(poll, 2000)
+        })
+    }
+    timer = setTimeout(poll, 500)
+    return () => {
+      cancelled = true
+      if (timer !== undefined) clearTimeout(timer)
+    }
+  }, [applyCatalogStatus, catalogChecking])
+
+  const applyCatalogUpdate = useCallback(() => {
+    setCatalogUpdating(true)
+    setCatalogUpdateError(null)
+    fetch('/dsh-market/registry/update', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    })
+      .then(async res => {
+        const body = (await res.json().catch(() => ({}))) as {
+          registry?: Registry
+          catalog?: CatalogSyncStatus
+          error?: string
+        }
+        if (!res.ok) throw new Error(typeof body.error === 'string' ? body.error : `HTTP ${String(res.status)}`)
+        return body
+      })
+      .then(body => {
+        if (body.registry === undefined) throw new Error('the catalog update carried no data')
+        cachedRegistry = body.registry
+        setData(body.registry)
+        applyCatalogStatus(body.catalog)
+      })
+      .catch((error: unknown) => setCatalogUpdateError(error instanceof Error ? error.message : String(error)))
+      .finally(() => setCatalogUpdating(false))
+  }, [applyCatalogStatus])
 
   useEffect(() => {
     void loadCatalog()
     fetch('/dsh-market/status', { cache: 'no-store' })
       .then(res => res.json())
       .then(status => {
-        setEnvReady(status.pnpm !== false)
+        const ready = status.pnpm !== false
+        setEnvReady(ready)
+        if (!ready) setEnvDialogOpen(true)
         if (typeof status.boot === 'string') {
           setBootId(status.boot)
           // A dismissal only silences the notice for the boot it was made
@@ -1165,20 +1236,24 @@ export function MarketSection(props: MarketSectionProps) {
 
   const fixEnv = useCallback(() => {
     setEnvFixing(true)
-    setEnvFailed(false)
+    setEnvRepairError(null)
     fetch('/dsh-market/setup-pnpm', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
-      .then(res => res.json())
+      .then(async res => {
+        const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+        if (!res.ok && typeof body.error !== 'string') throw new Error(`HTTP ${String(res.status)}`)
+        return body
+      })
       .then(body => {
         if (body.ok) {
           setEnvReady(true)
+          setEnvDialogOpen(false)
         } else {
-          setEnvFailed(true)
-          if (typeof body.error === 'string') setInstallError(body.error)
+          setEnvRepairError(typeof body.error === 'string' ? body.error : t('envFixFail'))
         }
       })
-      .catch(() => setEnvFailed(true))
+      .catch((error: unknown) => setEnvRepairError(error instanceof Error ? error.message : t('envFixFail')))
       .finally(() => setEnvFixing(false))
-  }, [])
+  }, [t])
 
   // Recover an install whose HTTP response was lost (page navigated away or
   // the connection dropped): the pending marker survives in sessionStorage and
@@ -1378,6 +1453,11 @@ export function MarketSection(props: MarketSectionProps) {
   }
 
   const doInstall = useCallback((plugin: RegistryPlugin) => {
+    if (!envReady) {
+      setConfirming(null)
+      setEnvDialogOpen(true)
+      return
+    }
     setBuildsSkipped(null)
     setConfirming(null)
     setInstallError(null)
@@ -1483,7 +1563,7 @@ export function MarketSection(props: MarketSectionProps) {
         // success once the plugin lands (busy-aware since #91) and strikes
         // out genuinely dead installs (#32).
       })
-  }, [nextRecordId, refreshInstalled, t])
+  }, [envReady, nextRecordId, refreshInstalled, t])
 
   /**
    * Resolve a loader-id clash the only way one profile allows: uninstall the
@@ -1547,12 +1627,27 @@ export function MarketSection(props: MarketSectionProps) {
   }, [data, doReplace, t])
 
   /**
-   * Restart the host and reload once the boot id changes (#14 by @ysyyhhh).
+   * Desktop owns the Harness child lifecycle, so its preload bridge is the
+   * primary restart path there. Standalone web hosts keep the original
+   * self-restart route and reload once the boot id changes (#14 by @ysyyhhh).
    * The 202 races the process's SIGTERM, so network errors on the initial
    * request are expected and treated as "restart under way".
    */
   const doRestart = useCallback(() => {
-    if (bootId === null || restarting) return
+    if (restarting) return
+    const desktopRestart = window.dshDesktop?.restartHarness
+    if (typeof desktopRestart === 'function') {
+      setRestarting(true)
+      setInstallError(null)
+      void desktopRestart().then((result) => {
+        if (!result.ok) throw new Error(t('restartFail'))
+      }).catch((error: unknown) => {
+        setRestarting(false)
+        setInstallError(t('restartFail') + ': ' + (error instanceof Error ? error.message : String(error)))
+      })
+      return
+    }
+    if (bootId === null) return
     const previousBoot = bootId
     setRestarting(true)
     setInstallError(null)
@@ -1611,6 +1706,10 @@ export function MarketSection(props: MarketSectionProps) {
   }, [])
 
   const doUpdate = useCallback((name: string, force = false) => {
+    if (!envReady) {
+      setEnvDialogOpen(true)
+      return Promise.resolve()
+    }
     setInstallError(null)
     setActivationWarnings([])
     setStaleName(null)
@@ -1674,7 +1773,7 @@ export function MarketSection(props: MarketSectionProps) {
         // running row, and let the status poll converge the outcome instead
         // of declaring a false failure — mirroring the install flow's catch.
       })
-  }, [refreshInstalled, t])
+  }, [envReady, refreshInstalled, t])
 
   const doUseSkin = useCallback((name: string) => {
     setInstallError(null)
@@ -1698,6 +1797,11 @@ export function MarketSection(props: MarketSectionProps) {
   }, [])
 
   const doUninstall = useCallback((name: string) => {
+    if (!envReady) {
+      setRemoveConfirm(null)
+      setEnvDialogOpen(true)
+      return Promise.resolve()
+    }
     setRemoveConfirm(null)
     setInstallError(null)
     setActivationWarnings([])
@@ -1724,7 +1828,7 @@ export function MarketSection(props: MarketSectionProps) {
       })
       .catch(error => setInstallError(String(error)))
       .finally(() => setRemovingName(null))
-  }, [refreshInstalled])
+  }, [envReady, refreshInstalled])
 
   /** Live enable/disable of one installed plugin (#60). `reload` opts the
    * card-level theme flow into a page refresh so the visual result lands
@@ -1892,6 +1996,10 @@ export function MarketSection(props: MarketSectionProps) {
   const installedOtherCount = Object.keys(installed).filter(name => name !== selfName).length
 
   const doUpdateAll = useCallback(() => {
+    if (!envReady) {
+      setEnvDialogOpen(true)
+      return
+    }
     const names = updatableNames.slice()
     setUpdatingAll(true)
     const next = () => {
@@ -1903,7 +2011,7 @@ export function MarketSection(props: MarketSectionProps) {
       doUpdate(name).then(next, next)
     }
     next()
-  }, [updatableNames, doUpdate])
+  }, [envReady, updatableNames, doUpdate])
 
   const finishRestore = useCallback((body: { errors?: unknown; unportable?: unknown }) => {
     const errors = Array.isArray(body.errors) ? body.errors as { name?: unknown; error?: unknown }[] : []
@@ -1940,6 +2048,11 @@ export function MarketSection(props: MarketSectionProps) {
   /** Actually run the restore; the confirm dialog gates this (previously window.confirm). */
   const doRestore = useCallback(() => {
     if (pendingBackup === null) return Promise.resolve()
+    if (!envReady) {
+      setRestoreConfirmOpen(false)
+      setEnvDialogOpen(true)
+      return Promise.resolve()
+    }
     setRestoreConfirmOpen(false)
     setBackupBusy(true)
     setBackupMessage(null)
@@ -1951,7 +2064,7 @@ export function MarketSection(props: MarketSectionProps) {
       if (!response.ok) throw new Error(String(body.error || 'restore failed'))
       finishRestore(body)
     }).catch(error => setBackupMessage(String(error))).finally(() => setBackupBusy(false))
-  }, [finishRestore, pendingBackup])
+  }, [envReady, finishRestore, pendingBackup])
 
   const runWebdav = useCallback((action: 'backup' | 'restore') => {
     if (webdavUrl.trim() === '') return
@@ -2085,7 +2198,8 @@ export function MarketSection(props: MarketSectionProps) {
   const specKind = (spec: string | undefined): 'npm' | 'git' | 'file' | 'bundle' => {
     if (spec === undefined) return 'bundle'
     if (/^file:/i.test(spec)) return 'file'
-    if (/^(github:|git\+|git:)/i.test(spec)) return 'git'
+    if (/^(github:|git\+|git:)/i.test(spec)
+      || /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/archive\/[0-9a-f]{40,64}\.tar\.gz$/i.test(spec)) return 'git'
     return 'npm'
   }
 
@@ -2125,6 +2239,14 @@ export function MarketSection(props: MarketSectionProps) {
   const hostPendingNames = Object.keys(activations).filter(name => activations[name]?.state === 'restart')
   const showHostPending = hostPendingNames.length > 0 && !restartNoticeDismissed && sessionPendingRestart === 0
   const pendingRestart = sessionPendingRestart > 0 ? sessionPendingRestart : (showHostPending ? hostPendingNames.length : 0)
+  const desktopRestartAvailable = typeof window.dshDesktop?.restartHarness === 'function'
+  const restartAvailable = restartEnabled || desktopRestartAvailable
+  const restartBlocked = restarting
+    || hostBusy
+    || busyUrl !== null
+    || updatingName !== null
+    || removingName !== null
+    || (!desktopRestartAvailable && bootId === null)
   const displayedInstalled = pendingBackup === null ? installed : { ...pendingDependencies, ...installed }
   const missingRestoreCount = Object.keys(pendingDependencies).filter(name => !installedFiles.includes(name)).length
   // Self-update lives in the header button and the settings card, not this
@@ -2223,8 +2345,11 @@ export function MarketSection(props: MarketSectionProps) {
                           variant="primary"
                           size="sm"
                           className={css.installBtn}
-                          disabled={busyUrl !== null || !envReady}
-                          onClick={() => setConfirming(p)}
+                          disabled={busyUrl !== null}
+                          onClick={() => {
+                            if (envReady) setConfirming(p)
+                            else setEnvDialogOpen(true)
+                          }}
                         >{t('install')}</Button>
                       )}
           </div>
@@ -2448,15 +2573,71 @@ export function MarketSection(props: MarketSectionProps) {
   const showEmbeddedOperations = records.length > 0 || operationsOpen || advanced
   const showEmbeddedHead = showEmbeddedOperations
     || (tab === 'installed' && updatableNames.length >= 2)
-    || !envReady
-    || backupMessage !== null
-    || restoreErrors.length > 0
-    || (tab === 'installed' && pendingBackup !== null)
-    || pendingRefreshNames.length > 0
-    || pendingRestart > 0
-    || activationWarnings.length > 0
-    || (tab === 'installed' && hostDependencyFindings.length > 0)
   const showHead = props.embedded !== true || showEmbeddedHead
+
+  const topNotices = (
+    <>
+      {catalogUpdateAvailable && (
+        <div className={css.banner}>
+          <IconDownloadOutline16 size={14} className={css.bannerIcon} />
+          <span className={css.grow} title={catalogUpdateError ?? undefined}>
+            {catalogUpdateError === null ? t('catalogUpdateAvailable') : t('catalogUpdateFailed')}
+          </span>
+          <Button variant="primary" size="sm" disabled={catalogUpdating} onClick={applyCatalogUpdate}>
+            {catalogUpdating ? t('catalogUpdating') : t('catalogUpdateAction')}
+          </Button>
+        </div>
+      )}
+      {pendingRestart > 0 && (
+        <div className={css.banner}>
+          {restartAvailable
+            ? (
+                <button
+                  type="button"
+                  className={css.restartIconButton}
+                  aria-label={t('restartNow')}
+                  title={t('restartNow')}
+                  disabled={restartBlocked}
+                  onClick={() => setRestartConfirmOpen(true)}
+                >
+                  <IconRefreshOutline14 size={14} />
+                </button>
+              )
+            : <IconRefreshOutline14 size={14} className={css.bannerIcon} />}
+          <span className={css.grow}><b>{pendingRestart}</b> {t('restartBanner')}</span>
+          <Tooltip
+            label={desktopRestartAvailable
+              ? t('restartHintDesktop')
+              : supervisor === null
+                ? t('restartHint')
+                : t('restartHintSupervised').replace('{0}', supervisor)}
+            side="bottom"
+          >
+            <span className={css.bannerHint}><IconQuestionOutline14 size={14} /></span>
+          </Tooltip>
+          {restartEnabled && (
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={restartBlocked}
+              onClick={() => setRestartConfirmOpen(true)}
+            >{restarting ? t('restarting') : t('restartNow')}</Button>
+          )}
+          {showHostPending && (
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={t('dismissNotice')}
+              onClick={() => {
+                setRestartNoticeDismissed(true)
+                try { sessionStorage.setItem('dshm-restart-dismissed', String(bootId ?? '')) } catch { /* storage unavailable */ }
+              }}
+            >{t('dismiss')}</Button>
+          )}
+        </div>
+      )}
+    </>
+  )
 
   return (
     <div className={css.root} style={props.embedded ? { minHeight: 0 } : undefined}>
@@ -2556,101 +2737,64 @@ export function MarketSection(props: MarketSectionProps) {
             <span className={css.grow} />
           </div>
         )}
-        {!envReady && (
-          <div className={css.banner}>
-            <IconCordisPluginOutline14 size={14} className={css.bannerIcon} />
-            <span className={css.grow}>{envFailed ? t('envFixFail') : t('envMissing')}</span>
-            {!envFailed && (
-              <Button variant="primary" size="sm" disabled={envFixing} onClick={fixEnv}>
-                {envFixing ? t('envFixing') : t('envFix')}
-              </Button>
-            )}
-          </div>
-        )}
-        {backupMessage !== null && <div className={css.backupMessage}>{backupMessage}</div>}
-        {restoreErrors.length > 0 && (
-          <div className={css.banner}>
-            <IconWarningOutline16 size={14} className={css.bannerIcon} />
-            <span className={css.grow}>
-              <div><b>{t('restorePartial')}</b></div>
-              {restoreErrors.map(error => <div key={error} className={css.spec}>{error}</div>)}
-            </span>
-          </div>
-        )}
-        {tab === 'installed' && pendingBackup !== null && (
-          <div className={css.banner}>
-            <IconRefreshOutline14 size={14} className={css.bannerIcon} />
-            <span className={css.grow}>{t('restoreMissing').replace('{0}', String(missingRestoreCount))}</span>
-            <Button variant="primary" size="sm" disabled={backupBusy} onClick={() => setRestoreConfirmOpen(true)}>
-              {backupBusy ? t('backupWorking') : t('restoreStart')}
-            </Button>
-          </div>
-        )}
-        {pendingRefreshNames.length > 0 && (
-          <div className={css.banner}>
-            <IconSparkle16 size={14} className={css.bannerIcon} />
-            <span className={css.grow}><b>{pendingRefreshNames.length}</b> {t('refreshBanner')}</span>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                if (hotNames.length > 0) sessionStorage.setItem('dshm-toast', JSON.stringify(hotNames))
-                sessionStorage.setItem('dshm-tab', 'installed')
-                location.reload()
-              }}
-            >{t('refresh')}</Button>
-          </div>
-        )}
-        {pendingRestart > 0 && (
-          <div className={css.banner}>
-            <IconRefreshOutline14 size={14} className={css.bannerIcon} />
-            <span className={css.grow}><b>{pendingRestart}</b> {t('restartBanner')}</span>
-            <Tooltip
-              label={supervisor === null ? t('restartHint') : t('restartHintSupervised').replace('{0}', supervisor)}
-              side="bottom"
-            >
-              <span className={css.bannerHint}><IconQuestionOutline14 size={14} /></span>
-            </Tooltip>
-            {restartEnabled && (
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={restarting || hostBusy || busyUrl !== null || updatingName !== null || removingName !== null}
-                onClick={doRestart}
-              >{restarting ? t('restarting') : t('restartNow')}</Button>
-            )}
-            {/* Only the standing host-reported notice is dismissible: a
-                banner for something you just did in this session should not
-                be swipeable away mid-flow. */}
-            {showHostPending && (
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label={t('dismissNotice')}
-                onClick={() => {
-                  setRestartNoticeDismissed(true)
-                  try { sessionStorage.setItem('dshm-restart-dismissed', String(bootId ?? '')) } catch { /* storage unavailable */ }
-                }}
-              >{t('dismiss')}</Button>
-            )}
-          </div>
-        )}
-        {activationWarnings.length > 0 && (
-          <div className={css.banner}>
-            <IconWarningOutline16 size={14} className={css.bannerIcon} />
-            <span className={css.grow}>
-              {activationWarnings.map(({ name, info }) => (
-                <div key={name}>
-                  <b>{name}</b> — {activationMeta(info.state, t).label}
-                  {info.reasons.length > 0 && <span className={css.spec}>（{info.reasons.join(' / ')}）</span>}
-                </div>
-              ))}
-            </span>
-          </div>
-        )}
-        {tab === 'installed' && <HostDependencyDiagnostics findings={hostDependencyFindings} t={t} />}
       </div>
       )}
+      <div
+        className={css.body}
+        style={props.embedded ? { paddingTop: 0, scrollbarGutter: 'stable' } : undefined}
+        ref={bodyRef}
+        onScroll={e => setShowTop(e.currentTarget.scrollTop > 400)}
+      >
+      <div className={css.topNotices}>{topNotices}</div>
+      <div className={css.contextNotices}>
+      {backupMessage !== null && tab === 'backup' && <div className={css.backupMessage}>{backupMessage}</div>}
+      {restoreErrors.length > 0 && (
+        <div className={css.banner}>
+          <IconWarningOutline16 size={14} className={css.bannerIcon} />
+          <span className={css.grow}>
+            <div><b>{t('restorePartial')}</b></div>
+            {restoreErrors.map(error => <div key={error} className={css.spec}>{error}</div>)}
+          </span>
+        </div>
+      )}
+      {tab === 'installed' && pendingBackup !== null && (
+        <div className={css.banner}>
+          <IconRefreshOutline14 size={14} className={css.bannerIcon} />
+          <span className={css.grow}>{t('restoreMissing').replace('{0}', String(missingRestoreCount))}</span>
+          <Button variant="primary" size="sm" disabled={backupBusy} onClick={() => setRestoreConfirmOpen(true)}>
+            {backupBusy ? t('backupWorking') : t('restoreStart')}
+          </Button>
+        </div>
+      )}
+      {pendingRefreshNames.length > 0 && (
+        <div className={css.banner}>
+          <IconSparkle16 size={14} className={css.bannerIcon} />
+          <span className={css.grow}><b>{pendingRefreshNames.length}</b> {t('refreshBanner')}</span>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              if (hotNames.length > 0) sessionStorage.setItem('dshm-toast', JSON.stringify(hotNames))
+              sessionStorage.setItem('dshm-tab', 'installed')
+              location.reload()
+            }}
+          >{t('refresh')}</Button>
+        </div>
+      )}
+      {activationWarnings.length > 0 && (
+        <div className={css.banner}>
+          <IconWarningOutline16 size={14} className={css.bannerIcon} />
+          <span className={css.grow}>
+            {activationWarnings.map(({ name, info }) => (
+              <div key={name}>
+                <b>{name}</b> — {activationMeta(info.state, t).label}
+                {info.reasons.length > 0 && <span className={css.spec}>（{info.reasons.join(' / ')}）</span>}
+              </div>
+            ))}
+          </span>
+        </div>
+      )}
+      {tab === 'installed' && <HostDependencyDiagnostics findings={hostDependencyFindings} t={t} />}
       {buildsSkipped !== null && (
         <div className={css.banner}>
           <IconWarningOutline16 size={14} className={css.bannerIcon} />
@@ -2728,12 +2872,7 @@ export function MarketSection(props: MarketSectionProps) {
           </div>
         </div>
       )}
-      <div
-        className={css.body}
-        style={props.embedded ? { paddingTop: 0, scrollbarGutter: 'stable' } : undefined}
-        ref={bodyRef}
-        onScroll={e => setShowTop(e.currentTarget.scrollTop > 400)}
-      >
+      </div>
         {tab === 'backup'
           ? (
               <div className={css.backupGrid}>
@@ -3194,12 +3333,15 @@ export function MarketSection(props: MarketSectionProps) {
                             const version = status && status.version ? 'v' + status.version : ''
                             const specText = String(spec)
                             // A plain range beside the resolved version says the
-                            // same thing twice. Every other spec — github:, file:,
-                            // link:, a tag — is the only place the row says where
-                            // the plugin came from, so it stays.
+                            // same thing twice. Every other spec — github:, an
+                            // immutable GitHub archive, file:, link:, a tag — is
+                            // the only place the row says where the plugin came
+                            // from, so it stays.
                             const specRedundant = version !== '' && /^[\^~]?\d/.test(specText)
                             const ghSpec = /^github:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:#|$)/.exec(specText)
-                            const repoUrl = entry !== undefined ? entry.url : ghSpec !== null ? 'https://github.com/' + ghSpec[1] : null
+                            const archiveSpec = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/archive\/[0-9a-f]{40,64}\.tar\.gz$/i.exec(specText)
+                            const repo = ghSpec?.[1] ?? archiveSpec?.[1] ?? null
+                            const repoUrl = entry !== undefined ? entry.url : repo !== null ? 'https://github.com/' + repo : null
                             const off = effectiveDisabledSet.has(name)
                             // Switches only where they make sense: everything in
                             // the disable list (to re-enable), plus live/restart
@@ -3379,6 +3521,53 @@ export function MarketSection(props: MarketSectionProps) {
             ><IconChevronUpOutline14 size={16} /></Button>
           </span>
         </Tooltip>
+      )}
+      {envDialogOpen && !envReady && (
+        <Modal
+          open
+          onClose={() => { if (!envFixing) setEnvDialogOpen(false) }}
+          title={t('envDialogTitle')}
+          description={t('envDialogDesc')}
+          footer={(
+            <>
+              <Button variant="ghost" disabled={envFixing} onClick={() => setEnvDialogOpen(false)}>{t('cancel')}</Button>
+              {envRepairError !== null && (
+                <Button
+                  variant="outline"
+                  disabled={exportState === 'busy' || envFixing}
+                  icon={<IconDownloadOutline16 size={14} />}
+                  onClick={doExportLog}
+                >{exportState === 'busy' ? t('exportingLog') : t('exportLog')}</Button>
+              )}
+              <Button variant="primary" disabled={envFixing} onClick={fixEnv}>
+                {envFixing ? t('envFixing') : envRepairError === null ? t('envFix') : t('envFixRetry')}
+              </Button>
+            </>
+          )}
+        >
+          {envRepairError !== null && <div className={css.envRepairError}>{envRepairError}</div>}
+        </Modal>
+      )}
+      {restartConfirmOpen && (
+        <Modal
+          open
+          onClose={() => setRestartConfirmOpen(false)}
+          title={t('restartConfirmTitle')}
+          description={t('restartConfirmDesc')}
+          footer={(
+            <>
+              <Button variant="ghost" onClick={() => setRestartConfirmOpen(false)}>{t('cancel')}</Button>
+              <Button
+                variant="primary"
+                disabled={restartBlocked}
+                onClick={() => {
+                  setRestartConfirmOpen(false)
+                  doRestart()
+                }}
+              >{restarting ? t('restarting') : t('restartConfirmAction')}</Button>
+            </>
+          )}
+        />
       )}
       {confirming !== null && (
         <Modal

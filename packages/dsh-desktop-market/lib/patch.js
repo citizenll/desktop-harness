@@ -27,9 +27,9 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { logEvent } from './log.js';
-import { parsePatchFile } from './check.js';
-import { bundlePatchInsertedIds, parsePatchRows } from './profile.js';
+import { logEvent } from "./log.js";
+import { parsePatchFile } from "./check.js";
+import { bundlePatchInsertedIds, parsePatchRows } from "./profile.js";
 /**
  * Host infrastructure rows: disabling any of these breaks the very chain
  * the patch layer runs on (e.g. timer → HMR, webserver → the page itself),

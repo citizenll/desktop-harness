@@ -4,6 +4,54 @@
  */
 
 const REPO_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
+const MAX_DIRECT_SOURCE_LENGTH = 2_048
+
+export interface GitHubDependencySource {
+  repo: string
+  /** Present only for Desktop's immutable archive form. */
+  commit: string | null
+  /** pnpm's GitHub collection selector; immutable archives are root-only. */
+  subpath: string | null
+  kind: 'git' | 'archive'
+}
+
+/**
+ * Parse every GitHub dependency form Desktop persists or accepts from pnpm.
+ *
+ * The immutable `github.com/<repo>/archive/<sha>.tar.gz` form is deliberate:
+ * unlike a `github:` / codeload Git dependency, pnpm treats it as an ordinary
+ * integrity-pinned tarball and therefore does not replay the repository's
+ * `prepare` script during every later profile mutation.
+ */
+export function parseGitHubDependencySpec(spec: string): GitHubDependencySource | null {
+  const archive = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/archive\/([0-9a-f]{40,64})\.tar\.gz$/i.exec(spec)
+  if (archive !== null && REPO_RE.test(archive[1]!)) {
+    return { repo: archive[1]!, commit: archive[2]!.toLowerCase(), subpath: null, kind: 'archive' }
+  }
+
+  const shorthand = /^github:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:\.git)?(?:#(.*))?$/i.exec(spec)
+  if (shorthand !== null && REPO_RE.test(shorthand[1]!)) {
+    const hash = shorthand[2] ?? ''
+    const subpath = hash.toLowerCase().startsWith('path:/') ? hash.slice('path:/'.length) : null
+    if (subpath !== null && !validSubpath(subpath)) return null
+    return { repo: shorthand[1]!, commit: null, subpath, kind: 'git' }
+  }
+
+  const remote = /^(?:git\+)?(?:https?|git|ssh):\/\/(?:git@)?github\.com[/:]([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:#(.*))?$/i.exec(spec)
+  if (remote === null) return null
+  const repo = `${remote[1]!}/${remote[2]!}`
+  if (!REPO_RE.test(repo)) return null
+  const hash = remote[3] ?? ''
+  const subpath = hash.toLowerCase().startsWith('path:/') ? hash.slice('path:/'.length) : null
+  if (subpath !== null && !validSubpath(subpath)) return null
+  return { repo, commit: null, subpath, kind: 'git' }
+}
+
+/** Immutable, integrity-lockable GitHub source for a repository commit. */
+export function githubArchiveSpec(repo: string, commit: string): string | null {
+  if (!REPO_RE.test(repo) || !/^[0-9a-f]{40,64}$/i.test(commit)) return null
+  return `https://github.com/${repo}/archive/${commit.toLowerCase()}.tar.gz`
+}
 
 function validSubpath(subpath: string): boolean {
   if (!/^[A-Za-z0-9_./-]+$/.test(subpath)) return false
@@ -13,6 +61,95 @@ function validSubpath(subpath: string): boolean {
 /** Registry tarball names must be plain npm package names, nothing fancier. */
 const NPM_NAME_RE = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/
 
+export interface DirectInstallSource {
+  /** The exact user-facing source after whitespace normalization. */
+  source: string
+  /** A package-manager target accepted by `dsh plugin add`. */
+  target: string
+  /** Stable identity used by the duplicate and name-collision guards. */
+  name: string
+  owner: string
+  /** Canonical source URL when one exists; npm sources use their package page. */
+  url: string
+  kind: 'github' | 'npm'
+}
+
+function githubDirectSource(source: string): DirectInstallSource | null {
+  let repo: string
+  let subpath: string | null = null
+  let url: string
+
+  const shorthand = /^(?:github:)?([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?:#path:\/(.+))?$/i.exec(source)
+  if (shorthand !== null) {
+    const owner = shorthand[1]!
+    const repoName = shorthand[2]!.replace(/\.git$/i, '')
+    repo = `${owner}/${repoName}`
+    subpath = shorthand[3] ?? null
+    url = `https://github.com/${repo}`
+  } else {
+    let parsed: URL
+    try {
+      parsed = new URL(source)
+    } catch {
+      return null
+    }
+    if (parsed.protocol !== 'https:' || parsed.hostname.toLowerCase() !== 'github.com') return null
+    if (parsed.username !== '' || parsed.password !== '' || parsed.search !== '' || parsed.hash !== '') return null
+    const parts = parsed.pathname.split('/').filter(Boolean)
+    if (parts.length < 2) return null
+    const owner = parts[0]!
+    const repoName = parts[1]!.replace(/\.git$/i, '')
+    repo = `${owner}/${repoName}`
+    if (parts.length > 2) {
+      // A repository subdirectory is the only supported GitHub suffix. The
+      // branch name is deliberately not copied into the pnpm target: DSH's
+      // established collection format is github:o/r#path:/package.
+      if (parts[2] !== 'tree' || parts.length < 5) return null
+      subpath = parts.slice(4).join('/')
+    }
+    url = `https://github.com/${repo}${subpath === null ? '' : `/tree/${parts[3]!}/${subpath}`}`
+  }
+
+  if (!REPO_RE.test(repo) || (subpath !== null && !validSubpath(subpath))) return null
+  const [owner, repoName] = repo.split('/') as [string, string]
+  return {
+    source,
+    target: subpath === null ? `github:${repo}` : `github:${repo}#path:/${subpath}`,
+    name: subpath === null ? repoName : subpath.split('/').at(-1)!,
+    owner,
+    url,
+    kind: 'github',
+  }
+}
+
+/**
+ * Resolve the deliberately bounded sources accepted by Desktop's direct
+ * install flow. This is a trust boundary, not a general pnpm-spec parser:
+ * local paths, arbitrary git hosts, scripts, tarballs and package aliases
+ * are rejected. The UI may receive a broader token, but only this function
+ * can turn it into a profile mutation target.
+ */
+export function directInstallSourceFor(input: unknown): DirectInstallSource | null {
+  if (typeof input !== 'string') return null
+  const source = input.trim()
+  if (source.length === 0 || source.length > MAX_DIRECT_SOURCE_LENGTH) return null
+  if (/\s|["\u0000-\u001f\u007f]/u.test(source)) return null
+
+  const github = githubDirectSource(source)
+  if (github !== null) return github
+  if (!NPM_NAME_RE.test(source)) return null
+
+  const scoped = /^@([^/]+)\/(.+)$/.exec(source)
+  return {
+    source,
+    target: source,
+    name: source,
+    owner: scoped?.[1] ?? 'npm',
+    url: `https://www.npmjs.com/package/${encodeURIComponent(source)}`,
+    kind: 'npm',
+  }
+}
+
 /**
  * Parse a registry source url: a github repo, optionally with a
  * `/tree/<branch>/<subpath>` suffix (how the curated list links monorepo
@@ -20,13 +157,13 @@ const NPM_NAME_RE = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/
  */
 export function parseSourceUrl(url: string): { repo: string; subpath: string | null } | null {
   const m = /^https:\/\/github\.com\/([^/]+\/[^/]+?)(?:\/tree\/[^/]+\/(.+?))?\/?$/.exec(url)
-  if (m === null || !REPO_RE.test(m[1])) return null
+  if (m === null || !REPO_RE.test(m[1]!)) return null
   const subpath = m[2] ?? null
   if (subpath !== null) {
     // No empty/dot segments: `..` would escape the repo in the #path: selector.
     if (!validSubpath(subpath)) return null
   }
-  return { repo: m[1], subpath }
+  return { repo: m[1]!, subpath }
 }
 
 function repoFromParts(owner: string, name: string): { repo: string } | null {
@@ -106,9 +243,9 @@ export function repoOf(url: string): string | null {
  * @returns the stable key, or null when the spec is not github-hosted.
  */
 export function gitAllowBuildsKey(name: string, spec: string): string | null {
-  const m = /^github:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:\.git)?(?:#.*)?$/.exec(spec)
-  if (m === null) return null
-  return `${name}@git+https://github.com/${m[1]}.git`
+  const source = parseGitHubDependencySpec(spec)
+  if (source === null || source.kind !== 'git') return null
+  return `${name}@git+https://github.com/${source.repo}.git`
 }
 
 /**
@@ -155,10 +292,10 @@ export function findInstalledAlias(
     const dep = new Set<string>([name.toLowerCase()])
     const scoped = /^@([^/]+)\/(.+)$/.exec(name)
     if (scoped !== null) dep.add(`${scoped[1]}/${scoped[2]}`.toLowerCase())
-    const m = /github:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:#path:\/([A-Za-z0-9_./-]+))?/i.exec(spec)
-    if (m !== null) {
-      dep.add(m[1].toLowerCase())
-      if (m[2] !== undefined) dep.add(`${m[1].toLowerCase()}#path:/${m[2].toLowerCase()}`)
+    const sourceSpec = parseGitHubDependencySpec(spec)
+    if (sourceSpec !== null) {
+      dep.add(sourceSpec.repo.toLowerCase())
+      if (sourceSpec.subpath !== null) dep.add(`${sourceSpec.repo.toLowerCase()}#path:/${sourceSpec.subpath.toLowerCase()}`)
       // Repo evidence on both sides is decisive (#66): the curated registry
       // lists distinct plugins under one name (both dsh-usage-stats, four
       // dsh-memory…), so a github-installed dependency is the entry's plugin

@@ -4,35 +4,45 @@
  * process spawning lives in dsh-cli.ts, filesystem reads in profile.ts,
  * orchestration in install.ts / themes.ts / updates.ts.
  *
- * Security: the install route executes a shell command, so it accepts only
- * same-origin POSTs and only sources present in the curated registry.
+ * Security: install routes execute a package-manager command, so they accept
+ * only same-origin POSTs. Catalog installs must resolve to the curated
+ * registry; direct installs pass through the narrower source allowlist in
+ * sources.ts and are confirmed by a dedicated client dialog.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import { loadRegistry } from './registry.js';
-import { cleanHotDir, hotMount, hotUnmount, listHotMounts, mountClientOnlyDeps, purgeMarketState, readMarketState, writeMarketState, } from './hot.js';
-import { createGroup, deleteGroup, removeFromGroups, renameGroup, setGroupMembers } from './groups.js';
-import { exportLogs, logEvent } from './log.js';
-import { diagnosePackageManifests } from './diagnostics.js';
-import { BOOT_ID, cancelActive, probePnpm, progress, provisionPnpm, runDshPlugin, } from './dsh-cli.js';
-import { addProfileBundle, hasLoadableEntry, INBOX_BUNDLES, profileDir, readInstalled, readInstalledManifest, readInstalledRepoEvidence, readInstalledVersion, readLockCommits, readManifestDeps, readProfileBundles, removeProfileBundle, restoreManifestDeps, setAllowBuilds } from './profile.js';
-import { assessProfile, introducedDuplicateNames, introducedRisks } from './compatibility.js';
-import { runningAgentIds } from './agents.js';
-import { analyzeProfile } from './check.js';
-import { applyBundleOrder, mergeOrder, readBundleRules, readBundleStack, validateOrder } from './order.js';
-import { trialValidate } from './trial.js';
-import { findInstalledAlias, gitAllowBuildsKey, installTargetFor } from './sources.js';
-import { groupConflictsByOwner, isStaleUpdate, parseIgnoredBuilds, parsePrepareNotAllowed, RELEASE_AGE_OVERRIDE, retargetCollections, validateAddedPlugins, withHoistRecovery } from './install.js';
-import { asChannel, CHANNELS, DIST_TAG, resolveChannel } from './channels.js';
-import { checkUpdates, fetchNpmLatest, invalidateUpdates, isUpgrade, latestPublishedRecently, versionOnChannel } from './updates.js';
-import { createThemeManager } from './themes.js';
-import { readJsonBody, sameOrigin, sendJson } from './http.js';
-import { detectedSupervisor, restartAllowed, scheduleRestart, servingPort, trustedRestartRequest, trustedDownloadRequest } from './restart.js';
-import { activationAfterReplace, checkClientBundle, hasHostHalf, verifyActivation } from './verify.js';
-import { carrierDisableIds, disableRow, enableRow, findUserPatchPath, isProtectedModule, packagePatchFlags, readUserPatchState, removeRowBlocks, rowIdsForPackage, } from './patch.js';
-import { createProfileBackup, downloadWebdav, MAX_BACKUP_BYTES, mergeRestoreManifest, restoreProfileBackup, unportableDeps, uploadWebdav, } from './backup.js';
-import { createGist, fitsGistLimit, GistError, gistErrorCode, parseGistId, readGist, resolveGistTokenSource, updateGist, verifyGistToken, } from './gist.js';
+import { createCatalogStore } from "./registry.js";
+import { cleanHotDir, hotMount, hotUnmount, listHotMounts, mountClientOnlyDeps, purgeMarketState, readMarketState, writeMarketState, } from "./hot.js";
+import { createGroup, deleteGroup, removeFromGroups, renameGroup, setGroupMembers } from "./groups.js";
+import { exportLogs, logEvent } from "./log.js";
+import { diagnosePackageManifests } from "./diagnostics.js";
+import { beginInstallOutputSession, BOOT_ID, cancelActive, finishInstallOutputSession, probePnpm, progress, provisionPnpm, runDshPlugin, } from "./dsh-cli.js";
+import { addProfileBundle, hasLoadableEntry, INBOX_BUNDLES, profileDir, readInstalled, readInstalledManifest, readInstalledRepoEvidence, readInstalledVersion, readLockCommits, readManifestDeps, readProfileBundles, removeProfileBundle, restoreManifestDeps, setAllowBuilds } from "./profile.js";
+import { assessProfile, introducedDuplicateNames, introducedRisks } from "./compatibility.js";
+import { runningAgentIds } from "./agents.js";
+import { analyzeProfile } from "./check.js";
+import { applyBundleOrder, mergeOrder, readBundleRules, readBundleStack, validateOrder } from "./order.js";
+import { trialValidate } from "./trial.js";
+import { directInstallSourceFor, findInstalledAlias, gitAllowBuildsKey, installTargetFor, parseGitHubDependencySpec } from "./sources.js";
+import { gitPrebuiltFallbackArgs, groupConflictsByOwner, IGNORE_SCRIPTS_OVERRIDE, isExecutedGitPrepareFailure, isStaleUpdate, parseBuildApprovalEvidence, RELEASE_AGE_OVERRIDE, retargetCollections, validateAddedPlugins, withHoistRecovery } from "./install.js";
+import { asChannel, CHANNELS, DIST_TAG, resolveChannel } from "./channels.js";
+import { checkUpdates, fetchNpmLatest, invalidateUpdates, isUpgrade, latestPublishedRecently, versionOnChannel } from "./updates.js";
+import { createThemeManager } from "./themes.js";
+import { readJsonBody, sameOrigin, sendJson } from "./http.js";
+import { detectedSupervisor, restartAllowed, scheduleRestart, servingPort, trustedRestartRequest, trustedDownloadRequest } from "./restart.js";
+import { activationAfterReplace, checkClientBundle, hasHostHalf, verifyActivation } from "./verify.js";
+import { carrierDisableIds, disableRow, enableRow, findUserPatchPath, isProtectedModule, packagePatchFlags, readUserPatchState, removeRowBlocks, rowIdsForPackage, } from "./patch.js";
+import { createProfileBackup, downloadWebdav, MAX_BACKUP_BYTES, mergeRestoreManifest, restoreProfileBackup, unportableDeps, uploadWebdav, } from "./backup.js";
+import { createGist, fitsGistLimit, GistError, gistErrorCode, parseGistId, readGist, resolveGistTokenSource, updateGist, verifyGistToken, } from "./gist.js";
 const PROFILE_RE = /^[A-Za-z0-9_-]+$/;
+const MAX_DIRECT_BUILD_APPROVAL_RETRIES = 4;
+const INSTALL_OUTPUT_SESSION_RE = /^[A-Za-z0-9._:-]{1,80}$/;
+function installOutputSession(value) {
+    return typeof value === 'string' && INSTALL_OUTPUT_SESSION_RE.test(value)
+        ? value
+        : `direct-${randomUUID()}`;
+}
 /**
  * The market's own version, read once from its installed package.json.
  *
@@ -76,14 +86,28 @@ function packageHasClientPart(profileDirectory, name) {
  * which fires BEFORE the package lands in node_modules (#68). Undefined when
  * none, so the field can be spread straight into a JSON response.
  */
-function blockedBuilds(result) {
-    if (Array.isArray(result.ignoredBuilds) && result.ignoredBuilds.length > 0)
-        return result.ignoredBuilds;
-    const list = parseIgnoredBuilds(result.stdout, result.stderr);
-    if (list.length > 0)
-        return list;
-    const pending = parsePrepareNotAllowed(result.stdout, result.stderr);
-    return pending !== null ? [pending] : undefined;
+function buildApprovalEvidence(result) {
+    const parsed = parseBuildApprovalEvidence(result.stdout, result.stderr);
+    const packages = new Set(parsed.packages);
+    if (Array.isArray(result.ignoredBuilds)) {
+        for (const name of result.ignoredBuilds) {
+            if (typeof name === 'string' && /^(@[A-Za-z0-9-~][A-Za-z0-9._~-]*\/)?[A-Za-z0-9-~][A-Za-z0-9._~-]*$/.test(name)) {
+                packages.add(name);
+            }
+        }
+    }
+    return { packages: [...packages], exactKeys: parsed.exactKeys };
+}
+/** Every key written here is either a validated package name, server-derived
+ * source identity, or an exact selector copied from pnpm's own error. */
+function buildApprovalKeys(evidence, target) {
+    const keys = new Set([...evidence.packages, ...evidence.exactKeys]);
+    for (const name of evidence.packages) {
+        const stableGitKey = gitAllowBuildsKey(name, target);
+        if (stableGitKey !== null)
+            keys.add(stableGitKey);
+    }
+    return [...keys];
 }
 /**
  * Register the market's HTTP routes.
@@ -142,7 +166,8 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
     if (marketState.channel !== undefined)
         config.channel = marketState.channel;
     const activeChannel = () => resolveChannel(config.channel, marketVersion());
-    const themes = createThemeManager(host, config.profile, disabled, activeProfileDir);
+    const catalog = createCatalogStore(activeProfileDir);
+    const themes = createThemeManager(host, config.profile, disabled, activeProfileDir, () => catalog.load());
     // Client-only packages (dsh.client without dsh.bundle) are invisible to the
     // bundle layer in every boot; the market shim-mounts them so their client
     // bundles are actually served.
@@ -307,7 +332,15 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
         }
     }
     /** Every plugin command goes through the pnpm-drift recovery wrapper (#20). */
-    const runPlugin = (profile, args) => withHoistRecovery(commands.runPlugin, profile, args);
+    const runPlugin = (profile, args) => withHoistRecovery(commands.runPlugin, profile, args, activeProfileDir);
+    /** Route rollback must not undo a profile repair completed by the runner. */
+    function rememberInstallRepairs(repairs, result) {
+        if (result.repairedDependencies !== undefined)
+            Object.assign(repairs, result.repairedDependencies);
+    }
+    function withInstallRepairs(snapshot, repairs) {
+        return Object.keys(repairs).length === 0 ? snapshot : { ...snapshot, ...repairs };
+    }
     /**
      * Undo a clean-exit update whose new build cannot boot. Restoring only the
      * manifest pin (the original #159 behavior) leaves the bad package files
@@ -335,6 +368,22 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
     }
     const pendingRollbacks = new Map();
     let rollbackSequence = 0;
+    // Exact git approval selectors cannot be reconstructed from a URL: pnpm
+    // pins them to the resolved commit. Keep the server-observed evidence until
+    // the user's explicit approval request consumes it. The map is bounded and
+    // process-local; no client-provided selector is ever written to YAML.
+    const pendingBuildApprovals = new Map();
+    function rememberBuildApproval(evidence, target) {
+        const keys = buildApprovalKeys(evidence, target);
+        for (const name of evidence.packages) {
+            if (pendingBuildApprovals.size >= 64 && !pendingBuildApprovals.has(name)) {
+                const oldest = pendingBuildApprovals.keys().next().value;
+                if (oldest !== undefined)
+                    pendingBuildApprovals.delete(oldest);
+            }
+            pendingBuildApprovals.set(name, { target, keys });
+        }
+    }
     function savePendingRollback(record) {
         const id = `rollback-${String(rollbackSequence++)}`;
         pendingRollbacks.set(id, { ...record, id });
@@ -344,6 +393,19 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
     async function rollbackGitBuild(name, manifestBefore, target, beforeCommit) {
         if (beforeCommit === null) {
             return { ok: false, detail: 'the previous commit is unknown; nothing to roll back to' };
+        }
+        // Immutable archive pins already name the exact old commit. Reinstalling
+        // that manifest is both sufficient and script-free; converting it back
+        // through `github:#sha` would reintroduce the prepare failure this pin
+        // exists to isolate.
+        const previousSource = parseGitHubDependencySpec(manifestBefore[name] ?? '');
+        if (previousSource?.kind === 'archive') {
+            restoreManifestDeps(config.profile, manifestBefore, activeProfileDir);
+            const reinstall = await runPlugin(config.profile, ['install', '--no-frozen-lockfile', IGNORE_SCRIPTS_OVERRIDE]);
+            const ok = reinstall.exitCode === 0 && !reinstall.timedOut && !reinstall.cancelled;
+            if (ok)
+                logEvent('info', 'update-rollback', `${name}: restored immutable archive at ${beforeCommit}`);
+            return { ok, detail: ok ? null : (reinstall.stderr || reinstall.stdout).slice(-300) };
         }
         restoreManifestDeps(config.profile, manifestBefore, activeProfileDir);
         const add = await runPlugin(config.profile, ['add', RELEASE_AGE_OVERRIDE, `${target}#${beforeCommit}`]);
@@ -622,16 +684,54 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                 }
                 try {
                     try {
-                        sendJson(response, 200, { registry: await loadRegistry() });
+                        const registry = await catalog.load();
+                        catalog.scheduleCheck();
+                        sendJson(response, 200, { registry, catalog: catalog.status() });
                     }
                     catch (error) {
-                        // Say what went wrong. The market used to substitute a bundled
-                        // copy here, so an unreachable registry looked exactly like a
-                        // reachable one with fewer plugins in it.
+                        // This is only a first-use failure: once one valid catalog has
+                        // been saved, load() serves it locally and remote failures stay
+                        // confined to the background update check.
                         const message = error instanceof Error ? error.message : String(error);
                         logEvent('warn', 'registry', `catalog fetch failed: ${message}`);
                         sendJson(response, 502, { error: message });
                     }
+                }
+                catch (error) {
+                    sendJson(response, 500, { error: error instanceof Error ? error.message : String(error) });
+                }
+            },
+        }),
+        host.webServer.register({
+            kind: 'exact',
+            path: '/dsh-market/registry/status',
+            handler: (request, response) => {
+                if (request.method !== 'GET') {
+                    response.writeHead(405, { allow: 'GET' });
+                    response.end();
+                    return;
+                }
+                sendJson(response, 200, { catalog: catalog.status() });
+            },
+        }),
+        host.webServer.register({
+            kind: 'exact',
+            path: '/dsh-market/registry/update',
+            handler: async (request, response) => {
+                if (request.method !== 'POST') {
+                    response.writeHead(405, { allow: 'POST' });
+                    response.end();
+                    return;
+                }
+                if (!sameOrigin(request))
+                    return sendJson(response, 403, { error: 'untrusted origin' });
+                try {
+                    const registry = await catalog.applyUpdate();
+                    if (registry === null) {
+                        sendJson(response, 409, { error: 'no catalog update is pending', catalog: catalog.status() });
+                        return;
+                    }
+                    sendJson(response, 200, { ok: true, registry, catalog: catalog.status() });
                 }
                 catch (error) {
                     sendJson(response, 500, { error: error instanceof Error ? error.message : String(error) });
@@ -1113,6 +1213,35 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
         }),
         host.webServer.register({
             kind: 'exact',
+            path: '/dsh-market/install-progress',
+            handler: (request, response) => {
+                if (request.method !== 'GET') {
+                    response.writeHead(405, { allow: 'GET' });
+                    response.end();
+                    return;
+                }
+                // This high-frequency endpoint intentionally excludes catalog,
+                // profile and environment probes performed by /status. It is a
+                // bounded in-memory snapshot, so polling it cannot make installation
+                // slower by repeatedly touching the profile filesystem.
+                sendJson(response, 200, {
+                    active: progress.active,
+                    target: progress.target,
+                    phase: progress.phase,
+                    done: progress.done,
+                    total: progress.total,
+                    currentPackage: progress.currentPackage,
+                    downloaded: progress.downloaded,
+                    size: progress.size,
+                    cancelling: progress.cancelling,
+                    busy: installing,
+                    outputSession: progress.outputSession,
+                    output: progress.output,
+                });
+            },
+        }),
+        host.webServer.register({
+            kind: 'exact',
             path: '/dsh-market/logs',
             handler: (request, response) => {
                 if (request.method !== 'GET') {
@@ -1203,16 +1332,18 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                             return;
                         }
                         const beforeInstalled = readInstalled(config.profile, activeProfileDir);
-                        // Re-running add re-resolves the source: git HEAD for github specs,
-                        // dist-tag latest for registry installs.
-                        const isGit = spec.startsWith('github:');
+                        // Re-running add re-resolves the source: git HEAD for both legacy
+                        // github: specs and Desktop's immutable archive pins; dist-tag
+                        // latest for registry installs.
+                        const gitSource = parseGitHubDependencySpec(spec);
+                        const isGit = gitSource !== null;
                         // `@latest` was hardcoded, so a beta subscriber would have been
                         // told an update existed and then handed the stable build. The
                         // dist-tag has to follow the same setting the offer came from.
                         // The market follows its channel; everything else is `latest`.
                         const selfChannel = SELF_NAMES.has(name) ? activeChannel() : null;
                         const tag = selfChannel === null ? 'latest' : DIST_TAG[selfChannel];
-                        const target = isGit ? spec.replace(/#.*$/, '') : `${name}@${tag}`;
+                        const target = gitSource !== null ? `github:${gitSource.repo}` : `${name}@${tag}`;
                         // Never let `@latest` walk a profile BACKWARDS (#64 by @ZeroOrigin64):
                         // a package whose latest dist-tag was left on an older release turns
                         // this update into a downgrade that also rewrites an exact pin to
@@ -1241,7 +1372,7 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                                 return;
                             }
                         }
-                        const repoKey = isGit ? spec.slice('github:'.length).replace(/#.*$/, '').toLowerCase() : null;
+                        const repoKey = gitSource?.repo.toLowerCase() ?? null;
                         // Captured BEFORE pnpm replaces the files: afterwards the loader
                         // inventory reads exactly the same, because replacing a package
                         // on disk does not unload the module the process already imported.
@@ -1252,7 +1383,7 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                             && hasHostHalf(config.profile, name, activeProfileDir);
                         const beforeVersion = readInstalledVersion(config.profile, name, activeProfileDir);
                         const beforeCommit = repoKey !== null
-                            ? readLockCommits(config.profile, activeProfileDir).get(repoKey) ?? null
+                            ? gitSource?.commit ?? readLockCommits(config.profile, activeProfileDir).get(repoKey) ?? null
                             : null;
                         // force: the user chose to install a fresh release without the
                         // default one-day safety wait; scoped to this single command.
@@ -1263,10 +1394,37 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                         pendingRollbacks.clear();
                         const compatibilityBefore = assessProfile(config.profile, activeProfileDir);
                         const manifestBefore = readManifestDeps(config.profile, activeProfileDir);
-                        const result = await runPlugin(config.profile, addArgs);
+                        const installRepairs = {};
+                        let result = await runPlugin(config.profile, addArgs);
+                        rememberInstallRepairs(installRepairs, result);
+                        let prebuiltFallback = false;
+                        const fallbackArgs = isGit && isExecutedGitPrepareFailure(result)
+                            ? gitPrebuiltFallbackArgs(addArgs)
+                            : null;
+                        if (fallbackArgs !== null) {
+                            const buildFailure = result;
+                            const rolledBack = restoreManifestDeps(config.profile, withInstallRepairs(manifestBefore, installRepairs), activeProfileDir);
+                            if (rolledBack.length > 0) {
+                                logEvent('warn', 'update', `${name}: cleared manifest residue before prebuilt-artifact fallback: ${rolledBack.join(', ')}`);
+                            }
+                            const fallback = await runPlugin(config.profile, fallbackArgs);
+                            rememberInstallRepairs(installRepairs, fallback);
+                            if (fallback.exitCode === 0 && !fallback.timedOut && !fallback.cancelled) {
+                                result = fallback;
+                                prebuiltFallback = true;
+                                logEvent('warn', 'update', `${name}: lifecycle build failed; updated from committed artifacts with ${IGNORE_SCRIPTS_OVERRIDE} — ${(buildFailure.stderr || buildFailure.stdout).trim().slice(-300)}`);
+                            }
+                            else {
+                                const original = (buildFailure.stderr || buildFailure.stdout).trim().slice(-1200);
+                                result = {
+                                    ...fallback,
+                                    stderr: `${fallback.stderr}${fallback.stderr ? '\n\n' : ''}Original git lifecycle failure:\n${original}`,
+                                };
+                            }
+                        }
                         const cancelled = result.cancelled;
                         if ((result.exitCode !== 0 || result.timedOut) && !cancelled) {
-                            const rolledBack = restoreManifestDeps(config.profile, manifestBefore, activeProfileDir);
+                            const rolledBack = restoreManifestDeps(config.profile, withInstallRepairs(manifestBefore, installRepairs), activeProfileDir);
                             if (rolledBack.length > 0)
                                 logEvent('warn', 'update', `${name}: rolled back manifest residue of the failed run: ${rolledBack.join(', ')}`);
                         }
@@ -1391,7 +1549,12 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                         // build-required dep fails the add with ERR_PNPM_IGNORED_BUILDS.
                         // Reporting the blocked packages here gives the client the same
                         // approve-and-retry banner the install flow has had since #6.
-                        const ignoredBuilds = ok || cancelled ? undefined : blockedBuilds(result);
+                        const updateBuildEvidence = ok || cancelled
+                            ? { packages: [], exactKeys: [] }
+                            : buildApprovalEvidence(result);
+                        const ignoredBuilds = updateBuildEvidence.packages.length > 0 ? updateBuildEvidence.packages : undefined;
+                        if (ignoredBuilds !== undefined)
+                            rememberBuildApproval(updateBuildEvidence, target);
                         logEvent(ok || cancelled ? 'info' : 'error', 'update', `${name} -> ${target} exit=${String(result.exitCode)}${result.timedOut ? ' TIMEOUT' : ''}${cancelled ? ' CANCELLED' : ''}${stale ? ` STALE(${staleReason ?? 'unknown'})` : ''}${ok || cancelled ? '' : ` stderr=${result.stderr.slice(-300)}`}`);
                         // A user-cancelled run is a quiet outcome, not an error.
                         sendJson(response, ok || cancelled ? 200 : result.busy === true ? 409 : 502, {
@@ -1403,6 +1566,7 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                             changed: cancelDiff?.changed,
                             activation,
                             compatibility,
+                            prebuiltFallback: prebuiltFallback || undefined,
                             ignoredBuilds,
                             staleReason: staleReason ?? undefined,
                             error: trialError ?? brokenEntryError ?? staleError ?? undefined,
@@ -1672,14 +1836,15 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                     };
                     const PKG_RE = /^(@[A-Za-z0-9-~][A-Za-z0-9._~-]*\/)?[A-Za-z0-9-~][A-Za-z0-9._~-]*$/;
                     const body = (await readJsonBody(request));
+                    const directSource = directInstallSourceFor(body.source);
                     const requested = (Array.isArray(body.packages) ? body.packages.map(String).map(stripVersion) : [])
                         .filter(name => PKG_RE.test(name));
                     const installed = requested
                         .filter(name => existsSync(join(activeProfileDir, 'node_modules', name, 'package.json')));
-                    // Git-hosted plugins rejected by pnpm's FETCHER (#68) exist in
-                    // neither node_modules nor package.json — the only trusted anchor
-                    // left is the curated registry itself: a name that resolves to a
-                    // github-sourced catalog entry may be approved pre-materialization.
+                    // Git-hosted plugins rejected by pnpm's fetcher exist in neither
+                    // node_modules nor package.json. pnpm 10 also requires its exact,
+                    // commit-pinned codeload selector; that value is consumed from the
+                    // server-side evidence map populated by the failed install/update.
                     //
                     // pnpm only matches a git-hosted dep's allowBuilds entry under its
                     // stable `name@git+https://…` key (#68/#69) — a bare name entry is
@@ -1689,7 +1854,14 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                     // is kept alongside — it authorizes the npm-sourced case.
                     const specs = readInstalled(config.profile, activeProfileDir);
                     const packages = [];
+                    const pendingConsumed = [];
                     for (const name of requested) {
+                        const pending = pendingBuildApprovals.get(name);
+                        if (pending !== undefined && (directSource === null || pending.target === directSource.target)) {
+                            packages.push(...pending.keys);
+                            pendingConsumed.push(name);
+                            continue;
+                        }
                         if (installed.includes(name)) {
                             packages.push(name);
                             const key = gitAllowBuildsKey(name, String(specs[name] ?? ''));
@@ -1699,6 +1871,18 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                         }
                         if (specs[name] !== undefined)
                             continue;
+                        // A direct GitHub install rejected during prepare may not have
+                        // materialized anything yet. The confirmed request itself is the
+                        // trusted source anchor, so derive pnpm's stable git allowBuilds
+                        // key from it instead of requiring a catalog entry that does not
+                        // exist by definition for many direct installs.
+                        if (directSource?.kind === 'github') {
+                            packages.push(name);
+                            const key = gitAllowBuildsKey(name, directSource.target);
+                            if (key !== null)
+                                packages.push(key);
+                            continue;
+                        }
                         // The catalog can now FAIL rather than quietly serving a bundled
                         // copy, and this key is an optimisation, not a requirement: the
                         // bare name already authorizes the npm-sourced case, and a git
@@ -1706,7 +1890,7 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                         // catalog must not turn "allow this build" into a 500.
                         let entry;
                         try {
-                            entry = (await loadRegistry()).plugins.find(p => p.name === name || p.npm === name);
+                            entry = (await catalog.load()).plugins.find(p => p.name === name || p.npm === name);
                         }
                         catch (error) {
                             logEvent('warn', 'approve-builds', `catalog unavailable, authorizing ${name} by name only: ${error instanceof Error ? error.message : String(error)}`);
@@ -1724,6 +1908,8 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                         return;
                     }
                     const approved = setAllowBuilds(config.profile, packages, activeProfileDir);
+                    for (const name of pendingConsumed)
+                        pendingBuildApprovals.delete(name);
                     logEvent('info', 'approve-builds', `allowed build scripts: ${approved.join(', ')}`);
                     sendJson(response, 200, { ok: true, approved });
                 }
@@ -1941,6 +2127,7 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                     sendJson(response, 403, { error: 'untrusted origin' });
                     return;
                 }
+                let directProgressSession = null;
                 try {
                     await withMutationLock(response, 'install', async () => {
                         const body = (await readJsonBody(request));
@@ -1954,18 +2141,46 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                             });
                             return;
                         }
-                        const url = typeof body.url === 'string' ? body.url : '';
-                        const registry = await loadRegistry();
-                        const entry = registry.plugins.find(p => p.url.toLowerCase() === url.toLowerCase());
-                        if (entry === undefined) {
-                            logEvent('warn', 'install-rejected', `not in curated registry: ${url.slice(0, 120)}`);
-                            sendJson(response, 400, { error: 'plugin is not in the curated registry' });
-                            return;
+                        const direct = body.source === undefined ? null : directInstallSourceFor(body.source);
+                        let entry;
+                        let target;
+                        if (body.source !== undefined) {
+                            if (direct === null) {
+                                logEvent('warn', 'direct-install-rejected', String(body.source).slice(0, 120));
+                                sendJson(response, 400, {
+                                    error: 'unsupported direct source; use a GitHub repository (owner/repo or https://github.com/owner/repo) or an npm package name',
+                                });
+                                return;
+                            }
+                            // This path deliberately does not search or depend on the
+                            // catalog. It installs the exact source the user confirmed in
+                            // the external-request dialog, while reusing the same guarded
+                            // mutation/rollback/activation engine as a catalog install.
+                            entry = {
+                                name: direct.name,
+                                owner: direct.owner,
+                                url: direct.url,
+                                npm: direct.kind === 'npm' ? direct.target : undefined,
+                                category: 'direct',
+                            };
+                            target = direct.target;
                         }
-                        const target = installTargetFor(entry);
-                        if (target === null) {
-                            sendJson(response, 400, { error: 'unsupported source url' });
-                            return;
+                        else {
+                            const url = typeof body.url === 'string' ? body.url : '';
+                            const registry = await catalog.load();
+                            const registryEntry = registry.plugins.find(p => p.url.toLowerCase() === url.toLowerCase());
+                            if (registryEntry === undefined) {
+                                logEvent('warn', 'install-rejected', `not in curated registry: ${url.slice(0, 120)}`);
+                                sendJson(response, 400, { error: 'plugin is not in the curated registry' });
+                                return;
+                            }
+                            const registryTarget = installTargetFor(registryEntry);
+                            if (registryTarget === null) {
+                                sendJson(response, 400, { error: 'unsupported source url' });
+                                return;
+                            }
+                            entry = registryEntry;
+                            target = registryTarget;
                         }
                         // Duplicate guard (#27): the same plugin listed under another name
                         // (an alias entry pointing at the same repo) must never install
@@ -1989,8 +2204,14 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                             // Same install? The leftover's own name/spec must match what we
                             // are about to add — an npm entry retries under its npm name; a
                             // github entry's package.json spec equals the target.
+                            const installedSource = parseGitHubDependencySpec(String(installedNow[aliasOf] ?? ''));
+                            const requestedSource = parseGitHubDependencySpec(String(target));
+                            const sameGitSource = installedSource !== null && requestedSource !== null
+                                && installedSource.repo.toLowerCase() === requestedSource.repo.toLowerCase()
+                                && (installedSource.subpath ?? '').toLowerCase() === (requestedSource.subpath ?? '').toLowerCase();
                             const sameSource = aliasOf.toLowerCase() === (entry.npm ?? '').toLowerCase()
-                                || String(installedNow[aliasOf] ?? '').replace(/^file:/, '').toLowerCase() === String(target).replace(/^file:/, '').toLowerCase();
+                                || String(installedNow[aliasOf] ?? '').replace(/^file:/, '').toLowerCase() === String(target).replace(/^file:/, '').toLowerCase()
+                                || sameGitSource;
                             let active = false;
                             try {
                                 const manifest = JSON.parse(readFileSync(join(activeProfileDir, 'package.json'), 'utf8'));
@@ -2036,14 +2257,112 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                         // every later pnpm run — of anything. Cancelled runs keep their
                         // partial state on purpose (the user sees the diff and decides).
                         const manifestBefore = readManifestDeps(config.profile, activeProfileDir);
-                        const result = await runPlugin(config.profile, ['add', target]);
+                        const autoApproveBuilds = direct !== null && body.allowBuildScripts === true;
+                        const skipDirectBuildScripts = direct !== null && body.allowBuildScripts === false;
+                        const installArgs = skipDirectBuildScripts
+                            ? ['add', IGNORE_SCRIPTS_OVERRIDE, target]
+                            : ['add', target];
+                        if (direct !== null) {
+                            directProgressSession = installOutputSession(body.requestId);
+                            beginInstallOutputSession(directProgressSession, target);
+                        }
+                        const installRepairs = {};
+                        let result = await runPlugin(config.profile, installArgs);
+                        rememberInstallRepairs(installRepairs, result);
+                        let buildEvidence = buildApprovalEvidence(result);
+                        if (skipDirectBuildScripts && result.exitCode === 0 && !result.timedOut && !result.cancelled) {
+                            // The user explicitly selected a no-script install. pnpm may
+                            // still emit an ignored-build warning, but committed artifacts
+                            // are validated below before anything is activated.
+                            buildEvidence = { packages: [], exactKeys: [] };
+                        }
+                        let autoApprovalAttempts = 0;
+                        let autoApprovalFailure = null;
+                        let prebuiltFallback = false;
+                        const approvedInRequest = new Set();
+                        const encounteredBuildPackages = new Set();
+                        // A trusted external source may need its prepare/build scripts
+                        // before it even reaches node_modules. Automatically authorize
+                        // only selectors observed in pnpm's own output, then retry inside
+                        // this one request. The fresh-key check is the loop breaker: if
+                        // pnpm rejects the same selector again, another click cannot fix
+                        // it and the real error is surfaced instead of prompting forever.
+                        while (autoApproveBuilds
+                            && !result.cancelled
+                            && !result.timedOut
+                            && result.busy !== true
+                            && buildEvidence.packages.length > 0) {
+                            for (const name of buildEvidence.packages)
+                                encounteredBuildPackages.add(name);
+                            const freshApprovals = buildApprovalKeys(buildEvidence, target)
+                                .filter(key => !approvedInRequest.has(key));
+                            if (freshApprovals.length === 0) {
+                                autoApprovalFailure = `构建脚本已经放行，但 pnpm 仍然拒绝同一组构建请求（${buildEvidence.packages.join(', ')}）。继续重试不会解决问题，请查看日志中的真实构建错误。 / Build scripts were already allowed, but pnpm rejected the same request again (${buildEvidence.packages.join(', ')}). Repeating the approval cannot fix it; inspect the build error in the log.`;
+                                break;
+                            }
+                            if (autoApprovalAttempts >= MAX_DIRECT_BUILD_APPROVAL_RETRIES) {
+                                autoApprovalFailure = `插件连续触发了过多层构建授权（${buildEvidence.packages.join(', ')}），已停止自动重试，避免安装循环。 / The plugin requested too many successive build approvals (${buildEvidence.packages.join(', ')}); automatic retries stopped to prevent an install loop.`;
+                                break;
+                            }
+                            const rolledBack = restoreManifestDeps(config.profile, withInstallRepairs(manifestBefore, installRepairs), activeProfileDir);
+                            if (rolledBack.length > 0) {
+                                logEvent('warn', 'install', `${target}: cleared manifest residue before automatic build approval: ${rolledBack.join(', ')}`);
+                            }
+                            setAllowBuilds(config.profile, freshApprovals, activeProfileDir);
+                            for (const key of freshApprovals)
+                                approvedInRequest.add(key);
+                            autoApprovalAttempts += 1;
+                            logEvent('info', 'approve-builds', `${target}: automatically allowed server-observed build selectors (${freshApprovals.join(', ')}), retry ${String(autoApprovalAttempts)}`);
+                            result = await runPlugin(config.profile, ['add', target]);
+                            rememberInstallRepairs(installRepairs, result);
+                            buildEvidence = buildApprovalEvidence(result);
+                        }
+                        // A successful authorization only answers "may this script run?";
+                        // it cannot make a broken upstream build succeed. If the lifecycle
+                        // really ran and failed, retry once without scripts and accept the
+                        // result only when the normal loadable-artifact validation below
+                        // proves the repository already ships runnable output.
+                        const fallbackArgs = autoApprovalFailure === null && isExecutedGitPrepareFailure(result)
+                            ? gitPrebuiltFallbackArgs(installArgs)
+                            : null;
+                        if (fallbackArgs !== null) {
+                            const buildFailure = result;
+                            const rolledBack = restoreManifestDeps(config.profile, withInstallRepairs(manifestBefore, installRepairs), activeProfileDir);
+                            if (rolledBack.length > 0) {
+                                logEvent('warn', 'install', `${target}: cleared manifest residue before prebuilt-artifact fallback: ${rolledBack.join(', ')}`);
+                            }
+                            const fallback = await runPlugin(config.profile, fallbackArgs);
+                            rememberInstallRepairs(installRepairs, fallback);
+                            if (fallback.exitCode === 0 && !fallback.timedOut && !fallback.cancelled) {
+                                result = fallback;
+                                buildEvidence = { packages: [], exactKeys: [] };
+                                prebuiltFallback = true;
+                                logEvent('warn', 'install', `${target}: lifecycle build failed; installed committed artifacts with ${IGNORE_SCRIPTS_OVERRIDE} — ${(buildFailure.stderr || buildFailure.stdout).trim().slice(-300)}`);
+                            }
+                            else {
+                                const original = (buildFailure.stderr || buildFailure.stdout).trim().slice(-1200);
+                                result = {
+                                    ...fallback,
+                                    stderr: `${fallback.stderr}${fallback.stderr ? '\n\n' : ''}Original git lifecycle failure:\n${original}`,
+                                };
+                                buildEvidence = buildApprovalEvidence(result);
+                            }
+                        }
                         const cancelled = result.cancelled;
-                        if ((result.exitCode !== 0 || result.timedOut) && !cancelled) {
-                            const rolledBack = restoreManifestDeps(config.profile, manifestBefore, activeProfileDir);
+                        const unresolvedBuilds = buildEvidence.packages.length > 0;
+                        if ((result.exitCode !== 0 || result.timedOut || unresolvedBuilds || autoApprovalFailure !== null) && !cancelled) {
+                            const rolledBack = restoreManifestDeps(config.profile, withInstallRepairs(manifestBefore, installRepairs), activeProfileDir);
                             if (rolledBack.length > 0)
                                 logEvent('warn', 'install', `${target}: rolled back manifest residue of the failed run: ${rolledBack.join(', ')}`);
                         }
-                        let ok = result.exitCode === 0 && !result.timedOut && !cancelled;
+                        if (!autoApproveBuilds && unresolvedBuilds)
+                            rememberBuildApproval(buildEvidence, target);
+                        const commandCompleted = result.exitCode === 0
+                            && !result.timedOut
+                            && !cancelled
+                            && !unresolvedBuilds
+                            && autoApprovalFailure === null;
+                        let ok = commandCompleted;
                         const cancelDiff = cancelled ? changedSince(beforeSpecs) : null;
                         if (ok)
                             invalidateUpdates();
@@ -2060,7 +2379,7 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                         let notAPlugin = false;
                         let removedBroken = [];
                         let conflicts = [];
-                        if (result.exitCode === 0 && !result.timedOut && !cancelled) {
+                        if (commandCompleted) {
                             const validated = await validateAddedPlugins(runPlugin, config.profile, before, activeProfileDir);
                             removedBroken = validated.removedBroken;
                             conflicts = validated.conflicts;
@@ -2076,6 +2395,10 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                                 // Partial success across a collection still counts as success.
                                 ok = true;
                             }
+                        }
+                        if (ok) {
+                            for (const name of encounteredBuildPackages)
+                                pendingBuildApprovals.delete(name);
                         }
                         const conflictGroups = groupConflictsByOwner(conflicts);
                         const installed = readInstalled(config.profile, activeProfileDir);
@@ -2145,16 +2468,26 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                             }
                         }
                         logEvent(ok || cancelled ? 'info' : 'error', 'install', `${target} exit=${String(result.exitCode)}${result.timedOut ? ' TIMEOUT' : ''}${cancelled ? ' CANCELLED' : ''}${ok ? ` hot=${String(hot)}` : cancelled ? '' : ` stderr=${result.stderr.slice(-300)}`}`);
-                        const ignoredBuilds = blockedBuilds(result);
+                        // A default-on direct install has already consumed and retried
+                        // every fresh approval it observed. Never turn its terminal error
+                        // back into the same approval prompt; manual/catalog flows still
+                        // receive the explicit approve action.
+                        const ignoredBuilds = !autoApproveBuilds && buildEvidence.packages.length > 0
+                            ? buildEvidence.packages
+                            : undefined;
+                        if (directProgressSession !== null)
+                            finishInstallOutputSession(directProgressSession);
                         sendJson(response, ok || cancelled ? 200 : result.busy === true ? 409 : 502, {
                             ok,
                             cancelled: cancelled || undefined,
                             busy: result.busy || undefined,
                             hot,
+                            addedPackages,
                             partial: cancelDiff?.partial,
                             changed: cancelDiff?.changed,
                             activation,
                             compatibility,
+                            prebuiltFallback: prebuiltFallback || undefined,
                             ignoredBuilds,
                             // Blocked build scripts are expected (pnpm >= 10 blocks them by
                             // default): surface the approve-builds banner instead of scaring
@@ -2168,13 +2501,14 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                             // owner while listing every id blamed one plugin for another's
                             // ids.
                             conflictGroups: conflictGroups.length > 0 ? conflictGroups : undefined,
-                            error: conflictGroups.length > 0
-                                ? `「${conflicts[0].name}」与已安装的 ${conflictGroups.map(group => `「${group.owner}」（${group.ids.join('、')}）`).join('、')} 占用相同的 loader 条目 id，无法在同一环境中共存——保留会导致 DeepSeek Harness 下次启动失败，因此已自动移除。 / "${conflicts[0].name}" declares the same loader entry id(s) as the installed ${conflictGroups.map(group => `"${group.owner}" (${group.ids.join(', ')})`).join(', ')}; they cannot coexist in one environment — keeping it would stop DeepSeek Harness from starting, so it was removed.`
-                                : notAPlugin
-                                    ? 'nothing installable: the plugin(s) need a build step (blocked by default, see allowBuilds) or ship no prebuilt artifacts / 没有可安装的内容：插件需要构建授权（allowBuilds，默认拦截）或未附带构建产物，详见导出日志'
-                                    : Array.isArray(ignoredBuilds) && ignoredBuilds.length > 0
-                                        ? `构建脚本被 pnpm 默认拦截（${ignoredBuilds.join(', ')}），请点击上方按钮放行后重试 / build scripts are blocked by pnpm by default (${ignoredBuilds.join(', ')}); click "Allow build scripts and retry" above`
-                                        : undefined,
+                            error: autoApprovalFailure
+                                ?? (conflictGroups.length > 0
+                                    ? `「${conflicts[0].name}」与已安装的 ${conflictGroups.map(group => `「${group.owner}」（${group.ids.join('、')}）`).join('、')} 占用相同的 loader 条目 id，无法在同一环境中共存——保留会导致 DeepSeek Harness 下次启动失败，因此已自动移除。 / "${conflicts[0].name}" declares the same loader entry id(s) as the installed ${conflictGroups.map(group => `"${group.owner}" (${group.ids.join(', ')})`).join(', ')}; they cannot coexist in one environment — keeping it would stop DeepSeek Harness from starting, so it was removed.`
+                                    : notAPlugin
+                                        ? 'nothing installable: the plugin either failed its own build or ships no loadable artifacts / 没有可安装的内容：插件自身构建失败，或来源没有提供可加载产物，请查看日志'
+                                        : Array.isArray(ignoredBuilds) && ignoredBuilds.length > 0
+                                            ? `构建脚本被 pnpm 默认拦截（${ignoredBuilds.join(', ')}），请点击上方按钮放行后重试 / build scripts are blocked by pnpm by default (${ignoredBuilds.join(', ')}); click "Allow build scripts and retry" above`
+                                            : undefined),
                             exitCode: result.exitCode,
                             timedOut: result.timedOut,
                             stdout: result.stdout,
@@ -2184,6 +2518,8 @@ export function mountMarketRoutes(host, config, commandRuntime, agentsLookup) {
                     });
                 }
                 catch (error) {
+                    if (directProgressSession !== null)
+                        finishInstallOutputSession(directProgressSession);
                     const message = error instanceof Error ? error.message : String(error);
                     host.logger?.warn(`[dsh-market] install failed: ${message}`);
                     logEvent('error', 'install', `route error: ${message}`);

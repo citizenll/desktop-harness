@@ -1,8 +1,12 @@
 /**
- * Registry access: the curated list from awesome-dsh-plugin.com, fetched
- * fresh on every request. See `loadRegistry` for why there is nothing
- * behind it any more.
+ * Persistent, staged access to the curated plugin catalog.
+ *
+ * The active catalog is read from the profile immediately after the first
+ * successful download. Remote checks happen in the background and stage a
+ * newer catalog until the user explicitly applies it, so opening the market
+ * never turns into a network loading screen again.
  */
+import { marketFetch } from './net.ts';
 export interface RegistryPlugin {
     name: string;
     owner: string;
@@ -11,21 +15,11 @@ export interface RegistryPlugin {
     description: Record<string, string>;
     npm?: string | null;
     stars?: number | null;
-    /**
-     * npm downloads in the last 30 days, when the entry has a published
-     * package. `null`/absent means "no npm package" — a coverage gap, not a
-     * zero — so sorting must not read it as "less popular than 0".
-     */
+    /** npm downloads in the last 30 days. */
     downloads?: number | null;
     install: string;
     added: string;
-    /**
-     * Catalog-side deprecation flags (#60): supplied by awesome-dsh-plugin,
-     * absent for every normal entry — the market only consumes them, so a
-     * catalog without the fields behaves exactly as before.
-     */
     deprecated?: boolean;
-    /** Catalog name of the suggested replacement plugin, when deprecated. */
     replacement?: string;
 }
 export interface Registry {
@@ -34,43 +28,45 @@ export interface Registry {
     categories: Record<string, Record<string, string>>;
     plugins: RegistryPlugin[];
 }
+export interface CatalogStatus {
+    checking: boolean;
+    updateAvailable: boolean;
+    activeUpdated: string | null;
+    pendingUpdated: string | null;
+    lastCheckedAt: string | null;
+    error: string | null;
+}
+export interface CatalogStore {
+    /** Return the active local catalog, downloading it only when none exists. */
+    load(): Promise<Registry>;
+    /** Start a throttled remote check without delaying the caller. */
+    scheduleCheck(): void;
+    /** Check the source now; primarily useful to diagnostics and tests. */
+    checkForUpdate(force?: boolean): Promise<CatalogStatus>;
+    /** Promote the already-downloaded pending catalog. */
+    applyUpdate(): Promise<Registry | null>;
+    status(): CatalogStatus;
+}
+type MarketFetcher = typeof marketFetch;
+export interface CatalogStoreOptions {
+    /** Override used by tests and private mirrors. */
+    sourceUrl?: string;
+    /** Null disables persistence while retaining the same staged semantics. */
+    cachePath?: string | null;
+    /** Remote revalidation cadence. */
+    checkIntervalMs?: number;
+    fetcher?: MarketFetcher;
+    now?: () => number;
+}
+export declare const CATALOG_CHECK_INTERVAL_MS: number;
 /**
- * Drop what we remember, so the next call is unconditional.
- *
- * Exists for tests: the memo is module state, and a spec that asserted a
- * 304 would otherwise leak a validator into the next one.
+ * Create one catalog store for one profile. The cache belongs to the profile
+ * because a Desktop installation can host more than one isolated profile.
  */
-export declare function forgetCatalog(): void;
-/**
- * The catalog, revalidated every time it is asked for.
- *
- * There used to be three answers here — live, a one-hour in-memory cache,
- * and a snapshot bundled into the npm package — and only the first was
- * correct. The other two were indistinguishable from it on screen, so a
- * machine that could not reach the registry browsed the publish-time file
- * (839 entries against 1367 live, and frozen forever for anyone on an older
- * release), while a machine that COULD reach it still saw an hour-old
- * listing of a catalog that grows by ~250 entries a day.
- *
- * For a catalog, stale is not a degraded answer, it is a wrong one: a plugin
- * published this morning reads as "does not exist". So there is one source
- * now, and a failure is a failure — the caller reports it and offers a
- * retry, which is a state the user can act on. In particular a network
- * failure is NEVER answered from `served`: an origin that cannot be reached
- * has not confirmed anything, and quietly handing back the last catalog
- * would rebuild exactly the fallback this replaced.
- * @throws when the catalog cannot be fetched or does not look like one.
- */
+export declare function createCatalogStore(profileDirectory?: string, options?: CatalogStoreOptions): CatalogStore;
 export declare function loadRegistry(): Promise<Registry>;
-/**
- * A catalog failure with the facts needed to classify it, in the message
- * itself.
- *
- * The market shows this string and the log export carries it, so it is the
- * whole of what a bug report will contain. "The operation was aborted due to
- * timeout" alone cannot distinguish a slow link from a blocked one from a
- * proxy this process cannot use — and Node's `fetch` ignores HTTP_PROXY
- * entirely (measured on Node 25), so a machine whose only route out is a
- * proxy fails here every time while every other tool on it works.
- */
+/** Reset the compatibility store between tests. */
+export declare function forgetCatalog(): void;
+/** Describe a catalog failure with enough network context for exported logs. */
 export declare function describeFetchFailure(error: unknown, elapsedMs: number): string;
+export {};

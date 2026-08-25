@@ -24,7 +24,7 @@ import { spawn } from 'node:child_process';
 import { request as httpsRequest } from 'node:https';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { MAX_BACKUP_BYTES, validatedBackup } from './backup.js';
+import { MAX_BACKUP_BYTES, validatedBackup } from "./backup.js";
 /** The single file every dshmarket backup Gist carries. */
 export const GIST_FILENAME = 'dsh-profile-backup.json';
 /** GitHub hard limit for one Gist file (1 MB); enforced before upload. */

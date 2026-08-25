@@ -254,7 +254,7 @@ export function restartHelperSource(
     '  try {',
     '    const out = fs.openSync(logOut, "a")',
     '    const err = fs.openSync(logErr, "a")',
-    '    child = spawn(file, args, { cwd, detached, stdio: ["ignore", out, err], env: process.env, shell: viaShell })',
+    '    child = spawn(file, args, { cwd, detached, stdio: ["ignore", out, err], env: process.env, shell: viaShell, windowsHide: true })',
     // spawn reports a missing or unexecutable file ASYNCHRONOUSLY; the
     // try/catch below only covers the synchronous throw, so without this
     // listener that failure is exactly as silent as the bug being fixed.
@@ -296,6 +296,7 @@ export function scheduleRestart(port: number | null = null): RestartResult {
     detached: true,
     stdio: 'ignore',
     env: process.env,
+    windowsHide: true,
   })
   helper.unref()
   setTimeout(() => process.kill(process.pid, 'SIGTERM'), 500)

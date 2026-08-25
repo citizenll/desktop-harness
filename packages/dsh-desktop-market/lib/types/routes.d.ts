@@ -4,8 +4,10 @@
  * process spawning lives in dsh-cli.ts, filesystem reads in profile.ts,
  * orchestration in install.ts / themes.ts / updates.ts.
  *
- * Security: the install route executes a shell command, so it accepts only
- * same-origin POSTs and only sources present in the curated registry.
+ * Security: install routes execute a package-manager command, so they accept
+ * only same-origin POSTs. Catalog installs must resolve to the curated
+ * registry; direct installs pass through the narrower source allowlist in
+ * sources.ts and are confirmed by a dedicated client dialog.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { type PluginCommandRuntime } from './dsh-cli.ts';

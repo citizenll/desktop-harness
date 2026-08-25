@@ -8,8 +8,8 @@
  *    the published contract (enforced by preflight.mjs, and relied on by
  *    hosts that sniff the loader id from the file head) requires the file to
  *    START with the exact one-line `window.__ModuleLoader__.load({ id: "…"`
- *    prefix. Collapse the header onto one line, leaving blank lines in place
- *    of the folded ones so the sourcemap's line numbers stay valid.
+ *    prefix. Collapse the header onto one line while retaining the emitted
+ *    line layout, keeping the generated artifact easy to diff.
  * 2. tsdown names the CSS module's virtual chunk by ABSOLUTE path, so the
  *    builder's checkout path (`/Users/…`, `D:\Github\…`) ends up committed
  *    in a region comment and shipped to npm. Besides leaking the path, it
@@ -20,8 +20,7 @@
  *    runs the build on a plain `npm install`, so every contributor's working
  *    tree acquires that diff without touching anything, and three open PRs
  *    carry it. Sort the map by key; object key order has no effect on
- *    behaviour, and sorting preserves the line COUNT so the sourcemap's line
- *    numbers stay valid, exactly as the banner fold above relies on.
+ *    behaviour, and preserving the line count keeps the generated layout stable.
  */
 import fs from 'node:fs'
 import path from 'node:path'

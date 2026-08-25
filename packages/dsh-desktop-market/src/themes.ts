@@ -5,11 +5,11 @@
  * persisted across restarts.
  */
 
-import { loadRegistry } from './registry.ts'
+import { loadRegistry, type Registry } from './registry.ts'
 import { hotMount, hotUnmount, listHotMounts, writeDisabled } from './hot.ts'
 import { logEvent } from './log.ts'
 import { profileDir, readInstalled } from './profile.ts'
-import { repoOf } from './sources.ts'
+import { parseGitHubDependencySpec, repoOf } from './sources.ts'
 
 /** The slice of a cordis loader entry the market needs for live enable/disable. */
 export interface LoaderEntry {
@@ -41,13 +41,14 @@ export function createThemeManager(
   profile: string,
   disabledThemes: Set<string>,
   explicitDir?: string,
+  registryLoader: () => Promise<Registry> = loadRegistry,
 ): ThemeManager {
   const activeProfileDir = profileDir(profile, explicitDir)
   /** Installed package names classified as themes by the registry's theme category. */
   async function installedThemeNames(): Promise<Set<string>> {
     const names = new Set<string>()
     try {
-      const registry = await loadRegistry()
+      const registry = await registryLoader()
       const themeEntries = registry.plugins.filter(p => p.category === 'theme')
       const themeNames = new Set(themeEntries.map(p => p.name))
       const themeRepos = new Set(
@@ -58,8 +59,8 @@ export function createThemeManager(
           names.add(name)
           continue
         }
-        const match = /github:([^#\s]+)/.exec(String(spec).toLowerCase())
-        if (match !== null && themeRepos.has(match[1])) names.add(name)
+        const source = parseGitHubDependencySpec(String(spec))
+        if (source !== null && themeRepos.has(source.repo.toLowerCase())) names.add(name)
       }
     } catch { /* registry unavailable — nothing classifies as a theme */ }
     return names

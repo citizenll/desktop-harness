@@ -11,7 +11,7 @@ import { lookup } from 'node:dns/promises';
 import { request as httpsRequest } from 'node:https';
 import { isIP } from 'node:net';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
-import { profileDir } from './profile.js';
+import { profileDir } from "./profile.js";
 export const BACKUP_FORMAT = 'dsh-profile-backup';
 export const MAX_BACKUP_BYTES = 2 * 1024 * 1024;
 const MAX_FILES = 256;

@@ -27,12 +27,13 @@
     "postinstall": "patch-package && node scripts/install-brand-assets.mjs && install-electron --no",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "market:build": "npm --prefix packages/dsh-desktop-market run build:client",
     "build:runtime": "npm run build && npm run runtime:stage",
     "runtime:stage": "node scripts/prepare-runtime.mjs",
     "runtime:verify": "node scripts/verify-packaged-runtime.mjs dist",
     "icons:generate": "node scripts/generate-app-icons.mjs",
     "preview": "electron-vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.node.json",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && npm --prefix packages/dsh-desktop-market run typecheck:client",
     "check:dsh": "node scripts/check-dsh-release-train.mjs",
     "test": "npm run check:dsh && vitest run",
     "test:watch": "vitest",
@@ -77,12 +78,16 @@
     "@electron/asar": "3.4.1",
     "@types/node": "24.10.1",
     "@types/qrcode": "^1.5.6",
+    "@types/react": "18.3.28",
+    "@types/react-dom": "18.3.7",
     "electron": "43.4.0",
     "electron-builder": "26.15.3",
     "electron-updater": "^6.8.9",
     "electron-vite": "5.0.0",
+    "lightningcss": "1.33.0",
     "patch-package": "^8.0.1",
     "qrcode": "^1.5.4",
+    "tsdown": "0.21.1",
     "typescript": "5.9.3",
     "vite": "7.3.6",
     "vitest": "^4.1.10",
@@ -94,6 +99,14 @@
   "build": {
     "appId": "io.dsh.desktop",
     "productName": "DSH Desktop",
+    "protocols": [
+      {
+        "name": "DSH Desktop Plugin Installer",
+        "schemes": [
+          "dsh-desktop"
+        ]
+      }
+    ],
     "asar": {
       "smartUnpack": false
     },
@@ -149,6 +162,15 @@
     "win": {
       "icon": "build/icon.ico",
       "verifyUpdateCodeSignature": false,
+      "extraResources": [
+        {
+          "from": "build/dsh-cli",
+          "to": "dsh-cli",
+          "filter": [
+            "**/*"
+          ]
+        }
+      ],
       "target": [
         {
           "target": "nsis",

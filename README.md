@@ -36,6 +36,18 @@ DSH Desktop 把 DeepSeek Harness 的本地 Web 体验封装为桌面应用：应
 
 已安装的 macOS 和 Windows 版本会在启动后及每六小时从本仓库的 GitHub Releases 检查更新。更新将在后台下载，准备完成后提示重启安装；也可以从应用菜单选择 **检查更新…** 手动检查。
 
+### 插件安装入口
+
+DSH Desktop 将以下入口统一接入独立的外部插件安装流程。它们会展示实际来源并交给用户确认，不会静默修改 Profile：
+
+```text
+http://127.0.0.1:3080/#dsh-plugin-install=nexu-io%2Fopen-design
+dsh-desktop://plugin/install?source=nexu-io%2Fopen-design
+dsh plugin --profile web add github:le-soleil-se-couche/dsh-skin-claude-code
+```
+
+`dsh plugin add` 同时接受 `github:用户/仓库`、GitHub HTTPS 地址和 npm 包名。`3080` 是 DSH Desktop 固定的网页安装桥接端口；应用运行时，网页会把片段中的来源安全地转交给桌面端，并在应用内显示确认窗口。Harness UI 仍使用内部随机端口，避免端口冲突。`dsh-desktop://` 协议支持应用冷启动和运行中唤起；Windows 安装包还会为用户 PATH 注册与桌面应用交互的 `dsh` 命令，安装后请打开新的终端使用。macOS 与 Linux 当前支持协议和网页入口，不自动修改系统 PATH。
+
 ## 为什么做这个项目
 
 DeepSeek Harness 本身提供完整的 Agent Runtime 与 Web UI。DSH Desktop 不重新实现 Harness，而是补上桌面产品所需的宿主能力：

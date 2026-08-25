@@ -10,8 +10,7 @@ import {
   Menu,
   nativeTheme,
   shell,
-  type IpcMainInvokeEvent,
-  type MessageBoxOptions
+  type IpcMainInvokeEvent
 } from 'electron'
 import { extractFailureCause, HarnessRuntime } from './runtime/harness-runtime'
 import { removeProfilePluginWithDsh } from './runtime/profile-plugin-command'
@@ -53,6 +52,22 @@ import {
 } from '../shared/desktop-menu'
 import { buildPluginRecoveryViewModel } from './plugin-recovery-view'
 import { configureNodeWorkerModuleFallback } from './runtime/node-module-fallback'
+import { PluginInstallWebBridge } from './plugin-install-web-bridge'
+import {
+  DSH_DESKTOP_PLUGIN_INSTALL_CHANNEL,
+  parseDesktopPluginInstallUrl,
+  parseDshDesktopCliLaunchArguments,
+  type PluginInstallIntentErrorCode,
+  type PluginInstallIntentResult
+} from '../shared/plugin-install-intent'
+import {
+  DSH_DESKTOP_DIALOG_RESPONSE_CHANNEL,
+  DSH_DESKTOP_DIALOG_SHOW_CHANNEL,
+  type DesktopDialogButton,
+  type DesktopDialogRequest,
+  type DesktopDialogResponse,
+  type DesktopDialogTone
+} from '../shared/app-dialog'
 
 type PluginRecoveryAction = 'uninstall' | 'show-log' | 'quit' | 'restart' | 'refresh'
 
@@ -65,6 +80,7 @@ const PLUGIN_RECOVERY_ACTIONS = new Set<PluginRecoveryAction>([
 let mainWindow: BrowserWindow | undefined
 let runtime: HarnessRuntime
 let mobileBridge: LanMobileBridge
+let pluginInstallWebBridge: PluginInstallWebBridge | undefined
 let launchDirectory: string
 let quitting = false
 let failureRecoveryVisible = false
@@ -76,6 +92,17 @@ let pluginRecoveryRemovedPlugins: string[] = []
 let pluginRecoveryResetTimer: ReturnType<typeof setTimeout> | undefined
 let pendingFrontendPluginRecovery = false
 let pendingFrontendPluginRecoveryMessage: string | undefined
+const pendingPluginInstallSources: string[] = []
+const pendingPluginInstallErrors: PluginInstallIntentErrorCode[] = []
+let foregroundReleaseTimer: ReturnType<typeof setTimeout> | undefined
+let desktopDialogSequence = 0
+
+interface PendingDesktopDialog {
+  webContentsId: number
+  settle: (response: number) => void
+}
+
+const pendingDesktopDialogs = new Map<number, PendingDesktopDialog>()
 
 function appendRendererPluginFailureLog(message: string): void {
   const trimmed = message.trim()
@@ -166,6 +193,182 @@ function isDevelopmentBuild(): boolean {
 }
 
 const developmentBuild = isDevelopmentBuild()
+
+function acceptPluginInstallIntent(result: PluginInstallIntentResult): boolean {
+  if (result.status === 'ignored') return false
+  if (result.status === 'error') {
+    pendingPluginInstallErrors.push(result.code)
+    return true
+  }
+
+  const { source } = result.intent
+  if (!pendingPluginInstallSources.includes(source)) pendingPluginInstallSources.push(source)
+  return true
+}
+
+/**
+ * Every external entry point converges here. Main only transports the source;
+ * the embedded installer owns the dedicated confirmation UI, source
+ * validation and the actual profile mutation.
+ */
+function acceptExternalLaunchArguments(argv: readonly string[]): boolean {
+  let handled = false
+  for (const argument of argv) {
+    handled = acceptPluginInstallIntent(parseDesktopPluginInstallUrl(argument)) || handled
+  }
+
+  handled = acceptPluginInstallIntent(parseDshDesktopCliLaunchArguments(argv)) || handled
+  return handled
+}
+
+function focusDesktopWindow(forceForeground = false): void {
+  const window = mainWindow
+  if (!window || window.isDestroyed()) return
+  if (window.isMinimized()) window.restore()
+
+  if (forceForeground && process.platform === 'darwin') {
+    app.focus({ steal: true })
+  }
+  if (forceForeground) {
+    // Windows normally prevents a background process from stealing focus from
+    // the browser that submitted the loopback request. A short topmost pulse
+    // makes the confirmation dialog visible immediately, then restores the
+    // normal z-order so Desktop never remains pinned above other applications.
+    if (process.platform === 'win32') {
+      if (foregroundReleaseTimer) clearTimeout(foregroundReleaseTimer)
+      window.setAlwaysOnTop(true)
+    }
+    window.moveTop()
+  }
+  window.show()
+  window.focus()
+
+  if (forceForeground && process.platform === 'win32') {
+    foregroundReleaseTimer = setTimeout(() => {
+      foregroundReleaseTimer = undefined
+      if (window.isDestroyed()) return
+      window.setAlwaysOnTop(false)
+      window.moveTop()
+      window.focus()
+    }, 500)
+  }
+}
+
+function registerDesktopDialogHandlers(): void {
+  ipcMain.removeAllListeners(DSH_DESKTOP_DIALOG_RESPONSE_CHANNEL)
+  ipcMain.on(DSH_DESKTOP_DIALOG_RESPONSE_CHANNEL, (event, payload: unknown) => {
+    if (typeof payload !== 'object' || payload === null) return
+    const response = payload as Partial<DesktopDialogResponse>
+    if (!Number.isSafeInteger(response.id) || !Number.isInteger(response.response)) return
+    const pending = pendingDesktopDialogs.get(response.id!)
+    if (!pending || pending.webContentsId !== event.sender.id) return
+    pending.settle(response.response!)
+  })
+}
+
+function showDesktopDialog(window: BrowserWindow, options: {
+  tone: DesktopDialogTone
+  message: string
+  detail?: string
+  buttons: DesktopDialogButton[]
+  defaultId?: number
+  cancelId?: number
+}): Promise<{ response: number }> {
+  const id = ++desktopDialogSequence
+  const defaultId = options.defaultId ?? 0
+  const cancelId = options.cancelId ?? Math.max(0, options.buttons.length - 1)
+  const request: DesktopDialogRequest = {
+    id,
+    tone: options.tone,
+    message: options.message,
+    detail: options.detail,
+    buttons: options.buttons,
+    defaultId,
+    cancelId
+  }
+
+  return new Promise((resolve) => {
+    const contents = window.webContents
+    let settled = false
+    const settle = (response: number): void => {
+      if (settled) return
+      settled = true
+      pendingDesktopDialogs.delete(id)
+      contents.removeListener('did-finish-load', send)
+      contents.removeListener('destroyed', cancel)
+      contents.removeListener('render-process-gone', cancel)
+      resolve({ response })
+    }
+    const cancel = (): void => settle(cancelId)
+    const send = (): void => {
+      if (window.isDestroyed() || contents.isDestroyed()) {
+        cancel()
+        return
+      }
+      try {
+        contents.send(DSH_DESKTOP_DIALOG_SHOW_CHANNEL, request)
+      } catch {
+        cancel()
+      }
+    }
+
+    pendingDesktopDialogs.set(id, { webContentsId: contents.id, settle })
+    contents.once('destroyed', cancel)
+    contents.once('render-process-gone', cancel)
+    if (contents.isLoadingMainFrame()) contents.once('did-finish-load', send)
+    else send()
+  })
+}
+
+function pluginInstallErrorDetail(
+  errors: readonly PluginInstallIntentErrorCode[],
+  chinese: boolean
+): string {
+  const messages: Record<PluginInstallIntentErrorCode, [string, string]> = {
+    'malformed-link': ['DSH Desktop 插件链接格式无效。', 'The DSH Desktop plugin link is malformed.'],
+    'unsupported-route': ['该 DSH Desktop 链接不是插件安装请求。', 'The DSH Desktop link is not a plugin install request.'],
+    'invalid-source': ['插件来源无效，请检查仓库地址或包名。', 'The plugin source is invalid. Check the repository URL or package name.'],
+    'unsupported-cli-syntax': [
+      '支持的命令格式：dsh plugin --profile web add <plugin-source>',
+      'Supported syntax: dsh plugin --profile web add <plugin-source>'
+    ]
+  }
+  return [...new Set(errors)].map((code) => messages[code][chinese ? 0 : 1]).join('\n')
+}
+
+function dispatchPendingPluginInstallRequests(window: BrowserWindow): void {
+  if (window.isDestroyed() || window.webContents.isLoadingMainFrame()) return
+  for (const source of pendingPluginInstallSources.splice(0)) {
+    window.webContents.send(DSH_DESKTOP_PLUGIN_INSTALL_CHANNEL, { source })
+  }
+  if (pendingPluginInstallErrors.length > 0) {
+    const chinese = harnessLocale() === 'zh'
+    const detail = pluginInstallErrorDetail(pendingPluginInstallErrors.splice(0), chinese)
+    void showDesktopDialog(window, {
+      tone: 'warning',
+      message: chinese ? '无法打开插件请求' : 'Unable to open the plugin request',
+      detail,
+      buttons: [{ label: chinese ? '确定' : 'OK', kind: 'primary' }]
+    })
+  }
+}
+
+async function openPluginInstallRequest(source: string): Promise<void> {
+  acceptPluginInstallIntent({ status: 'ok', intent: { source } })
+  const snapshot = runtime?.snapshot()
+  if (snapshot?.phase === 'ready' && snapshot.url) {
+    await openHarness(snapshot.url)
+  } else {
+    focusDesktopWindow(true)
+  }
+}
+
+function registerDesktopProtocol(): void {
+  if (developmentBuild) return
+  if (!app.setAsDefaultProtocolClient('dsh-desktop')) {
+    console.warn('[desktop] unable to register the dsh-desktop protocol for this user')
+  }
+}
 
 function windowsTitleBarOverlay(isDark: boolean): Electron.TitleBarOverlayOptions {
   return {
@@ -420,9 +623,10 @@ async function openHarness(url: string): Promise<void> {
   }
   if (runtime.snapshot().url !== url || window.isDestroyed()) return
   await syncNativeTheme(window)
-  if (window.isMinimized()) window.restore()
-  window.show()
-  window.focus()
+  const hasPendingPluginInstall =
+    pendingPluginInstallSources.length > 0 || pendingPluginInstallErrors.length > 0
+  dispatchPendingPluginInstallRequests(window)
+  focusDesktopWindow(hasPendingPluginInstall)
 }
 
 async function showSplash(): Promise<void> {
@@ -554,16 +758,18 @@ async function executeDesktopMenuCommand(command: DesktopMenuCommand): Promise<v
     case 'toggle-fullscreen':
       window.setFullScreen(!window.isFullScreen())
       break
-    case 'about':
-      await dialog.showMessageBox(window, {
-        type: 'info',
-        title: 'DSH Desktop',
+    case 'about': {
+      const chinese = harnessLocale() === 'zh'
+      await showDesktopDialog(window, {
+        tone: 'info',
         message: `DSH Desktop ${app.getVersion()}`,
-        detail: 'A desktop application for DeepSeek Harness.',
-        buttons: ['OK'],
-        noLink: true
+        detail: chinese
+          ? '面向 DeepSeek Harness 的开箱即用桌面客户端。'
+          : 'A ready-to-use desktop application for DeepSeek Harness.',
+        buttons: [{ label: chinese ? '确定' : 'OK', kind: 'primary' }]
       })
       break
+    }
     case 'quit':
       app.quit()
       break
@@ -609,6 +815,19 @@ async function waitForPluginRecoveryAction(options: {
 
 function showUnexpectedError(error: unknown): void {
   const message = error instanceof Error ? error.stack ?? error.message : String(error)
+  const window = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined
+  if (window) {
+    const chinese = harnessLocale() === 'zh'
+    void showDesktopDialog(window, {
+      tone: 'error',
+      message: chinese ? 'DSH Desktop 遇到错误' : 'DSH Desktop encountered an error',
+      detail: message,
+      buttons: [{ label: chinese ? '确定' : 'OK', kind: 'primary' }]
+    })
+    return
+  }
+  // No renderer exists during a catastrophic pre-window bootstrap failure.
+  // This is the only situation where an in-app dialog cannot be rendered.
   dialog.showErrorBox('DSH Desktop encountered an error', message)
 }
 
@@ -797,21 +1016,25 @@ async function showPackageManagerRecovery(initialSnapshot: RuntimeSnapshot): Pro
             '',
             `System tools (diagnostics only): ${detected || 'detection unavailable'}`
           ].join('\n')
-      const options: MessageBoxOptions = {
-        type: 'warning',
-        title: isChinese ? '修复插件安装环境' : 'Repair plugin install environment',
+      const dialogWindow = mainWindow && !mainWindow.isDestroyed() ? mainWindow : createWindow()
+      const result = await showDesktopDialog(dialogWindow, {
+        tone: 'warning',
         message: isChinese ? '插件安装环境不可用' : 'The plugin install environment is unavailable',
         detail,
         buttons: isChinese
-          ? ['自动修复并重试', '查看日志', '退出']
-          : ['Repair and Retry', 'Show Log', 'Quit'],
+          ? [
+              { label: '自动修复并重试', kind: 'primary' },
+              { label: '查看日志', kind: 'secondary' },
+              { label: '退出', kind: 'danger' }
+            ]
+          : [
+              { label: 'Repair and Retry', kind: 'primary' },
+              { label: 'Show Log', kind: 'secondary' },
+              { label: 'Quit', kind: 'danger' }
+            ],
         defaultId: 0,
-        cancelId: 2,
-        noLink: true
-      }
-      const result = await (mainWindow && !mainWindow.isDestroyed()
-        ? dialog.showMessageBox(mainWindow, options)
-        : dialog.showMessageBox(options))
+        cancelId: 2
+      })
 
       if (result.response === 1) {
         shell.showItemInFolder(logPath)
@@ -936,34 +1159,36 @@ function installMenu(): void {
 
 async function showMobilePairing(): Promise<void> {
   const runtimeSnapshot = runtime.snapshot()
+  const window = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined
+  if (!window) return
+  const chinese = harnessLocale() === 'zh'
   if (runtimeSnapshot.phase !== 'ready' || !runtimeSnapshot.url) {
-    const options: MessageBoxOptions = {
-      type: 'info',
-      message: 'Harness is still starting.',
-      detail: 'Wait until DSH Desktop is ready, then connect your phone again.',
-      buttons: ['OK']
-    }
-    await (mainWindow ? dialog.showMessageBox(mainWindow, options) : dialog.showMessageBox(options))
+    await showDesktopDialog(window, {
+      tone: 'info',
+      message: chinese ? 'Harness 仍在启动' : 'Harness is still starting',
+      detail: chinese
+        ? '请等待 DSH Desktop 准备完成后，再次连接手机。'
+        : 'Wait until DSH Desktop is ready, then connect your phone again.',
+      buttons: [{ label: chinese ? '确定' : 'OK', kind: 'primary' }]
+    })
     return
   }
 
   const snapshot = await mobileBridge.start()
   if (!snapshot.desktopUrl) {
     await mobileBridge.stop()
-    const options: MessageBoxOptions = {
-      type: 'warning',
-      message: 'The phone access service could not start.',
-      detail: 'Restart DSH Desktop and try again.',
-      buttons: ['OK']
-    }
-    await (mainWindow ? dialog.showMessageBox(mainWindow, options) : dialog.showMessageBox(options))
+    await showDesktopDialog(window, {
+      tone: 'warning',
+      message: chinese ? '手机访问服务无法启动' : 'The phone access service could not start',
+      detail: chinese ? '请重启 DSH Desktop 后重试。' : 'Restart DSH Desktop and try again.',
+      buttons: [{ label: chinese ? '确定' : 'OK', kind: 'primary' }]
+    })
     return
   }
 
   nativeTheme.themeSource = harnessThemePreference()
   await openHarness(runtimeSnapshot.url)
-  const window = mainWindow
-  if (!window || window.isDestroyed()) return
+  if (window.isDestroyed()) return
   const panelUrl = new URL(snapshot.desktopUrl)
   panelUrl.searchParams.set('embedded', '1')
   window.webContents.send('mobile:show-panel', { url: panelUrl.href })
@@ -971,6 +1196,8 @@ async function showMobilePairing(): Promise<void> {
 
 async function bootstrap(): Promise<void> {
   if (process.platform === 'darwin') app.dock?.setIcon(desktopIconPath())
+  registerDesktopProtocol()
+  registerDesktopDialogHandlers()
   configureNodeWorkerModuleFallback({
     applicationPath: app.getAppPath(),
     hookPath: desktopResourcePath('runtime-module-fallback.mjs')
@@ -1021,6 +1248,16 @@ async function bootstrap(): Promise<void> {
     }
   })
   registerHarnessHandlers()
+  pluginInstallWebBridge = new PluginInstallWebBridge({
+    onInstallRequest: openPluginInstallRequest
+  })
+  try {
+    const webInstallUrl = await pluginInstallWebBridge.start()
+    console.info(`[desktop] plugin install web bridge listening at ${webInstallUrl}`)
+  } catch (error) {
+    pluginInstallWebBridge = undefined
+    console.warn('[desktop] could not start the plugin install web bridge on port 3080', error)
+  }
   mobileBridge = new LanMobileBridge({
     harnessUrl: () => runtime.snapshot().url,
     locale: harnessLocale,
@@ -1102,7 +1339,7 @@ async function bootstrap(): Promise<void> {
   if (!developmentBuild) {
     startUpdateManager({
       prepareToInstall: async () => {
-        await runtime.stop()
+        await Promise.all([runtime.stop(), pluginInstallWebBridge?.stop()])
         quitting = true
         stopUpdateManager()
       }
@@ -1112,14 +1349,28 @@ async function bootstrap(): Promise<void> {
 
 configureAppIdentity()
 configureApplicationLocale()
+acceptExternalLaunchArguments(process.argv)
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  if (!acceptExternalLaunchArguments([url])) return
+  const snapshot = runtime?.snapshot()
+  if (snapshot?.phase === 'ready' && snapshot.url) {
+    void openHarness(snapshot.url).catch(showUnexpectedError)
+  } else {
+    focusDesktopWindow()
+  }
+})
 const singleInstance = app.requestSingleInstanceLock()
 if (!singleInstance) {
   app.quit()
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, commandLine) => {
+    acceptExternalLaunchArguments(commandLine)
     const snapshot = runtime?.snapshot()
     if (snapshot?.phase === 'ready' && snapshot.url) {
       void openHarness(snapshot.url).catch(showUnexpectedError)
+    } else {
+      focusDesktopWindow()
     }
   })
   app.whenReady().then(bootstrap).catch((error: unknown) => {
@@ -1142,6 +1393,10 @@ if (!singleInstance) {
     event.preventDefault()
     quitting = true
     stopUpdateManager()
-    void Promise.all([runtime.stop(), mobileBridge?.stop()]).finally(() => app.quit())
+    void Promise.all([
+      runtime.stop(),
+      mobileBridge?.stop(),
+      pluginInstallWebBridge?.stop()
+    ]).finally(() => app.quit())
   })
 }

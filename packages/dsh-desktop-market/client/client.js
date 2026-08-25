@@ -1,6 +1,6 @@
-window.__ModuleLoader__.load({
-	id: "dsh-desktop-market",
-	factory: (require) => {
+window.__ModuleLoader__.load({ id: "dsh-desktop-market", factory: (require) => {
+
+
 		var module = { exports: {} };
 		var exports = module.exports;
 		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
@@ -21,14 +21,14 @@ window.__ModuleLoader__.load({
 			}
 			return to;
 		};
-		var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(isNodeMode || !mod || !mod.__esModule || !__hasOwnProp.call(mod, "default") ? __defProp(target, "default", {
+		var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", {
 			value: mod,
 			enumerable: true
 		}) : target, mod));
 		//#endregion
 		let react = require("react");
 		let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
-		_deepseek_ai_dsh_client_ui_primitives = __toESM(_deepseek_ai_dsh_client_ui_primitives, 1);
+		_deepseek_ai_dsh_client_ui_primitives = __toESM(_deepseek_ai_dsh_client_ui_primitives);
 		let react_jsx_runtime = require("react/jsx-runtime");
 		let react_dom = require("react-dom");
 		//#region src/client/locales.ts
@@ -83,9 +83,27 @@ window.__ModuleLoader__.load({
 			uninstalling: "卸载中…",
 			uninstallConfirmDesc: "将从当前 profile 中移除该插件。",
 			restartHint: "重启方式：关闭当前 dsh 进程后重新运行（例如 dsh web）",
+			restartHintDesktop: "点击左侧重启图标，可由 DSH Desktop 安全重启 Harness。",
 			restartHintSupervised: "本进程是 {0} 服务的主进程，重启交给它负责——市场自己重启会连带杀掉 cgroup 里的接管进程，服务将起不来。请执行 systemctl restart <你的 unit>。确认你的配置能承受市场自行重启（如 KillMode=process），可在本插件配置里手动打开「允许重启」。",
 			confirmTitle: "安装",
 			confirmWarn: "插件是社区第三方代码。安装即表示你信任该来源；构建脚本默认被禁止执行。",
+			directInstallTitle: "安装外部插件",
+			directInstallIntro: "这是独立的指定来源安装流程，不会搜索或跳转插件市场。",
+			directInstallSource: "安装来源",
+			directInstallBuildScripts: "自动运行插件构建脚本",
+			directInstallBuildScriptsHint: "默认开启。仅放行本次安装中由 pnpm 实际报告的构建项，并自动重试。",
+			directInstallBuildScriptsWarn: "插件是社区第三方代码。开启后，本次来源的 prepare/build 脚本会在安装过程中执行。",
+			directInstallWorking: "正在验证来源并安装到当前 web profile…",
+			directInstallConsoleTitle: "安装进度",
+			directInstallConsoleLive: "实时",
+			directInstallConsoleDone: "完成",
+			directInstallConsoleWaiting: "等待安装进程输出…",
+			directInstallConsolePreparing: "正在准备安装环境…",
+			directInstallConsoleFinalizing: "正在校验并启用插件…",
+			directInstallConsoleStopped: "安装进程已结束",
+			directInstallReady: "安装完成，插件已在当前会话中启用",
+			directInstallRestart: "安装完成，重启 DSH Desktop 后生效",
+			directInstallPrebuiltFallback: "插件自身构建失败，已改用仓库内现成的运行产物完成安装。",
 			cancel: "取消",
 			empty: "没有匹配的插件",
 			installedEmpty: "尚未安装社区插件，可前往「发现」页浏览",
@@ -111,7 +129,11 @@ window.__ModuleLoader__.load({
 			rollingBack: "回滚中…",
 			approveBuilds: "放行构建脚本并重试",
 			buildsSkipped: "该插件需要运行构建脚本才能工作，出于安全默认被拦下。点击下方按钮为它放行并重装：",
+			buildApprovalStillBlocked: "构建脚本已放行，但 pnpm 仍返回相同的拦截结果。已停止重复请求，请查看下面的实际错误。",
 			restartNow: "立即重启",
+			restartConfirmTitle: "重启 DeepSeek Harness？",
+			restartConfirmDesc: "当前 Harness 会话将短暂中断，正在运行的任务可能停止。确认后 DSH Desktop 会自动重启 Harness，插件变更将在重启后生效。",
+			restartConfirmAction: "确认重启",
 			dismiss: "知道了",
 			dismissNotice: "关闭此提示",
 			restarting: "正在重启…",
@@ -166,10 +188,17 @@ window.__ModuleLoader__.load({
 			lightboxClose: "关闭预览",
 			lightboxPrev: "上一张",
 			lightboxNext: "下一张",
+			catalogUpdateAvailable: "插件商店数据发现有更新",
+			catalogUpdateFailed: "插件商店数据更新失败，可重试或稍后再试",
+			catalogUpdateAction: "更新目录",
+			catalogUpdating: "正在更新…",
 			envMissing: "安装插件前需要先配置 pnpm 环境",
-			envFix: "自动配置",
-			envFixing: "正在配置…",
-			envFixFail: "自动配置失败，请点击「导出日志」，并将文件附在 issue 中",
+			envDialogTitle: "修复插件安装环境",
+			envDialogDesc: "当前插件包管理器环境不可用。修复完成前无法安装或更新插件。",
+			envFix: "自动修复",
+			envFixing: "正在修复…",
+			envFixRetry: "重新自动修复",
+			envFixFail: "自动修复失败，请点击「导出日志」，并将文件附在 issue 中",
 			loading: "正在加载插件目录…",
 			backTop: "回到顶部",
 			confirm: "确认",
@@ -387,7 +416,6 @@ window.__ModuleLoader__.load({
 			catConflict: "冲突",
 			catDeps: "依赖",
 			catOrder: "顺序",
-			/** Summary-strip tooltip for the order count (before/after rule conflicts). */
 			checkOrderTip: "社区 bundle 加载顺序与插件声明的 before/after 规则冲突",
 			diagOkAll: "一切正常：未发现冲突、依赖或顺序问题",
 			hostDependencyWarning: "插件在 dependencies 中声明了已知的 DSH 共享宿主包，可能遮蔽宿主版本（仅依据清单，未确认运行时重复）：",
@@ -443,9 +471,27 @@ window.__ModuleLoader__.load({
 			uninstalling: "Removing…",
 			uninstallConfirmDesc: "This removes the plugin from the current profile.",
 			restartHint: "To restart: stop the current dsh process and run it again (e.g. dsh web)",
+			restartHintDesktop: "Select the restart icon on the left to let DSH Desktop restart Harness safely.",
 			restartHintSupervised: "This process is {0}'s own service process, so restarts belong to it — restarting from here would kill the takeover process along with the cgroup and the service would not come back. Use systemctl restart &lt;your unit&gt;. If your unit can survive a self-restart (KillMode=process), turn Allow restart on in this plugin's configuration.",
 			confirmTitle: "Install",
 			confirmWarn: "Plugins are third-party community code. Installing means you trust this source; build scripts are blocked by default.",
+			directInstallTitle: "Install external plugin",
+			directInstallIntro: "This is a separate source-specific install flow. It does not search or open the plugin market.",
+			directInstallSource: "Install source",
+			directInstallBuildScripts: "Run plugin build scripts automatically",
+			directInstallBuildScriptsHint: "On by default. Only build entries actually reported by pnpm for this install are allowed, then retried automatically.",
+			directInstallBuildScriptsWarn: "Plugins are third-party community code. When enabled, this source's prepare/build scripts run during installation.",
+			directInstallWorking: "Validating the source and installing into the current web profile…",
+			directInstallConsoleTitle: "Install progress",
+			directInstallConsoleLive: "Live",
+			directInstallConsoleDone: "Done",
+			directInstallConsoleWaiting: "Waiting for installer output…",
+			directInstallConsolePreparing: "Preparing the install environment…",
+			directInstallConsoleFinalizing: "Validating and activating the plugin…",
+			directInstallConsoleStopped: "Installer process ended",
+			directInstallReady: "Installed and activated in the current session",
+			directInstallRestart: "Installed — restart DSH Desktop to activate it",
+			directInstallPrebuiltFallback: "The plugin build failed, so DSH Desktop installed the runnable artifacts already committed in the repository.",
 			cancel: "Cancel",
 			empty: "No plugins match",
 			installedEmpty: "No community plugins yet — browse the Discover tab",
@@ -471,7 +517,11 @@ window.__ModuleLoader__.load({
 			rollingBack: "Rolling back…",
 			approveBuilds: "Allow build scripts and retry",
 			buildsSkipped: "This plugin needs its build scripts to run; they are blocked by default for safety. Click below to allow them and reinstall:",
+			buildApprovalStillBlocked: "The build scripts were allowed, but pnpm returned the same block again. Repeated approval has stopped; inspect the actual error below.",
 			restartNow: "Restart now",
+			restartConfirmTitle: "Restart DeepSeek Harness?",
+			restartConfirmDesc: "The current Harness session will be interrupted briefly and running tasks may stop. After confirmation, DSH Desktop will restart Harness and apply the plugin changes.",
+			restartConfirmAction: "Restart Harness",
 			dismiss: "Dismiss",
 			dismissNotice: "Dismiss this notice",
 			restarting: "Restarting…",
@@ -526,10 +576,17 @@ window.__ModuleLoader__.load({
 			lightboxClose: "Close preview",
 			lightboxPrev: "Previous",
 			lightboxNext: "Next",
+			catalogUpdateAvailable: "New plugin catalog data is available",
+			catalogUpdateFailed: "The plugin catalog update failed; retry now or later",
+			catalogUpdateAction: "Update catalog",
+			catalogUpdating: "Updating…",
 			envMissing: "pnpm needs to be set up before installing plugins",
-			envFix: "Set up automatically",
-			envFixing: "Setting up…",
-			envFixFail: "Automatic setup failed — export the log and attach it to your issue",
+			envDialogTitle: "Repair plugin installation environment",
+			envDialogDesc: "The plugin package-manager environment is unavailable. Plugins cannot be installed or updated until it is repaired.",
+			envFix: "Repair automatically",
+			envFixing: "Repairing…",
+			envFixRetry: "Retry automatic repair",
+			envFixFail: "Automatic repair failed — export the log and attach it to your issue",
 			loading: "Loading the catalog…",
 			backTop: "Back to top",
 			confirm: "Confirm",
@@ -747,12 +804,560 @@ window.__ModuleLoader__.load({
 			catConflict: "Conflicts",
 			catDeps: "Dependencies",
 			catOrder: "Order",
-			/** Summary-strip tooltip for the order count (before/after rule conflicts). */
 			checkOrderTip: "community bundle load order conflicts with declared before/after rules",
 			diagOkAll: "All good: no conflict, dependency or ordering issues found",
 			hostDependencyWarning: "A plugin lists known shared DSH host packages in dependencies. This may shadow the host version; the check is manifest-only and does not confirm a duplicate runtime instance:",
 			hostDependencyMore: "{0} more finding(s) omitted"
 		};
+		//#endregion
+		//#region \0dsh-css:src/client/DirectInstallDialog.module.css.mjs
+		const css$1 = ".b6K6Va_dialog{width:min(520px,100%);max-height:calc(100dvh - 48px)}.b6K6Va_modalContent{overscroll-behavior:contain;min-width:0;min-height:0;overflow-y:auto}.b6K6Va_stack{flex-direction:column;gap:14px;min-width:0;display:flex}.b6K6Va_sourceCard{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2,#e5e7eb);background:var(--dsw-alias-bg-layer-1,#fff);border-radius:12px;width:100%;min-width:0;padding:12px 14px}.b6K6Va_sourceLabel{color:var(--dsw-alias-label-tertiary,#6b7280);align-items:center;gap:6px;margin-bottom:6px;font-size:12px;line-height:18px;display:flex}.b6K6Va_source{min-width:0;color:var(--dsw-alias-label-primary,#111827);overflow-wrap:anywhere;word-break:break-word;white-space:normal;font:12px/19px ui-monospace,SFMono-Regular,Consolas,monospace;display:block}.b6K6Va_buildOption{border:1px solid var(--dsw-alias-border-l2,#e5e7eb);background:var(--dsw-alias-bg-layer-1,#fff);border-radius:12px;justify-content:space-between;align-items:center;gap:18px;min-width:0;padding:11px 12px;display:flex}.b6K6Va_buildOptionCopy{text-align:left;flex-direction:column;flex:1;gap:2px;min-width:0;display:flex}.b6K6Va_buildOptionCopy b{color:var(--dsw-alias-label-primary,#111827);font-size:13px;font-weight:600;line-height:20px}.b6K6Va_buildOptionCopy span{color:var(--dsw-alias-label-tertiary,#6b7280);font-size:12px;line-height:18px}.b6K6Va_switch{border:1px solid var(--dsw-alias-border-l2,#d9dde3);background:var(--dsw-alias-bg-layer-2,#e5e7eb);cursor:pointer;border-radius:999px;flex:none;width:38px;height:22px;padding:0;transition:background .15s,border-color .15s;position:relative}.b6K6Va_switchOn{border-color:var(--dsw-alias-brand-primary,#111827);background:var(--dsw-alias-brand-primary,#111827)}.b6K6Va_switchKnob{background:#fff;border-radius:50%;width:16px;height:16px;transition:transform .15s;position:absolute;top:2px;left:2px;box-shadow:0 1px 2px #0000003d}.b6K6Va_switchOn .b6K6Va_switchKnob{transform:translate(16px)}.b6K6Va_switch:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,#4f6ef7);outline-offset:2px}.b6K6Va_notice,.b6K6Va_status,.b6K6Va_result{border-radius:10px;align-items:flex-start;gap:9px;padding:11px 12px;font-size:13px;line-height:20px;display:flex}.b6K6Va_notice{color:var(--dsw-alias-label-secondary,#4b5563);background:var(--dsw-alias-bg-layer-2,#f6f7f8)}.b6K6Va_status{color:var(--dsw-alias-label-secondary,#4b5563);background:var(--dsw-alias-bg-layer-2,#f6f7f8);align-items:center}.b6K6Va_installProgress{flex-direction:column;gap:10px;min-width:0;display:flex}.b6K6Va_terminal{background:#101316;border:1px solid #11182738;border-radius:11px;min-width:0;overflow:hidden;box-shadow:0 8px 24px #0f172a21,inset 0 1px #ffffff0a}.b6K6Va_terminalBar{color:#555d68;-webkit-user-select:none;user-select:none;background:#e8ebee;border-bottom:1px solid #11182721;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;min-height:31px;padding:0 10px;font-size:10px;line-height:1;display:grid}.b6K6Va_terminalLights{justify-self:start;align-items:center;gap:5px;display:flex}.b6K6Va_terminalLights i{border-radius:50%;width:8px;height:8px;display:block;box-shadow:inset 0 0 0 1px #00000014}.b6K6Va_terminalLights i[data-light=red]{background:#ff605c}.b6K6Va_terminalLights i[data-light=yellow]{background:#ffbd44}.b6K6Va_terminalLights i[data-light=green]{background:#00ca4e}.b6K6Va_terminalTitle{letter-spacing:.01em;justify-self:center;font-weight:600}.b6K6Va_terminalLive,.b6K6Va_terminalIdle{color:#4d5966;letter-spacing:.08em;text-transform:uppercase;justify-self:end;align-items:center;gap:5px;font-size:9px;font-weight:650;display:inline-flex}.b6K6Va_terminalLive i,.b6K6Va_terminalIdle i{border-radius:50%;width:5px;height:5px;display:block}.b6K6Va_terminalLive i{background:#36cf74;animation:1.4s ease-in-out infinite b6K6Va_direct-install-pulse;box-shadow:0 0 0 3px #36cf7421}.b6K6Va_terminalIdle i{background:#98a1ab}.b6K6Va_terminalBody{box-sizing:border-box;overscroll-behavior:contain;scrollbar-color:#404852 transparent;color:#d9e0e7;white-space:pre-wrap;overflow-wrap:anywhere;background:linear-gradient(#12161a 0%,#0d1013 100%);height:166px;padding:10px 11px 12px;font:10.5px/17px ui-monospace,Cascadia Code,SFMono-Regular,Consolas,monospace;overflow:auto}.b6K6Va_terminalLine,.b6K6Va_terminalCurrent{grid-template-columns:13px minmax(0,1fr);align-items:start;min-width:0;display:grid}.b6K6Va_terminalLine[data-stream=command]{color:#f3f6f8}.b6K6Va_terminalLine[data-stream=stderr]{color:#ffb2a8}.b6K6Va_terminalLine[data-stream=system]{color:#9bc7ff}.b6K6Va_terminalPrompt{color:#61d98b;-webkit-user-select:none;user-select:none;font-weight:700}.b6K6Va_terminalLine[data-stream=stderr] .b6K6Va_terminalPrompt{color:#ff7e70}.b6K6Va_terminalLine[data-stream=system] .b6K6Va_terminalPrompt{color:#78aef8}.b6K6Va_terminalEmpty{color:#727d88;font-style:italic}.b6K6Va_terminalCurrent{color:#aab6c2;background:linear-gradient(#0d10139e,#0d1013 38%);grid-template-columns:13px minmax(0,1fr) auto;margin:4px -11px -12px;padding:7px 11px 8px;position:sticky;bottom:-12px}.b6K6Va_terminalCurrentText{text-overflow:ellipsis;white-space:nowrap;min-width:0;overflow:hidden}.b6K6Va_terminalCursor{background:#61d98b;align-self:center;width:6px;height:12px;margin:2px 0 0 3px;animation:1s step-end infinite b6K6Va_direct-install-cursor}.b6K6Va_result[data-tone=success]{color:var(--dsw-alias-state-success-primary,#16794b);background:color-mix(in srgb,var(--dsw-alias-state-success-primary,#16794b) 10%,transparent)}.b6K6Va_result[data-tone=warning]{color:var(--dsw-alias-state-warn-primary,#9a6700);background:color-mix(in srgb,var(--dsw-alias-state-warn-primary,#9a6700) 10%,transparent)}.b6K6Va_result[data-tone=error]{color:var(--dsw-alias-state-error-primary,#c9362b);background:color-mix(in srgb,var(--dsw-alias-state-error-primary,#c9362b) 9%,transparent)}.b6K6Va_warningIcon{color:var(--dsw-alias-state-warn-primary,#9a6700);flex:none;margin-top:2px}.b6K6Va_noticeCopy{text-align:left;min-width:0}.b6K6Va_detail{white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto}.b6K6Va_spinning{animation:1s linear infinite b6K6Va_direct-install-spin}@keyframes b6K6Va_direct-install-spin{to{transform:rotate(360deg)}}@keyframes b6K6Va_direct-install-pulse{0%,to{opacity:1}50%{opacity:.45}}@keyframes b6K6Va_direct-install-cursor{0%,48%{opacity:1}49%,to{opacity:0}}@media (max-width:560px){.b6K6Va_dialog{border-radius:18px}.b6K6Va_sourceCard{padding:11px 12px}.b6K6Va_buildOption{align-items:flex-start}.b6K6Va_terminalBody{height:146px}}@media (prefers-reduced-motion:reduce){.b6K6Va_spinning,.b6K6Va_terminalLive i,.b6K6Va_terminalCursor{animation:none}.b6K6Va_switch,.b6K6Va_switchKnob{transition:none}}";
+		const tagId$1 = "dsh-desktop-market/DirectInstallDialog.module.css";
+		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$1) + "]") === null) {
+			const tag = document.createElement("style");
+			tag.dataset.plugin = "dsh-desktop-market";
+			tag.dataset.pluginCss = tagId$1;
+			tag.textContent = css$1;
+			document.head.appendChild(tag);
+		}
+		var DirectInstallDialog_module_css_default = {
+			"direct-install-spin": "b6K6Va_direct-install-spin",
+			"direct-install-cursor": "b6K6Va_direct-install-cursor",
+			"buildOption": "b6K6Va_buildOption",
+			"buildOptionCopy": "b6K6Va_buildOptionCopy",
+			"dialog": "b6K6Va_dialog",
+			"installProgress": "b6K6Va_installProgress",
+			"modalContent": "b6K6Va_modalContent",
+			"notice": "b6K6Va_notice",
+			"noticeCopy": "b6K6Va_noticeCopy",
+			"result": "b6K6Va_result",
+			"source": "b6K6Va_source",
+			"sourceCard": "b6K6Va_sourceCard",
+			"spinning": "b6K6Va_spinning",
+			"switch": "b6K6Va_switch",
+			"switchKnob": "b6K6Va_switchKnob",
+			"switchOn": "b6K6Va_switchOn",
+			"terminal": "b6K6Va_terminal",
+			"terminalBar": "b6K6Va_terminalBar",
+			"terminalCurrent": "b6K6Va_terminalCurrent",
+			"terminalCurrentText": "b6K6Va_terminalCurrentText",
+			"terminalEmpty": "b6K6Va_terminalEmpty",
+			"terminalIdle": "b6K6Va_terminalIdle",
+			"terminalLive": "b6K6Va_terminalLive",
+			"terminalPrompt": "b6K6Va_terminalPrompt",
+			"terminalTitle": "b6K6Va_terminalTitle",
+			"warningIcon": "b6K6Va_warningIcon",
+			"direct-install-pulse": "b6K6Va_direct-install-pulse",
+			"detail": "b6K6Va_detail",
+			"sourceLabel": "b6K6Va_sourceLabel",
+			"stack": "b6K6Va_stack",
+			"status": "b6K6Va_status",
+			"terminalBody": "b6K6Va_terminalBody",
+			"terminalCursor": "b6K6Va_terminalCursor",
+			"terminalLights": "b6K6Va_terminalLights",
+			"terminalLine": "b6K6Va_terminalLine"
+		};
+		//#endregion
+		//#region src/client/InstallTerminal.tsx
+		function phaseLabel$1(phase, t) {
+			if (phase === "resolving") return t("phaseResolving");
+			if (phase === "downloading") return t("phaseDownloading");
+			if (phase === "linking") return t("phaseLinking");
+			return t("phaseBuilding");
+		}
+		function compactPackage(value) {
+			const normalized = value.replaceAll("\\", "/");
+			const packageName = normalized.split("/node_modules/").pop() ?? normalized;
+			return packageName.length <= 84 ? packageName : `…${packageName.slice(-83)}`;
+		}
+		function liveStatus(status, t) {
+			if (status?.cancelling === true) return t("cancelling");
+			if (status?.active === true && status.phase != null) {
+				const count = typeof status.done === "number" && status.done > 0 ? ` · ${String(status.done)}` : "";
+				const percent = typeof status.downloaded === "number" && typeof status.size === "number" && status.size > 0 ? ` · ${String(Math.max(0, Math.min(100, Math.round(status.downloaded / status.size * 100))))}%` : "";
+				const current = typeof status.currentPackage === "string" && status.currentPackage !== "" ? ` · ${compactPackage(status.currentPackage)}` : "";
+				return `${phaseLabel$1(status.phase, t)}${count}${percent}${current}`;
+			}
+			if (status?.busy === true) return t("directInstallConsoleFinalizing");
+			return t("directInstallConsolePreparing");
+		}
+		function promptFor(stream) {
+			if (stream === "command") return "$";
+			if (stream === "stderr") return "!";
+			if (stream === "system") return "›";
+			return "·";
+		}
+		function InstallTerminal({ lines, status, state, t }) {
+			const bodyRef = (0, react.useRef)(null);
+			const active = state === "active";
+			(0, react.useEffect)(() => {
+				const body = bodyRef.current;
+				if (body !== null) body.scrollTop = body.scrollHeight;
+			}, [lines]);
+			const current = active ? liveStatus(status, t) : state === "complete" ? t("directInstallConsoleDone") : t("directInstallConsoleStopped");
+			const stateLabel = active ? t("directInstallConsoleLive") : state === "complete" ? t("directInstallConsoleDone") : t("directInstallConsoleStopped");
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+				className: DirectInstallDialog_module_css_default.terminal,
+				"aria-label": t("directInstallConsoleTitle"),
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: DirectInstallDialog_module_css_default.terminalBar,
+					children: [
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+							className: DirectInstallDialog_module_css_default.terminalLights,
+							"aria-hidden": "true",
+							children: [
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("i", { "data-light": "red" }),
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("i", { "data-light": "yellow" }),
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("i", { "data-light": "green" })
+							]
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							className: DirectInstallDialog_module_css_default.terminalTitle,
+							children: t("directInstallConsoleTitle")
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+							className: active ? DirectInstallDialog_module_css_default.terminalLive : DirectInstallDialog_module_css_default.terminalIdle,
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("i", { "aria-hidden": "true" }), stateLabel]
+						})
+					]
+				}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					ref: bodyRef,
+					className: DirectInstallDialog_module_css_default.terminalBody,
+					role: "log",
+					"aria-live": "off",
+					children: [
+						lines.length === 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+							className: DirectInstallDialog_module_css_default.terminalEmpty,
+							children: t("directInstallConsoleWaiting")
+						}),
+						lines.map((line) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: DirectInstallDialog_module_css_default.terminalLine,
+							"data-stream": line.stream,
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+								className: DirectInstallDialog_module_css_default.terminalPrompt,
+								"aria-hidden": "true",
+								children: promptFor(line.stream)
+							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: line.text })]
+						}, line.id)),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: DirectInstallDialog_module_css_default.terminalCurrent,
+							children: [
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+									className: DirectInstallDialog_module_css_default.terminalPrompt,
+									"aria-hidden": "true",
+									children: "›"
+								}),
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+									className: DirectInstallDialog_module_css_default.terminalCurrentText,
+									children: current
+								}),
+								active && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+									className: DirectInstallDialog_module_css_default.terminalCursor,
+									"aria-hidden": "true"
+								})
+							]
+						})
+					]
+				})]
+			});
+		}
+		//#endregion
+		//#region src/client/plugin-install-request.ts
+		const PLUGIN_INSTALL_HASH_KEY = "dsh-plugin-install";
+		const PLUGIN_INSTALL_EVENT = "dsh:plugin-install-request";
+		const PLUGIN_INSTALL_STORAGE_KEY = "dsh-plugin-install-request";
+		const MAX_SOURCE_LENGTH = 2048;
+		function normalizePluginInstallSource(value) {
+			if (typeof value !== "string") return void 0;
+			const source = value.trim();
+			if (source.length === 0 || source.length > MAX_SOURCE_LENGTH) return void 0;
+			if (/\s|["\u0000-\u001f\u007f]/u.test(source)) return void 0;
+			return source;
+		}
+		/** Read the browser form: `#dsh-plugin-install=owner%2Frepository`. */
+		function parsePluginInstallHash(hash) {
+			const body = hash.startsWith("#") ? hash.slice(1) : hash;
+			if (body.length === 0) return void 0;
+			return normalizePluginInstallSource(new URLSearchParams(body).get(PLUGIN_INSTALL_HASH_KEY));
+		}
+		function takePendingPluginInstallRequest(storage = sessionStorage) {
+			let raw;
+			try {
+				raw = storage.getItem(PLUGIN_INSTALL_STORAGE_KEY);
+			} catch {
+				return;
+			}
+			if (raw === null) return void 0;
+			try {
+				storage.removeItem(PLUGIN_INSTALL_STORAGE_KEY);
+			} catch {}
+			try {
+				return normalizePluginInstallSource(JSON.parse(raw)?.source);
+			} catch {
+				return normalizePluginInstallSource(raw);
+			}
+		}
+		function publishPluginInstallRequest(source, target) {
+			try {
+				target.sessionStorage.setItem(PLUGIN_INSTALL_STORAGE_KEY, JSON.stringify({ source }));
+			} catch {}
+			target.dispatchEvent(new CustomEvent(PLUGIN_INSTALL_EVENT, { detail: { source } }));
+		}
+		function removeInstallHash(target) {
+			const params = new URLSearchParams(target.location.hash.slice(1));
+			if (!params.has("dsh-plugin-install")) return;
+			params.delete(PLUGIN_INSTALL_HASH_KEY);
+			const suffix = params.toString();
+			const cleanUrl = `${target.location.pathname}${target.location.search}${suffix ? `#${suffix}` : ""}`;
+			target.history.replaceState(target.history.state, "", cleanUrl);
+		}
+		/**
+		* Bridge the loopback HTTP form into the same direct-install request used by
+		* Desktop deep links. This lives in the market bundle so it also works when
+		* the Harness loopback page is opened in a normal browser.
+		*/
+		function installPluginInstallHashBridge(target = window) {
+			const consume = () => {
+				const source = parsePluginInstallHash(target.location.hash);
+				if (new URLSearchParams(target.location.hash.slice(1)).has("dsh-plugin-install")) removeInstallHash(target);
+				if (source) publishPluginInstallRequest(source, target);
+			};
+			target.addEventListener("hashchange", consume);
+			consume();
+			return () => target.removeEventListener("hashchange", consume);
+		}
+		//#endregion
+		//#region src/client/DirectInstallDialog.tsx
+		/**
+		* Dedicated external-source installation flow.
+		*
+		* Protocol, loopback-hash and Desktop CLI requests land here instead of
+		* being translated into a market search. The user confirms the exact source,
+		* then the host reuses the market's guarded install engine without consulting
+		* or navigating the catalog.
+		*/
+		function createInstallRequestId() {
+			if (typeof globalThis.crypto?.randomUUID === "function") return globalThis.crypto.randomUUID();
+			return `install-${String(Date.now())}-${Math.random().toString(36).slice(2, 10)}`;
+		}
+		async function readInstallProgress(requestId) {
+			const response = await fetch("/dsh-market/install-progress", { cache: "no-store" });
+			if (!response.ok) return null;
+			const status = await response.json();
+			return status.outputSession === requestId ? status : null;
+		}
+		function updateTerminalLines(current, next) {
+			const currentLast = current[current.length - 1]?.id;
+			const nextLast = next[next.length - 1]?.id;
+			return current.length === next.length && currentLast === nextLast ? current : next;
+		}
+		function asText(value) {
+			if (typeof value === "string") return value;
+			if (value && typeof value === "object" && "text" in value && typeof value.text === "string") return value.text;
+			return value == null ? "" : JSON.stringify(value);
+		}
+		function failureText(body, status) {
+			const direct = asText(body.error).trim();
+			if (direct !== "") return direct.slice(-800);
+			const output = [asText(body.stderr), asText(body.stdout)].filter(Boolean).join("\n").trim();
+			if (output !== "") return output.slice(-800);
+			return `HTTP ${String(status)}${body.exitCode == null ? "" : ` · exit ${String(body.exitCode)}`}`;
+		}
+		function DirectInstallDialog({ t }) {
+			const [source, setSource] = (0, react.useState)(null);
+			const [phase, setPhase] = (0, react.useState)("confirm");
+			const [message, setMessage] = (0, react.useState)("");
+			const [builds, setBuilds] = (0, react.useState)([]);
+			const [allowBuildScripts, setAllowBuildScripts] = (0, react.useState)(true);
+			const [progressRequestId, setProgressRequestId] = (0, react.useState)(null);
+			const [installStatus, setInstallStatus] = (0, react.useState)(null);
+			const [terminalLines, setTerminalLines] = (0, react.useState)([]);
+			const openRequest = (0, react.useCallback)((nextSource) => {
+				setSource(nextSource);
+				setPhase("confirm");
+				setMessage("");
+				setBuilds([]);
+				setAllowBuildScripts(true);
+				setProgressRequestId(null);
+				setInstallStatus(null);
+				setTerminalLines([]);
+			}, []);
+			(0, react.useEffect)(() => {
+				const pending = takePendingPluginInstallRequest();
+				if (pending) openRequest(pending);
+				const onRequest = (event) => {
+					const nextSource = normalizePluginInstallSource(event.detail?.source);
+					if (!nextSource) return;
+					takePendingPluginInstallRequest();
+					openRequest(nextSource);
+				};
+				window.addEventListener(PLUGIN_INSTALL_EVENT, onRequest);
+				return () => window.removeEventListener(PLUGIN_INSTALL_EVENT, onRequest);
+			}, [openRequest]);
+			const close = (0, react.useCallback)(() => {
+				if (phase === "installing") return;
+				setSource(null);
+			}, [phase]);
+			(0, react.useEffect)(() => {
+				if (phase !== "installing" || progressRequestId === null) return;
+				let stopped = false;
+				let timer;
+				const poll = async () => {
+					try {
+						const status = await readInstallProgress(progressRequestId);
+						if (!stopped && status !== null) {
+							setInstallStatus(status);
+							if (Array.isArray(status.output)) setTerminalLines((current) => updateTerminalLines(current, status.output));
+						}
+					} catch {}
+					if (!stopped) timer = setTimeout(() => {
+						poll();
+					}, 300);
+				};
+				poll();
+				return () => {
+					stopped = true;
+					if (timer !== void 0) clearTimeout(timer);
+				};
+			}, [phase, progressRequestId]);
+			const install = (0, react.useCallback)(async (requestedSource, previouslyApproved = []) => {
+				const requestId = createInstallRequestId();
+				setPhase("installing");
+				setMessage("");
+				setBuilds([]);
+				setProgressRequestId(requestId);
+				setInstallStatus(null);
+				setTerminalLines([]);
+				try {
+					const response = await fetch("/dsh-market/install", {
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: JSON.stringify({
+							source: requestedSource,
+							allowBuildScripts,
+							requestId
+						})
+					});
+					const body = await response.json().catch(() => ({}));
+					try {
+						const status = await readInstallProgress(requestId);
+						if (status !== null) {
+							setInstallStatus(status);
+							if (Array.isArray(status.output)) setTerminalLines((current) => updateTerminalLines(current, status.output));
+						}
+					} catch {}
+					if (body.cancelled === true) {
+						setPhase("error");
+						setMessage(t("cancelled"));
+						return;
+					}
+					if (response.ok && body.ok === true) {
+						const packages = Array.isArray(body.addedPackages) ? body.addedPackages.filter((name) => typeof name === "string") : [];
+						const prefix = packages.length > 0 ? `${packages.join(", ")} · ` : "";
+						const result = body.hot === true ? t("directInstallReady") : t("directInstallRestart");
+						const warning = body.compatibility?.code === "soft-incompatible" ? `\n${t("compatRiskBanner")}` : "";
+						setMessage(`${prefix}${result}${body.prebuiltFallback === true ? `\n${t("directInstallPrebuiltFallback")}` : ""}${warning}`);
+						setPhase("success");
+						return;
+					}
+					if (Array.isArray(body.ignoredBuilds) && body.ignoredBuilds.length > 0) {
+						const nextBuilds = body.ignoredBuilds.map(String);
+						if (previouslyApproved.length > 0 && nextBuilds.every((name) => previouslyApproved.includes(name))) {
+							const detail = failureText(body, response.status);
+							setMessage(`${t("buildApprovalStillBlocked")}${detail === "" ? "" : `\n${detail}`}`);
+							setPhase("error");
+							return;
+						}
+						setBuilds(nextBuilds);
+						setMessage(failureText(body, response.status));
+						setPhase("blocked");
+						return;
+					}
+					setMessage(failureText(body, response.status));
+					setPhase("error");
+				} catch (error) {
+					setMessage(error instanceof Error ? error.message : String(error));
+					setPhase("error");
+				}
+			}, [allowBuildScripts, t]);
+			const approveAndRetry = (0, react.useCallback)(async () => {
+				if (source === null || builds.length === 0) return;
+				setPhase("installing");
+				setMessage("");
+				setProgressRequestId(null);
+				setInstallStatus(null);
+				setTerminalLines([]);
+				try {
+					const response = await fetch("/dsh-market/approve-builds", {
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: JSON.stringify({
+							packages: builds,
+							source
+						})
+					});
+					const body = await response.json().catch(() => ({}));
+					if (!response.ok || body.ok !== true) {
+						setMessage(asText(body.error) || `HTTP ${String(response.status)}`);
+						setPhase("error");
+						return;
+					}
+					await install(source, builds);
+				} catch (error) {
+					setMessage(error instanceof Error ? error.message : String(error));
+					setPhase("error");
+				}
+			}, [
+				builds,
+				install,
+				source
+			]);
+			const cancelInstall = (0, react.useCallback)(() => {
+				fetch("/dsh-market/cancel", {
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: "{}"
+				}).catch(() => {});
+			}, []);
+			if (source === null) return null;
+			const footer = phase === "confirm" ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+				variant: "ghost",
+				onClick: close,
+				children: t("cancel")
+			}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+				variant: "primary",
+				onClick: () => void install(source),
+				children: t("install")
+			})] }) : phase === "installing" ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+				variant: "ghost",
+				onClick: cancelInstall,
+				children: t("cancelOp")
+			}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+				variant: "primary",
+				disabled: true,
+				children: t("installing")
+			})] }) : phase === "blocked" ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+				variant: "ghost",
+				onClick: close,
+				children: t("cancel")
+			}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+				variant: "primary",
+				onClick: () => void approveAndRetry(),
+				children: t("approveBuilds")
+			})] }) : phase === "success" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+				variant: "primary",
+				onClick: close,
+				children: t("dismiss")
+			}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+				variant: "ghost",
+				onClick: close,
+				children: t("cancel")
+			}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+				variant: "primary",
+				onClick: () => void install(source),
+				children: t("opRetry")
+			})] });
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Modal, {
+				open: true,
+				onClose: close,
+				title: t("directInstallTitle"),
+				description: t("directInstallIntro"),
+				footer,
+				className: DirectInstallDialog_module_css_default.dialog,
+				contentClassName: DirectInstallDialog_module_css_default.modalContent,
+				children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: DirectInstallDialog_module_css_default.stack,
+					children: [
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: DirectInstallDialog_module_css_default.sourceCard,
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+								className: DirectInstallDialog_module_css_default.sourceLabel,
+								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconLinkOutline14, { size: 14 }), t("directInstallSource")]
+							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("code", {
+								className: DirectInstallDialog_module_css_default.source,
+								children: source
+							})]
+						}),
+						phase === "confirm" && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: DirectInstallDialog_module_css_default.buildOption,
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+								className: DirectInstallDialog_module_css_default.buildOptionCopy,
+								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", { children: t("directInstallBuildScripts") }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: t("directInstallBuildScriptsHint") })]
+							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								role: "switch",
+								"aria-checked": allowBuildScripts,
+								"aria-label": t("directInstallBuildScripts"),
+								className: allowBuildScripts ? `${DirectInstallDialog_module_css_default.switch} ${DirectInstallDialog_module_css_default.switchOn}` : DirectInstallDialog_module_css_default.switch,
+								onClick: () => setAllowBuildScripts((value) => !value),
+								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: DirectInstallDialog_module_css_default.switchKnob })
+							})]
+						}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: DirectInstallDialog_module_css_default.notice,
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconWarningOutline16, {
+								size: 16,
+								className: DirectInstallDialog_module_css_default.warningIcon
+							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+								className: DirectInstallDialog_module_css_default.noticeCopy,
+								children: allowBuildScripts ? t("directInstallBuildScriptsWarn") : t("confirmWarn")
+							})]
+						})] }),
+						phase === "installing" && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: DirectInstallDialog_module_css_default.installProgress,
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+								className: DirectInstallDialog_module_css_default.status,
+								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconLoadingOutline16, {
+									size: 16,
+									className: DirectInstallDialog_module_css_default.spinning
+								}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: t("directInstallWorking") })]
+							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(InstallTerminal, {
+								lines: terminalLines,
+								status: installStatus,
+								state: "active",
+								t
+							})]
+						}),
+						phase !== "confirm" && phase !== "installing" && terminalLines.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(InstallTerminal, {
+							lines: terminalLines,
+							status: installStatus,
+							state: phase === "success" ? "complete" : "stopped",
+							t
+						}),
+						phase === "blocked" && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: DirectInstallDialog_module_css_default.result,
+							"data-tone": "warning",
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconWarningOutline16, { size: 16 }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", { children: t("buildsSkipped") }),
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+									className: DirectInstallDialog_module_css_default.detail,
+									children: builds.join(", ")
+								}),
+								message !== "" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+									className: DirectInstallDialog_module_css_default.detail,
+									children: message
+								})
+							] })]
+						}),
+						phase === "success" && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: DirectInstallDialog_module_css_default.result,
+							"data-tone": "success",
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconCheckOutline16, { size: 16 }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+								className: DirectInstallDialog_module_css_default.detail,
+								children: message
+							})]
+						}),
+						phase === "error" && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: DirectInstallDialog_module_css_default.result,
+							"data-tone": "error",
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconWarningOutline16, { size: 16 }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", { children: t("installFail") }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+								className: DirectInstallDialog_module_css_default.detail,
+								children: message
+							})] })]
+						})
+					]
+				})
+			});
+		}
 		//#endregion
 		//#region src/client/market-data.ts
 		function groupSwitchState(members, disabled) {
@@ -808,7 +1413,9 @@ window.__ModuleLoader__.load({
 		}
 		/**
 		* The discover list: category filter, then the published-within window, then
-		* search across name / owner / localized description, then the selected sort.
+		* search across names, package/repository identities and localized
+		* description, then the selected sort. Repository identity matters for the
+		* browser/deep-link entry points, whose natural input is `owner/repository`.
 		* Pure — the section renders exactly this.
 		*/
 		function visiblePlugins(plugins, options) {
@@ -819,7 +1426,7 @@ window.__ModuleLoader__.load({
 				if (options.sinceDays !== void 0 && !withinDays(p.added, options.sinceDays)) return false;
 				if (query === "") return true;
 				const desc = p.description && (p.description[options.lang] || p.description.en) || "";
-				return p.name.toLowerCase().includes(query) || p.owner.toLowerCase().includes(query) || desc.toLowerCase().includes(query);
+				return p.name.toLowerCase().includes(query) || p.owner.toLowerCase().includes(query) || `${p.owner}/${p.name}`.toLowerCase().includes(query) || p.url.toLowerCase().includes(query) || (p.npm ?? "").toLowerCase().includes(query) || (p.install ?? "").toLowerCase().includes(query) || desc.toLowerCase().includes(query);
 			});
 			const hasDownloads = (p) => typeof p.downloads === "number";
 			if (options.sort === "downloads-desc") return [...list].sort((a, b) => {
@@ -901,7 +1508,7 @@ window.__ModuleLoader__.load({
 		* so prefix-related repo names cannot cross-match.
 		*/
 		function entryIdentities(plugin) {
-			const ids = /* @__PURE__ */ new Set([plugin.name.toLowerCase()]);
+			const ids = new Set([plugin.name.toLowerCase()]);
 			if (plugin.npm) ids.add(plugin.npm.toLowerCase());
 			const m = /^https:\/\/github\.com\/([^/]+\/[^/]+?)(?:\/tree\/[^/]+\/(.+?))?\/?$/.exec(plugin.url);
 			if (m !== null) ids.add(m[2] !== void 0 ? `${m[1].toLowerCase()}#path:/${m[2].toLowerCase()}` : m[1].toLowerCase());
@@ -916,14 +1523,27 @@ window.__ModuleLoader__.load({
 				ids.add(value.toLowerCase());
 			}
 		}
+		/** Repo identity carried directly by a legacy Git or immutable archive spec. */
+		function dependencyGitHubSource(spec) {
+			const archive = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/archive\/[0-9a-f]{40,64}\.tar\.gz$/i.exec(spec);
+			if (archive !== null) return {
+				repo: archive[1],
+				subpath: null
+			};
+			const git = /github:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:#path:\/([A-Za-z0-9_./-]+))?/i.exec(spec);
+			return git === null ? null : {
+				repo: git[1],
+				subpath: git[2] ?? null
+			};
+		}
 		function depIdentities(name, spec, repoIdentities = []) {
-			const ids = /* @__PURE__ */ new Set([name.toLowerCase()]);
+			const ids = new Set([name.toLowerCase()]);
 			const scoped = /^@([^/]+)\/(.+)$/.exec(name);
 			if (scoped !== null) ids.add(`${scoped[1].toLowerCase()}/${scoped[2].toLowerCase()}`);
-			const match = /github:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:#path:\/([A-Za-z0-9_./-]+))?/i.exec(spec);
-			if (match !== null) {
-				ids.add(match[1].toLowerCase());
-				if (match[2] !== void 0) ids.add(`${match[1].toLowerCase()}#path:/${match[2].toLowerCase()}`);
+			const source = dependencyGitHubSource(spec);
+			if (source !== null) {
+				ids.add(source.repo.toLowerCase());
+				if (source.subpath !== null) ids.add(`${source.repo.toLowerCase()}#path:/${source.subpath.toLowerCase()}`);
 			}
 			addRepoIdentities(ids, repoIdentities);
 			return ids;
@@ -935,10 +1555,10 @@ window.__ModuleLoader__.load({
 		*/
 		function depRepoIds(spec, repoIdentities = []) {
 			const ids = /* @__PURE__ */ new Set();
-			const m = /github:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:#path:\/([A-Za-z0-9_./-]+))?/i.exec(spec);
-			if (m !== null) {
-				ids.add(m[1].toLowerCase());
-				if (m[2] !== void 0) ids.add(`${m[1].toLowerCase()}#path:/${m[2].toLowerCase()}`);
+			const source = dependencyGitHubSource(spec);
+			if (source !== null) {
+				ids.add(source.repo.toLowerCase());
+				if (source.subpath !== null) ids.add(`${source.repo.toLowerCase()}#path:/${source.subpath.toLowerCase()}`);
 			}
 			addRepoIdentities(ids, repoIdentities);
 			return ids;
@@ -1032,7 +1652,7 @@ window.__ModuleLoader__.load({
 		* a request carrying the user's IP, so registry data and README content are
 		* both treated as untrusted here, matching the upstream build gate.
 		*/
-		const SCREENSHOT_HOSTS = /* @__PURE__ */ new Set([
+		const SCREENSHOT_HOSTS = new Set([
 			"raw.githubusercontent.com",
 			"user-images.githubusercontent.com",
 			"camo.githubusercontent.com",
@@ -1229,272 +1849,276 @@ window.__ModuleLoader__.load({
 			});
 		}
 		//#endregion
-		//#region \0dsh-css:D:\Dev\self\.dsh-market-desktop-integration\src\client\Market.module.css.mjs
-		const css = ".eGUBIq_root{min-width:0;height:100%;color:var(--dsw-alias-label-primary,#1f2328);flex-direction:column;display:flex;position:relative}.eGUBIq_head{flex-direction:column;gap:12px;padding:4px 4px 6px;display:flex}.eGUBIq_title{margin:0;font-size:16px;font-weight:500;line-height:24px}.eGUBIq_sub{color:var(--dsw-alias-label-tertiary,#8b93a1);align-items:center;gap:8px;margin:0;font-size:12px;line-height:18px;display:flex}.eGUBIq_submitLink{color:var(--dsw-alias-label-tertiary,#8b93a1);white-space:nowrap;font-size:11px;line-height:18px;text-decoration:none}.eGUBIq_submitLink:hover{color:var(--dsw-alias-brand-primary,#4f6ef7);text-decoration:underline}.eGUBIq_tabs{border-bottom:1px solid var(--dsw-alias-border-l2,#e5e7eb);align-items:flex-end;gap:2px;display:flex}.eGUBIq_tab{font:inherit;color:var(--dsw-alias-label-secondary,#6b7280);cursor:pointer;white-space:nowrap;background:0 0;border:none;border-bottom:2px solid #0000;padding:7px 12px;font-size:13px}.eGUBIq_tab.eGUBIq_on{color:var(--dsw-alias-brand-primary,#4f6ef7);border-bottom-color:var(--dsw-alias-brand-primary,#4f6ef7);font-weight:600}.eGUBIq_subTabs{align-items:flex-end;gap:2px;margin:-4px 0 4px;display:flex}.eGUBIq_banner{background:var(--dsw-alias-bg-layer-2,#fdf3e3);border:1px solid var(--dsw-alias-border-l2,#f3e3c3);border-radius:8px;align-items:center;gap:8px;margin:0;padding:8px 12px;font-size:12px;display:flex}.eGUBIq_bannerIcon{color:var(--dsw-alias-label-secondary,#6b7280);flex-shrink:0}.eGUBIq_bannerHint{color:var(--dsw-alias-label-tertiary,#8b93a1);cursor:help;display:inline-flex}.eGUBIq_body{flex:1;padding:12px 4px 24px;overflow-x:hidden;overflow-y:auto}.eGUBIq_stickyHead{z-index:5;background:var(--dsw-alias-bg-layer-2,#f7f8fa);position:sticky;top:-1px}.eGUBIq_stickyHead:before{content:\"\";background:inherit;pointer-events:none;height:14px;position:absolute;bottom:100%;left:0;right:0}.eGUBIq_cats{margin:0 -4px 2px;padding:12px 4px 4px}.eGUBIq_catsRow{align-items:flex-start;gap:8px;display:flex;position:relative}.eGUBIq_star{color:var(--dsw-alias-label-secondary,#9ca3af);white-space:nowrap;flex:none;font-size:11px}.eGUBIq_top{z-index:20;display:inline-flex;position:absolute;bottom:18px;right:18px}.eGUBIq_topBtn{border-radius:99px;width:38px;height:38px;padding:0}.eGUBIq_tag{border:1px solid var(--dsw-alias-border-l3,#d9dde3);color:var(--dsw-alias-label-secondary,#6b7280);border-radius:4px;flex-shrink:0;padding:1px 6px;font-size:11px;line-height:16px}.eGUBIq_okState{color:var(--dsw-alias-state-success-primary,#16a34a);white-space:nowrap;font-size:12px;font-weight:600}.eGUBIq_catsWrap{flex-wrap:wrap;flex:1;align-items:center;gap:6px;min-width:0;display:flex}.eGUBIq_catsCollapsed{max-height:62px;overflow:hidden}.eGUBIq_catsToggle.eGUBIq_catsToggle{height:26px;min-height:26px;color:var(--dsw-alias-label-secondary,#6b7280);padding:0 6px}.eGUBIq_shots{-webkit-overflow-scrolling:touch;scrollbar-width:thin;gap:8px;margin:6px 0 8px;padding:2px 0 6px;display:flex;overflow-x:auto}.eGUBIq_shot{object-fit:cover;border:1px solid var(--dsw-alias-border-default,#e5e7eb);background:var(--dsw-alias-bg-layer-2,#f3f4f6);cursor:pointer;border-radius:8px;flex:none;width:220px;height:150px}.eGUBIq_cardShots{-webkit-overflow-scrolling:touch;scrollbar-width:thin;gap:6px;margin:0 0 6px;padding:0 0 2px;display:flex;overflow-x:auto}.eGUBIq_cardShot{object-fit:contain;border:1px solid var(--dsw-alias-border-default,#e5e7eb);background:var(--dsw-alias-bg-layer-2,#f3f4f6);cursor:pointer;border-radius:8px;flex:none;width:132px;height:88px;display:block}.eGUBIq_lightbox{z-index:10000;cursor:zoom-out;background:#000000d9;justify-content:center;align-items:center;display:flex;position:fixed;top:0;bottom:0;left:0;right:0}.eGUBIq_lightboxImg{object-fit:contain;cursor:default;border-radius:4px;max-width:90vw;max-height:85vh}.eGUBIq_lightboxClose{color:#fff;cursor:pointer;background:#ffffff1f;border:none;border-radius:99px;place-items:center;width:36px;height:36px;font-size:22px;line-height:1;display:grid;position:absolute;top:16px;right:16px}.eGUBIq_lightboxClose:hover{background:#ffffff38}.eGUBIq_lightboxNav{color:#fff;cursor:pointer;background:#ffffff1f;border:none;border-radius:99px;place-items:center;width:44px;height:44px;display:grid;position:absolute;top:50%;transform:translateY(-50%)}.eGUBIq_lightboxNav:hover{background:#ffffff38}.eGUBIq_lightboxPrev{left:16px}.eGUBIq_lightboxNext{right:16px}.eGUBIq_lightboxDots{gap:8px;display:flex;position:absolute;bottom:20px;left:50%;transform:translate(-50%)}.eGUBIq_lightboxDot{cursor:pointer;background:#fff6;border-radius:99px;width:7px;height:7px}.eGUBIq_lightboxDotOn{background:#fff}.eGUBIq_cmd{background:var(--dsw-alias-bg-layer-2,#f3f4f6);word-break:break-all;border-radius:6px;margin:8px 0 0;padding:8px 10px;font-family:ui-monospace,Menlo,monospace;font-size:11px;line-height:18px}.eGUBIq_warnLine{color:var(--dsw-alias-state-warn-primary,#b45309);flex-wrap:wrap;align-items:center;gap:4px;margin:0;font-size:12px;font-weight:600;line-height:18px;display:flex}.eGUBIq_modalNote{color:var(--dsw-alias-label-tertiary,#8b93a1);align-items:center;gap:4px;margin:12px 0 0;font-size:12px;line-height:18px;display:flex}.eGUBIq_grid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:10px;display:grid}.eGUBIq_masonry{align-items:flex-start;gap:10px;display:flex}.eGUBIq_masonryCol{flex-direction:column;flex:1;gap:10px;min-width:0;display:flex}.eGUBIq_masonry>.eGUBIq_masonryCol>*{align-self:stretch;min-width:0}@media (max-width:680px){.eGUBIq_masonry{flex-direction:column}}.eGUBIq_pairGrid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:10px;display:grid}@media (max-width:680px){.eGUBIq_grid,.eGUBIq_pairGrid{grid-template-columns:minmax(0,1fr)}}.eGUBIq_swatches{border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:8px;gap:0;height:34px;display:flex;overflow:hidden}.eGUBIq_themesGrid{margin-bottom:12px}.eGUBIq_swatches i{flex:1}.eGUBIq_card{background:var(--dsw-alias-bg-layer-1,#fff);border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:12px;flex-direction:column;align-self:start;gap:12px;padding:12px 14px;display:flex}.eGUBIq_row1{align-items:flex-start;gap:10px;min-width:0;display:flex}.eGUBIq_cardAction{flex-shrink:0;align-items:center;display:inline-flex}.eGUBIq_installBtn.eGUBIq_installBtn{min-width:64px}.eGUBIq_av{color:#fff;object-fit:cover;background:var(--dsw-alias-bg-layer-2,#f3f4f6);border-radius:50%;flex-shrink:0;place-items:center;width:16px;height:16px;font-size:9px;font-weight:700;display:grid}.eGUBIq_nm{text-overflow:ellipsis;white-space:nowrap;font-size:15px;font-weight:600;line-height:22px;overflow:hidden}.eGUBIq_nmLink{color:inherit;text-decoration:none;display:block}.eGUBIq_nmLink:hover{color:var(--dsw-alias-brand-primary,#4f6ef7);text-decoration:underline}.eGUBIq_byline{flex-wrap:wrap;align-items:center;gap:6px;min-width:0;margin-top:2px;display:flex}.eGUBIq_meta{color:var(--dsw-alias-label-secondary,#9ca3af);margin-top:2px;font-size:11px}.eGUBIq_metaInline{color:var(--dsw-alias-label-secondary,#9ca3af);font-size:11px}.eGUBIq_owner{color:var(--dsw-alias-label-secondary,#9ca3af);text-overflow:ellipsis;white-space:nowrap;flex:0 auto;min-width:44px;font-size:11px;overflow:hidden}.eGUBIq_desc{color:var(--dsw-alias-label-tertiary,#8b93a1);margin:0;font-size:12px;line-height:18px}.eGUBIq_descClamp{-webkit-line-clamp:5;-webkit-box-orient:vertical;display:-webkit-box;overflow:hidden}.eGUBIq_descToggle{width:20px;height:16px;color:var(--dsw-alias-label-tertiary,#8b93a1);cursor:pointer;background:0 0;border:none;justify-content:center;align-items:center;margin-top:2px;padding:0;display:flex}.eGUBIq_descToggle:hover{color:var(--dsw-alias-brand-primary,#4f6ef7)}.eGUBIq_foot{flex-wrap:wrap;align-items:center;gap:8px;display:flex}.eGUBIq_foot .eGUBIq_metaInline,.eGUBIq_foot .eGUBIq_src{white-space:nowrap}.eGUBIq_grow{flex:1}.eGUBIq_titleRow{align-items:center;gap:10px;display:flex}.eGUBIq_version{color:var(--dsw-alias-label-tertiary,#8b93a1);font-variant-numeric:tabular-nums;flex-shrink:0;font-size:12px;line-height:20px}.eGUBIq_repoLink{color:var(--dsw-alias-label-tertiary,#8b93a1);flex-shrink:0;font-size:12px;line-height:20px;text-decoration:none}.eGUBIq_repoLink:hover{color:var(--dsw-alias-brand-primary,#4f6ef7)}.eGUBIq_descTight{min-height:0}.eGUBIq_src{color:var(--dsw-alias-label-secondary,#9ca3af);font-size:11px;text-decoration:none}.eGUBIq_src:hover{color:var(--dsw-alias-brand-primary,#4f6ef7)}.eGUBIq_dot{vertical-align:2px;margin-left:5px}.eGUBIq_act{flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px;font-size:11px;display:flex}.eGUBIq_actLive{color:var(--dsw-alias-state-success-primary,#16a34a);align-items:center;gap:4px;font-weight:600;display:inline-flex}.eGUBIq_actWarn{color:var(--dsw-alias-state-warn-primary,#b45309);align-items:center;gap:4px;font-weight:600;display:inline-flex}.eGUBIq_actBroken{color:var(--dsw-alias-state-error-primary,#dc2626);align-items:center;gap:4px;font-weight:600;display:inline-flex}.eGUBIq_actWhy{color:var(--dsw-alias-label-secondary,#6b7280);margin-top:2px}.eGUBIq_loading{color:var(--dsw-alias-label-secondary,#9ca3af);flex-direction:column;align-items:center;gap:12px;padding:48px;font-size:13px;display:flex}.eGUBIq_spin{color:var(--dsw-alias-brand-primary,#4f6ef7);flex-shrink:0;animation:.8s linear infinite eGUBIq_sp;display:inline-flex}.eGUBIq_logoMark{color:var(--dsw-alias-brand-primary,#4f6ef7);flex-shrink:0;display:inline-flex}.eGUBIq_logoPlug{transform-box:fill-box;transform-origin:50%;animation:1.5s cubic-bezier(.4,0,.2,1) infinite eGUBIq_dshmPlug}@keyframes eGUBIq_dshmPlug{0%,12%{transform:rotate(9deg)}45%,62%{transform:translate(-1.28px,1.27px)rotate(0)}95%,to{transform:rotate(9deg)}}@media (prefers-reduced-motion:reduce){.eGUBIq_logoPlug,.eGUBIq_spin{animation:1.5s ease-in-out infinite eGUBIq_dshmPlugFade}}@keyframes eGUBIq_dshmPlugFade{0%,to{opacity:1}50%{opacity:.35}}@keyframes eGUBIq_sp{to{transform:rotate(360deg)}}.eGUBIq_progress{background:var(--dsw-alias-bg-layer-2,#f3f4f6);border:1px solid var(--dsw-alias-border-l2,#e5e7eb);color:var(--dsw-alias-label-secondary,#6b7280);border-radius:8px;flex-wrap:wrap;align-items:center;gap:9px;margin:0;padding:8px 12px;font-size:12px;display:flex}.eGUBIq_bar{background:var(--dsw-alias-border-l1,#e5e7eb);border-radius:99px;width:100%;height:4px;overflow:hidden}.eGUBIq_barFill{background:var(--dsw-alias-brand-primary,#4f6ef7);border-radius:99px;height:100%;transition:width .6s}.eGUBIq_barWave{width:30%;animation:1.2s ease-in-out infinite eGUBIq_dshmSlide}@keyframes eGUBIq_dshmSlide{0%{margin-left:-30%}to{margin-left:100%}}.eGUBIq_irow .eGUBIq_progress{margin-top:8px}.eGUBIq_progress code{text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,Menlo,monospace;font-size:11px;overflow:hidden}.eGUBIq_empty{color:var(--dsw-alias-label-secondary,#9ca3af);text-align:center;padding:32px;font-size:13px}.eGUBIq_err{color:var(--dsw-alias-state-error-primary,#dc2626);white-space:pre-wrap;word-break:break-all;margin:8px 0;font-size:12px}.eGUBIq_cardBlocked{border-color:var(--dsw-alias-state-error-primary,#dc2626)}.eGUBIq_conflictHead{align-items:flex-start;gap:8px;display:flex}.eGUBIq_conflictIcon{color:var(--dsw-alias-state-error-primary,#dc2626);flex-shrink:0;margin-top:1px}.eGUBIq_conflictTitle{color:var(--dsw-alias-state-error-primary,#dc2626);font-size:13px;font-weight:600;line-height:18px}.eGUBIq_conflictBody{margin:0;font-size:12px;line-height:19px}.eGUBIq_roster{background:var(--dsw-alias-border-l2,#e5e7eb);border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:8px;flex-direction:column;gap:1px;display:flex;overflow:hidden}.eGUBIq_rosterRow{background:var(--dsw-alias-bg-layer-1,#fff);align-items:center;gap:8px;padding:7px 10px;display:flex}.eGUBIq_rosterMain{flex-direction:column;min-width:0;display:flex}.eGUBIq_rosterName{text-overflow:ellipsis;white-space:nowrap;min-width:0;font-size:12px;font-weight:600;overflow:hidden}.eGUBIq_rosterAuthor{color:var(--dsw-alias-label-secondary,#9ca3af);text-overflow:ellipsis;white-space:nowrap;font-size:10.5px;overflow:hidden}.eGUBIq_rosterTag{border-radius:4px;flex-shrink:0;margin-left:auto;padding:1px 6px;font-size:10.5px;font-weight:600}.eGUBIq_rosterTagKeep{color:var(--dsw-alias-state-success-primary,#16a34a);background:#16a34a1f}.eGUBIq_rosterTagDrop{color:var(--dsw-alias-state-error-primary,#dc2626);background:#dc26261f}.eGUBIq_rosterRowOut .eGUBIq_rosterName{text-decoration:line-through}.eGUBIq_rosterRowOut{opacity:.62}.eGUBIq_rosterSplit{background:var(--dsw-alias-border-l2,#e5e7eb);height:1px}.eGUBIq_reassure{color:var(--dsw-alias-label-secondary,#6b7280);align-items:center;gap:5px;margin:0;font-size:11.5px;line-height:17px;display:flex}.eGUBIq_reassureOk{color:var(--dsw-alias-state-success-primary,#16a34a);flex-shrink:0}.eGUBIq_conflictWhy{color:var(--dsw-alias-label-tertiary,#8b93a1);overflow-wrap:anywhere;margin-top:2px;font-family:ui-monospace,Menlo,monospace;font-size:11px;line-height:17px}.eGUBIq_conflictWhyText{margin-top:5px;font-family:-apple-system,BlinkMacSystemFont,PingFang SC,sans-serif}.eGUBIq_choices{flex-direction:column;gap:7px;display:flex}.eGUBIq_choice{text-align:left;font:inherit;cursor:pointer;background:var(--dsw-alias-bg-layer-1,#fff);border:1px solid var(--dsw-alias-border-l3,#d9dde3);border-radius:9px;align-items:flex-start;gap:9px;padding:9px 11px;display:flex}.eGUBIq_choice:has(input:disabled){cursor:default;opacity:.6}.eGUBIq_choiceOn{border-color:var(--dsw-alias-brand-primary,#4f6ef7);background:var(--dsw-alias-bg-layer-2,#f5f7ff)}.eGUBIq_choiceRadio{width:13px;height:13px;accent-color:var(--dsw-alias-brand-primary,#4f6ef7);flex-shrink:0;margin:2px 0 0}.eGUBIq_choiceMain{flex-direction:column;gap:3px;min-width:0;display:flex}.eGUBIq_choiceTitle{font-size:12px;font-weight:600;line-height:17px}.eGUBIq_choiceNote{color:var(--dsw-alias-label-tertiary,#8b93a1);font-size:11px;line-height:16px}.eGUBIq_choiceSafe{color:var(--dsw-alias-state-success-primary,#16a34a)}.eGUBIq_stateTag{white-space:nowrap;background:var(--dsw-alias-bg-layer-2,#f3f4f6);min-height:20px;color:var(--dsw-alias-label-secondary,#6b7280);border-radius:5px;flex-shrink:0;align-items:center;gap:5px;padding:1px 7px;font-size:11px;line-height:16px;display:inline-flex}.eGUBIq_stateTag[data-on=true]{color:var(--dsw-alias-state-success-primary,#16a34a);background:color-mix(in srgb, var(--dsw-alias-state-success-primary,#16a34a) 10%, transparent)}.eGUBIq_stateDot{background:var(--dsw-alias-label-tertiary,#8b93a1);border-radius:999px;flex:none;width:6px;height:6px}.eGUBIq_stateDot[data-on=true]{background:var(--dsw-alias-state-success-primary,#16a34a)}.eGUBIq_metaTag{text-overflow:ellipsis;white-space:nowrap;background:var(--dsw-alias-bg-layer-2,#f3f4f6);min-width:0;max-width:100%;min-height:20px;color:var(--dsw-alias-label-tertiary,#8b93a1);border-radius:5px;flex-shrink:1;padding:1px 7px;font-size:11px;line-height:18px;display:inline-block;overflow:hidden}.eGUBIq_metaTagOk{color:var(--dsw-alias-state-success-primary,#16a34a);background:color-mix(in srgb, var(--dsw-alias-state-success-primary,#16a34a) 10%, transparent)}.eGUBIq_nameLink{color:inherit;text-decoration:none}.eGUBIq_nameLink:hover{color:var(--dsw-alias-brand-primary,#4f6ef7);text-decoration:underline}.eGUBIq_opWrap{flex-shrink:0;display:inline-flex;position:relative}.eGUBIq_opEntry{font:inherit;cursor:pointer;white-space:nowrap;color:var(--dsw-alias-label-primary,#1f2328);background:var(--dsw-alias-bg-layer-1,#fff);border:1px solid var(--dsw-alias-border-l3,#d9dde3);border-radius:7px;align-items:center;gap:6px;padding:4px 10px;font-size:12px;display:inline-flex;position:relative}.eGUBIq_opEntryQuiet{color:var(--dsw-alias-label-secondary,#6b7280);background:0 0;border-color:#0000}.eGUBIq_opEntryAlert{border-color:var(--dsw-alias-state-error-primary,#dc2626);color:var(--dsw-alias-state-error-primary,#dc2626)}.eGUBIq_opDot{background:var(--dsw-alias-state-error-primary,#dc2626);border-radius:99px;width:8px;height:8px;position:absolute;top:-3px;right:-3px}.eGUBIq_opPanel{z-index:40;background:var(--dsw-alias-bg-layer-1,#fff);border:1px solid var(--dsw-alias-border-l3,#d9dde3);border-radius:12px;width:460px;max-width:86vw;max-height:70vh;position:absolute;top:calc(100% + 6px);right:0;overflow-y:auto;box-shadow:0 20px 52px #00000047}.eGUBIq_opHead{border-bottom:1px solid var(--dsw-alias-border-l2,#e5e7eb);align-items:center;gap:8px;padding:9px 14px;display:flex}.eGUBIq_opPanelTitle{font-size:12.5px;font-weight:600}.eGUBIq_opCloseBtn.eGUBIq_opCloseBtn{min-width:0;color:var(--dsw-alias-label-secondary,#6b7280);padding:0 6px}.eGUBIq_opAggregate{border-bottom:1px solid var(--dsw-alias-border-l2,#e5e7eb);background:var(--dsw-alias-bg-layer-2,#f7f8fa);padding:9px 14px}.eGUBIq_opAggregateTop{font-variant-numeric:tabular-nums;font-size:12px;font-weight:600}.eGUBIq_opAggregateHint{color:var(--dsw-alias-label-tertiary,#8b93a1);margin-top:4px;font-size:10.5px}.eGUBIq_opRow{border-bottom:1px solid var(--dsw-alias-border-l2,#e5e7eb);align-items:flex-start;gap:9px;padding:9px 14px;display:flex}.eGUBIq_opRow:last-child{border-bottom:none}.eGUBIq_opRowAlert{background:#dc26260f}.eGUBIq_opIcon{flex-shrink:0;place-items:center;width:14px;margin-top:1px;display:grid}.eGUBIq_opQueuedIcon{color:var(--dsw-alias-label-tertiary,#8b93a1);font-size:12px}.eGUBIq_opMain{flex-direction:column;flex:1;gap:3px;min-width:0;display:flex}.eGUBIq_opTop{align-items:baseline;gap:6px;min-width:0;display:flex}.eGUBIq_opVerb{color:var(--dsw-alias-label-secondary,#6b7280);flex-shrink:0;font-size:12px}.eGUBIq_opName{text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600;overflow:hidden}.eGUBIq_opStatus{color:var(--dsw-alias-label-tertiary,#8b93a1);overflow-wrap:anywhere;font-size:10.5px;line-height:16px}.eGUBIq_opStatusBad{color:var(--dsw-alias-state-error-primary,#dc2626)}.eGUBIq_opActions{flex-shrink:0;align-items:center;gap:6px;margin-top:1px;display:flex}.eGUBIq_opDecision{border-top:1px dashed var(--dsw-alias-border-l2,#e5e7eb);flex-direction:column;gap:8px;margin-top:8px;padding-top:8px;display:flex}.eGUBIq_opDecisionFoot{align-items:center;gap:8px;display:flex}.eGUBIq_conflictDetailsToggle{font:inherit;cursor:pointer;color:var(--dsw-alias-label-tertiary,#8b93a1);background:0 0;border:none;align-items:center;gap:4px;padding:2px 0;font-size:11px;display:inline-flex}.eGUBIq_conflictDetailsToggle:hover{color:var(--dsw-alias-label-secondary,#6b7280)}.eGUBIq_opEmpty{text-align:center;color:var(--dsw-alias-label-secondary,#6b7280);padding:30px 14px;font-size:12px}.eGUBIq_opEmptyHint{color:var(--dsw-alias-label-tertiary,#8b93a1);margin-top:4px;font-size:11px}.eGUBIq_cardBlockedMark{font:inherit;cursor:pointer;color:var(--dsw-alias-state-error-primary,#dc2626);border:1px solid var(--dsw-alias-state-error-primary,#dc2626);background:#dc262614;border-radius:7px;align-items:center;gap:5px;padding:4px 9px;font-size:11px;display:inline-flex}.eGUBIq_dangerBtn.eGUBIq_dangerBtn{color:var(--dsw-alias-state-error-primary,#dc2626);border-color:var(--dsw-alias-state-error-primary,#dc2626)}.eGUBIq_dangerBtn.eGUBIq_dangerBtn:hover:not(:disabled){background:var(--dsw-alias-state-error-primary,#dc2626);color:#fff}.eGUBIq_dangerArmed.eGUBIq_dangerArmed{background:var(--dsw-alias-state-error-primary,#dc2626);border-color:var(--dsw-alias-state-error-primary,#dc2626);color:#fff}.eGUBIq_retryBtn{margin-top:4px}.eGUBIq_irow{background:var(--dsw-alias-bg-layer-1,#fff);border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:10px;flex-direction:column;gap:10px;min-width:0;padding:12px 14px;display:flex}.eGUBIq_irowActions{flex-wrap:wrap;justify-content:flex-start;align-items:center;gap:8px;min-width:0;display:flex}.eGUBIq_irowMissing{filter:grayscale();opacity:.5}.eGUBIq_irow>.eGUBIq_src,.eGUBIq_irow>.eGUBIq_owner,.eGUBIq_irow button{white-space:nowrap;flex-shrink:0}.eGUBIq_tabSearchRow{padding:0 4px 6px;display:flex}.eGUBIq_tabSearch{width:100%}.eGUBIq_spec{color:var(--dsw-alias-label-secondary,#9ca3af);overflow-wrap:anywhere;min-width:0;font-family:ui-monospace,Menlo,monospace;font-size:11px}.eGUBIq_specTag{white-space:nowrap;border-radius:4px;flex-shrink:0;align-items:center;height:16px;padding:0 5px;font-size:10px;font-weight:600;display:inline-flex}.eGUBIq_specTagGit{color:#0b7285;background:#12a3c41f}.eGUBIq_specTagFile{color:#b07d1b;background:#f0b42924}.eGUBIq_backupCheckList .eGUBIq_grow{white-space:nowrap;text-overflow:ellipsis;flex:70%;min-width:0;overflow:hidden}.eGUBIq_backupCheckList .eGUBIq_spec{text-align:right;white-space:nowrap;text-overflow:ellipsis;flex:0 30%;max-width:30%;overflow:hidden}.eGUBIq_staleAction{margin-top:8px}.eGUBIq_pct{color:var(--dsw-alias-label-secondary,#6b7280);flex-shrink:0;font-size:11px;font-weight:600}.eGUBIq_pager{flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;margin:16px 0 4px;display:flex}.eGUBIq_pagerPages{flex-wrap:wrap;flex:1;justify-content:center;align-items:center;gap:6px;min-width:0;display:flex}.eGUBIq_pageEllipsis{color:var(--dsw-alias-label-secondary,#9ca3af);padding:0 2px;font-size:12px}.eGUBIq_pageInfo{color:var(--dsw-alias-label-secondary,#6b7280);white-space:nowrap;font-size:12px}.eGUBIq_depBadge{border:1px solid var(--dsw-alias-state-warn-primary,#b45309);color:var(--dsw-alias-state-warn-primary,#b45309);white-space:nowrap;border-radius:4px;flex-shrink:0;margin-left:6px;padding:1px 6px;font-size:11px;font-weight:600;line-height:16px}.eGUBIq_deprecate{color:var(--dsw-alias-state-warn-primary,#b45309);background:var(--dsw-alias-bg-layer-2,#fdf3e3);border:1px solid var(--dsw-alias-border-l2,#f3e3c3);border-radius:8px;margin:0;padding:8px 10px;font-size:12px;line-height:18px}.eGUBIq_deprecate a{color:var(--dsw-alias-state-warn-primary,#b45309);text-decoration:underline}.eGUBIq_deprecate .eGUBIq_src{margin-left:8px}.eGUBIq_depLine{flex-wrap:wrap;align-items:center;gap:8px;display:flex}.eGUBIq_switch{border:1px solid var(--dsw-alias-border-l2,#d9dde3);background:var(--dsw-alias-bg-layer-2,#e5e7eb);cursor:pointer;border-radius:99px;flex-shrink:0;width:38px;height:22px;padding:0;transition:background .15s,border-color .15s;position:relative}.eGUBIq_switchOn{background:var(--dsw-alias-state-success-primary,#16a34a);border-color:var(--dsw-alias-state-success-primary,#16a34a)}.eGUBIq_switchMixed{background:var(--dsw-alias-state-warn-primary,#b45309);border-color:var(--dsw-alias-state-warn-primary,#b45309)}.eGUBIq_switchKnob{background:#fff;border-radius:99px;width:16px;height:16px;transition:left .15s;position:absolute;top:2px;left:2px;box-shadow:0 1px 2px #00000040}.eGUBIq_switchOn .eGUBIq_switchKnob,.eGUBIq_switchMixed .eGUBIq_switchKnob{left:18px}.eGUBIq_switch:disabled{opacity:.5;cursor:default}.eGUBIq_viewBar{border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:8px;align-items:center;gap:2px;width:fit-content;margin-bottom:12px;padding:2px;display:flex}.eGUBIq_viewBtn{font:inherit;color:var(--dsw-alias-label-secondary,#6b7280);cursor:pointer;white-space:nowrap;background:0 0;border:none;border-radius:6px;padding:4px 10px;font-size:12px;line-height:18px}.eGUBIq_viewBtn:hover{color:var(--dsw-alias-brand-primary,#4f6ef7)}.eGUBIq_viewOn{background:var(--dsw-alias-bg-layer-2,#eef0f4);color:var(--dsw-alias-label-primary,#1f2328);font-weight:600}.eGUBIq_groupRow{background:var(--dsw-alias-bg-layer-1,#fff);border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:12px;margin-bottom:10px;padding:12px 14px}.eGUBIq_groupHead{align-items:center;gap:10px;min-width:0;display:flex}.eGUBIq_groupName{text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600;line-height:20px;overflow:hidden}.eGUBIq_groupActions{flex-shrink:0;align-items:center;gap:6px;display:flex}.eGUBIq_groupMembers{flex-direction:column;gap:6px;margin-top:10px;display:flex}.eGUBIq_groupMember{background:var(--dsw-alias-bg-layer-2,#f7f8fa);border-radius:8px;align-items:center;gap:8px;padding:6px 8px;font-size:12px;line-height:18px;display:flex}.eGUBIq_groupMember .eGUBIq_nm{flex:1;min-width:0;font-size:12px}.eGUBIq_groupAddPanel{border-top:1px dashed var(--dsw-alias-border-l2,#e5e7eb);flex-direction:column;gap:6px;margin-top:10px;padding-top:10px;display:flex}.eGUBIq_groupCreate{align-items:center;gap:8px;margin-bottom:10px;display:flex}.eGUBIq_inlineInput{flex:1;min-width:120px}.eGUBIq_assignRow{flex-wrap:wrap;align-items:center;gap:8px;display:flex}.eGUBIq_assignSelect{border:1px solid var(--dsw-alias-border-l2,#e5e7eb);background:var(--dsw-alias-bg-layer-1,#fff);color:var(--dsw-alias-label-primary,#1f2328);font:inherit;border-radius:6px;padding:3px 6px;font-size:12px;line-height:18px}.eGUBIq_groupHint{color:var(--dsw-alias-label-tertiary,#8b93a1);font-size:11px}.eGUBIq_sectAction{color:var(--dsw-alias-label-secondary,#6b7280);align-items:center;gap:8px;margin:14px 2px 8px;font-size:12px;font-weight:600;display:flex}.eGUBIq_backupGrid{grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;display:grid}.eGUBIq_backupCard{background:var(--dsw-alias-bg-layer-1,#fff);border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:12px;flex-direction:column;gap:10px;padding:16px;display:flex}.eGUBIq_backupCard h3{margin:0;font-size:14px}.eGUBIq_backupCard p{color:var(--dsw-alias-label-secondary,#6b7280);margin:0;font-size:12px;line-height:18px}.eGUBIq_backupActions{flex-wrap:wrap;gap:8px;display:flex;position:relative}.eGUBIq_hiddenFile{opacity:0;pointer-events:none;width:1px;height:1px;position:absolute}.eGUBIq_backupInput{box-sizing:border-box;width:100%}.eGUBIq_backupCheck{cursor:pointer;align-items:center;gap:6px;font-size:12px;display:flex}.eGUBIq_backupWarn{margin:0;font-size:12px;line-height:18px;color:var(--dsw-alias-state-warn-primary,#b45309)!important}.eGUBIq_backupMessage{color:var(--dsw-alias-label-secondary,#6b7280);grid-column:1/-1;font-size:12px}.eGUBIq_backupCheckList{flex-direction:column;gap:6px;max-height:260px;margin:10px 0 4px;padding-right:4px;display:flex;overflow-y:auto}.eGUBIq_backupCheckList .eGUBIq_backupCheck{justify-content:space-between;gap:8px}.eGUBIq_diagPage{flex-direction:column;gap:12px;height:100%;min-height:0;display:flex;overflow-y:auto}.eGUBIq_diagSummary{background:var(--dsw-alias-bg-layer-1,#fff);border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:12px;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 14px;font-size:12px;display:flex}.eGUBIq_diagSummaryItem{color:var(--dsw-alias-label-secondary,#6b7280);white-space:nowrap;align-items:center;gap:6px;display:inline-flex}.eGUBIq_diagSummaryMeta{color:var(--dsw-alias-label-tertiary,#9ca3af);text-overflow:ellipsis;white-space:nowrap;max-width:320px;font-family:ui-monospace,Menlo,monospace;font-size:11px;overflow:hidden}.eGUBIq_diagSection{background:var(--dsw-alias-bg-layer-1,#fff);border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:12px;flex-direction:column;gap:8px;padding:12px 14px;display:flex}.eGUBIq_diagSection h3{color:var(--dsw-alias-label-primary,#1f2328);margin:0;font-size:13px;font-weight:600}.eGUBIq_diagCount{color:var(--dsw-alias-label-tertiary,#9ca3af);font-size:11px;font-weight:400}.eGUBIq_diagEmpty{color:var(--dsw-alias-label-secondary,#9ca3af);padding:8px 0;font-size:12px}.eGUBIq_diagBundle{border-top:1px solid var(--dsw-alias-border-l2,#f0f1f3);flex-direction:column;gap:6px;padding-top:8px;display:flex}.eGUBIq_diagBundle:first-of-type{border-top:none;padding-top:0}.eGUBIq_diagRow{flex-wrap:wrap;align-items:center;gap:8px;min-width:0;font-size:12px;line-height:18px;display:flex}.eGUBIq_diagMeta{align-items:baseline;gap:8px;min-width:0;font-size:12px;display:flex}.eGUBIq_diagKey{color:var(--dsw-alias-label-tertiary,#9ca3af);flex-shrink:0;min-width:64px;font-size:11px}.eGUBIq_diagVal{color:var(--dsw-alias-label-primary,#1f2328);overflow-wrap:anywhere;min-width:0;font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:500}.eGUBIq_diagIndex{background:var(--dsw-alias-bg-layer-2,#f3f4f6);min-width:18px;height:18px;color:var(--dsw-alias-label-secondary,#6b7280);border-radius:9px;flex-shrink:0;justify-content:center;align-items:center;font-size:11px;font-weight:600;display:inline-flex}.eGUBIq_diagArrow{color:var(--dsw-alias-label-tertiary,#9ca3af);flex-shrink:0;font-size:12px}.eGUBIq_diagBadgeOfficial{background:var(--dsw-alias-brand-primary,#4f6ef7);color:#fff;border-radius:9px;flex-shrink:0;align-items:center;height:18px;padding:0 8px;font-size:11px;font-weight:600;display:inline-flex}.eGUBIq_diagBadgeCommunity{background:var(--dsw-alias-bg-layer-2,#f3f4f6);height:18px;color:var(--dsw-alias-label-secondary,#6b7280);border-radius:9px;flex-shrink:0;align-items:center;padding:0 8px;font-size:11px;display:inline-flex}.eGUBIq_diagBadgeShadow{background:var(--dsw-alias-state-error-primary,#dc2626);color:#fff;border-radius:9px;flex-shrink:0;align-items:center;height:18px;padding:0 8px;font-size:11px;font-weight:600;display:inline-flex}.eGUBIq_diagList{flex-direction:column;gap:6px;display:flex}.eGUBIq_sectionOverview{color:var(--dsw-alias-label-tertiary,#8b93a1);text-overflow:ellipsis;white-space:nowrap;max-width:100%;padding:2px 0 6px;font-size:12px;line-height:18px;overflow:hidden}.eGUBIq_diagAlert{color:var(--dsw-alias-state-warn-primary,#b45309)}.eGUBIq_ovRow{background:var(--dsw-alias-bg-layer-2,#f7f8fa);border-radius:8px;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;padding:6px 10px;font-size:12px;line-height:18px;display:flex}.eGUBIq_ovArrow{color:var(--dsw-alias-label-tertiary,#9ca3af);flex-shrink:0;font-size:12px}.eGUBIq_ovByTag{background:var(--dsw-alias-brand-primary,#4f6ef7);color:#fff;text-overflow:ellipsis;white-space:nowrap;border-radius:9px;flex-shrink:0;align-items:center;max-width:260px;height:18px;padding:0 8px;font-size:11px;font-weight:600;display:inline-flex;overflow:hidden}.eGUBIq_ovFrom{color:var(--dsw-alias-label-secondary,#6b7280);text-overflow:ellipsis;white-space:nowrap;min-width:0;font-size:12px;overflow:hidden}.eGUBIq_orphRow{background:var(--dsw-alias-bg-layer-2,#f7f8fa);border-radius:8px;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;padding:6px 10px;font-size:12px;line-height:18px;display:flex}.eGUBIq_orphBadge{background:var(--dsw-alias-state-warn-primary,#b45309);color:#fff;white-space:nowrap;border-radius:9px;flex-shrink:0;align-items:center;height:18px;padding:0 8px;font-size:11px;font-weight:600;display:inline-flex}.eGUBIq_dragHandle{width:20px;height:20px;color:var(--dsw-alias-label-tertiary,#9ca3af);cursor:grab;-webkit-user-select:none;user-select:none;flex-shrink:0;justify-content:center;align-items:center;font-size:12px;line-height:20px;display:inline-flex}.eGUBIq_dragOver{outline:2px dashed var(--dsw-alias-brand-primary,#4f6ef7);outline-offset:2px;background:var(--dsw-alias-bg-layer-2,#f0f2f8);border-radius:8px}.eGUBIq_dragging{opacity:.45;background:var(--dsw-alias-bg-layer-2,#f3f4f6)}.eGUBIq_collapseHead{font:inherit;color:var(--dsw-alias-label-primary,#1f2328);cursor:pointer;text-align:left;background:0 0;border:none;align-items:center;gap:8px;width:100%;padding:0;font-size:13px;font-weight:600;display:flex}.eGUBIq_collapseIcon{color:var(--dsw-alias-label-secondary,#6b7280);flex-shrink:0;display:inline-flex}.eGUBIq_collapseTitle{flex:1;min-width:0}.eGUBIq_collapseBody{border-top:1px solid var(--dsw-alias-border-l2,#f0f1f3);overflow-wrap:anywhere;flex-direction:column;gap:10px;min-width:0;margin-top:8px;padding-top:10px;display:flex}.eGUBIq_panelNote{color:var(--dsw-alias-label-secondary,#6b7280);margin:0;font-size:12px;line-height:18px}.eGUBIq_fixFallback{flex-direction:column;gap:6px;margin:8px 0;display:flex}.eGUBIq_fixFallbackText{box-sizing:border-box;width:100%;color:var(--dsw-alias-label-primary,#1f2328);background:var(--dsw-alias-bg-layer-2,#f3f4f6);border:1px solid var(--dsw-alias-border-l2,#e5e7eb);resize:vertical;white-space:pre-wrap;word-break:break-all;border-radius:6px;padding:8px 10px;font-family:ui-monospace,Menlo,monospace;font-size:11px;line-height:16px}.eGUBIq_setCard{border:1px solid var(--dsw-alias-border-l2,#e5e7eb);background:var(--dsw-alias-bg-layer-3,#fff);border-radius:12px;list-style:none;transition:border-color .16s,background .16s}.eGUBIq_setCard:hover{border-color:var(--dsw-alias-label-dimmed,#c8ccd4)}.eGUBIq_setCardOpen{background:var(--dsw-alias-bg-layer-2,#f7f8fa);border-color:var(--dsw-alias-label-dimmed,#c8ccd4)}.eGUBIq_setHeader{-webkit-appearance:none;appearance:none;width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer;background:0 0;border:0;border-radius:12px;align-items:center;gap:12px;padding:14px 16px;display:flex}.eGUBIq_setHeader:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,#4f6ef7);outline-offset:-2px}.eGUBIq_setHeadText{flex-direction:column;flex:1;gap:4px;min-width:0;display:flex}.eGUBIq_setName{color:var(--dsw-alias-label-primary,#1f2328);font-size:15px;font-weight:600;line-height:1.4}.eGUBIq_setDesc{color:var(--dsw-alias-label-tertiary,#8b93a1);font-size:13px;line-height:1.5}.eGUBIq_setChevron{color:var(--dsw-alias-label-tertiary,#8b93a1);flex:none;transition:transform .16s;display:inline-flex}.eGUBIq_setChevronOpen{transform:rotate(180deg)}.eGUBIq_setBody{border-top:1px solid var(--dsw-alias-border-l2,#e5e7eb);margin:0 16px;padding-bottom:8px}.eGUBIq_setRow{align-items:center;gap:12px;padding:12px 0;display:flex}.eGUBIq_setRow+.eGUBIq_setRow{border-top:1px solid var(--dsw-alias-border-l2,#e5e7eb)}.eGUBIq_setLabelBox{flex-direction:column;flex:1;gap:3px;min-width:0;display:flex}.eGUBIq_setLabel{font-size:13px;line-height:20px}.eGUBIq_setHint{color:var(--dsw-alias-label-tertiary,#8b93a1);font-size:12px;line-height:18px}.eGUBIq_setConfirm{border-top:1px solid var(--dsw-alias-border-l2,#e5e7eb);flex-direction:column;gap:8px;padding:12px 0 4px;display:flex}.eGUBIq_setCheck{cursor:pointer;align-items:center;gap:8px;font-size:12px;line-height:18px;display:flex}.eGUBIq_setActions{border-top:1px solid var(--dsw-alias-border-l2,#e5e7eb);justify-content:flex-end;align-items:center;gap:8px;padding:12px 0 4px;display:flex}.eGUBIq_setDanger{color:var(--dsw-alias-state-error-primary,#dc2626)}.eGUBIq_setSeg{border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:8px;flex-shrink:0;gap:2px;padding:2px;display:inline-flex}.eGUBIq_setSegBtn{font:inherit;color:var(--dsw-alias-label-secondary,#6b7280);cursor:pointer;background:0 0;border:none;border-radius:6px;padding:3px 10px;font-size:12px;line-height:18px}.eGUBIq_setSegBtn:disabled{cursor:default;opacity:.5}.eGUBIq_setSegOn{background:var(--dsw-alias-bg-layer-2,#eef0f4);color:var(--dsw-alias-label-primary,#1f2328);font-weight:600}.eGUBIq_setBetaTag{background:var(--dsw-alias-bg-module-platform,#eef0f4);color:var(--dsw-alias-label-secondary,#6b7280);border-radius:9px;margin-left:6px;padding:0 6px;font-size:11px;font-weight:600;line-height:17px}";
-		const tagId = "dshmarket/Market.module.css";
+		//#region \0dsh-css:src/client/Market.module.css.mjs
+		const css = ".YvpMoq_root{min-width:0;height:100%;color:var(--dsw-alias-label-primary,#1f2328);flex-direction:column;display:flex;position:relative}.YvpMoq_head{flex-direction:column;gap:12px;padding:4px 4px 6px;display:flex}.YvpMoq_title{margin:0;font-size:16px;font-weight:500;line-height:24px}.YvpMoq_sub{color:var(--dsw-alias-label-tertiary,#8b93a1);align-items:center;gap:8px;margin:0;font-size:12px;line-height:18px;display:flex}.YvpMoq_submitLink{color:var(--dsw-alias-label-tertiary,#8b93a1);white-space:nowrap;font-size:11px;line-height:18px;text-decoration:none}.YvpMoq_submitLink:hover{color:var(--dsw-alias-brand-primary,#4f6ef7);text-decoration:underline}.YvpMoq_tabs{border-bottom:1px solid var(--dsw-alias-border-l2,#e5e7eb);align-items:flex-end;gap:2px;display:flex}.YvpMoq_tab{font:inherit;color:var(--dsw-alias-label-secondary,#6b7280);cursor:pointer;white-space:nowrap;background:0 0;border:none;border-bottom:2px solid #0000;padding:7px 12px;font-size:13px}.YvpMoq_tab.YvpMoq_on{color:var(--dsw-alias-brand-primary,#4f6ef7);border-bottom-color:var(--dsw-alias-brand-primary,#4f6ef7);font-weight:600}.YvpMoq_subTabs{align-items:flex-end;gap:2px;margin:-4px 0 4px;display:flex}.YvpMoq_banner{background:var(--dsw-alias-bg-layer-2,#fdf3e3);border:1px solid var(--dsw-alias-border-l2,#f3e3c3);border-radius:8px;align-items:center;gap:8px;margin:0;padding:8px 12px;font-size:12px;display:flex}.YvpMoq_bannerIcon{color:var(--dsw-alias-label-secondary,#6b7280);flex-shrink:0}.YvpMoq_restartIconButton{width:22px;height:22px;color:var(--dsw-alias-label-secondary,#6b7280);cursor:pointer;background:0 0;border:0;border-radius:6px;flex-shrink:0;justify-content:center;align-items:center;padding:0;display:inline-flex}.YvpMoq_restartIconButton:hover:not(:disabled){color:var(--dsw-alias-label-primary,#1f2328);background:var(--dsw-alias-interactive-bg-hover,#1f232814)}.YvpMoq_restartIconButton:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,#4f6ef7);outline-offset:1px}.YvpMoq_restartIconButton:disabled{opacity:.45;cursor:not-allowed}.YvpMoq_bannerHint{color:var(--dsw-alias-label-tertiary,#8b93a1);cursor:help;display:inline-flex}.YvpMoq_body{flex:1;padding:12px 4px 24px;overflow-x:hidden;overflow-y:auto}.YvpMoq_topNotices{flex-direction:column;gap:8px;padding:0 4px 6px;display:flex}.YvpMoq_topNotices:empty{display:none}.YvpMoq_contextNotices{flex-direction:column;gap:8px;padding:0 4px 8px;display:flex}.YvpMoq_contextNotices:empty{display:none}.YvpMoq_envRepairError{border:1px solid var(--dsw-alias-state-error-border,#fecaca);background:var(--dsw-alias-state-error-bg,#fef2f2);color:var(--dsw-alias-state-error-primary,#dc2626);white-space:pre-wrap;overflow-wrap:anywhere;border-radius:8px;padding:10px 12px;font-size:12px;line-height:18px}.YvpMoq_stickyHead{z-index:5;background:var(--dsw-alias-bg-layer-2,#f7f8fa);position:sticky;top:-1px}.YvpMoq_stickyHead:before{content:\"\";background:inherit;pointer-events:none;height:14px;position:absolute;bottom:100%;left:0;right:0}.YvpMoq_cats{margin:0 -4px 2px;padding:12px 4px 4px}.YvpMoq_catsRow{align-items:flex-start;gap:8px;display:flex;position:relative}.YvpMoq_star{color:var(--dsw-alias-label-secondary,#9ca3af);white-space:nowrap;flex:none;font-size:11px}.YvpMoq_top{z-index:20;display:inline-flex;position:absolute;bottom:18px;right:18px}.YvpMoq_topBtn{border-radius:99px;width:38px;height:38px;padding:0}.YvpMoq_tag{border:1px solid var(--dsw-alias-border-l3,#d9dde3);color:var(--dsw-alias-label-secondary,#6b7280);border-radius:4px;flex-shrink:0;padding:1px 6px;font-size:11px;line-height:16px}.YvpMoq_okState{color:var(--dsw-alias-state-success-primary,#16a34a);white-space:nowrap;font-size:12px;font-weight:600}.YvpMoq_catsWrap{flex-wrap:wrap;flex:1;align-items:center;gap:6px;min-width:0;display:flex}.YvpMoq_catsCollapsed{max-height:62px;overflow:hidden}.YvpMoq_catsToggle.YvpMoq_catsToggle{height:26px;min-height:26px;color:var(--dsw-alias-label-secondary,#6b7280);padding:0 6px}.YvpMoq_shots{-webkit-overflow-scrolling:touch;scrollbar-width:thin;gap:8px;margin:6px 0 8px;padding:2px 0 6px;display:flex;overflow-x:auto}.YvpMoq_shot{object-fit:cover;border:1px solid var(--dsw-alias-border-default,#e5e7eb);background:var(--dsw-alias-bg-layer-2,#f3f4f6);cursor:pointer;border-radius:8px;flex:none;width:220px;height:150px}.YvpMoq_cardShots{-webkit-overflow-scrolling:touch;scrollbar-width:thin;gap:6px;margin:0 0 6px;padding:0 0 2px;display:flex;overflow-x:auto}.YvpMoq_cardShot{object-fit:contain;border:1px solid var(--dsw-alias-border-default,#e5e7eb);background:var(--dsw-alias-bg-layer-2,#f3f4f6);cursor:pointer;border-radius:8px;flex:none;width:132px;height:88px;display:block}.YvpMoq_lightbox{z-index:10000;cursor:zoom-out;background:#000000d9;justify-content:center;align-items:center;display:flex;position:fixed;top:0;bottom:0;left:0;right:0}.YvpMoq_lightboxImg{object-fit:contain;cursor:default;border-radius:4px;max-width:90vw;max-height:85vh}.YvpMoq_lightboxClose{color:#fff;cursor:pointer;background:#ffffff1f;border:none;border-radius:99px;place-items:center;width:36px;height:36px;font-size:22px;line-height:1;display:grid;position:absolute;top:16px;right:16px}.YvpMoq_lightboxClose:hover{background:#ffffff38}.YvpMoq_lightboxNav{color:#fff;cursor:pointer;background:#ffffff1f;border:none;border-radius:99px;place-items:center;width:44px;height:44px;display:grid;position:absolute;top:50%;transform:translateY(-50%)}.YvpMoq_lightboxNav:hover{background:#ffffff38}.YvpMoq_lightboxPrev{left:16px}.YvpMoq_lightboxNext{right:16px}.YvpMoq_lightboxDots{gap:8px;display:flex;position:absolute;bottom:20px;left:50%;transform:translate(-50%)}.YvpMoq_lightboxDot{cursor:pointer;background:#fff6;border-radius:99px;width:7px;height:7px}.YvpMoq_lightboxDotOn{background:#fff}.YvpMoq_cmd{background:var(--dsw-alias-bg-layer-2,#f3f4f6);word-break:break-all;border-radius:6px;margin:8px 0 0;padding:8px 10px;font-family:ui-monospace,Menlo,monospace;font-size:11px;line-height:18px}.YvpMoq_warnLine{color:var(--dsw-alias-state-warn-primary,#b45309);flex-wrap:wrap;align-items:center;gap:4px;margin:0;font-size:12px;font-weight:600;line-height:18px;display:flex}.YvpMoq_modalNote{color:var(--dsw-alias-label-tertiary,#8b93a1);align-items:center;gap:4px;margin:12px 0 0;font-size:12px;line-height:18px;display:flex}.YvpMoq_grid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:10px;display:grid}.YvpMoq_masonry{align-items:flex-start;gap:10px;display:flex}.YvpMoq_masonryCol{flex-direction:column;flex:1;gap:10px;min-width:0;display:flex}.YvpMoq_masonry>.YvpMoq_masonryCol>*{align-self:stretch;min-width:0}@media (max-width:680px){.YvpMoq_masonry{flex-direction:column}}.YvpMoq_pairGrid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:10px;display:grid}@media (max-width:680px){.YvpMoq_grid,.YvpMoq_pairGrid{grid-template-columns:minmax(0,1fr)}}.YvpMoq_swatches{border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:8px;gap:0;height:34px;display:flex;overflow:hidden}.YvpMoq_themesGrid{margin-bottom:12px}.YvpMoq_swatches i{flex:1}.YvpMoq_card{background:var(--dsw-alias-bg-layer-1,#fff);border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:12px;flex-direction:column;align-self:start;gap:12px;padding:12px 14px;display:flex}.YvpMoq_row1{align-items:flex-start;gap:10px;min-width:0;display:flex}.YvpMoq_cardAction{flex-shrink:0;align-items:center;display:inline-flex}.YvpMoq_installBtn.YvpMoq_installBtn{min-width:64px}.YvpMoq_av{color:#fff;object-fit:cover;background:var(--dsw-alias-bg-layer-2,#f3f4f6);border-radius:50%;flex-shrink:0;place-items:center;width:16px;height:16px;font-size:9px;font-weight:700;display:grid}.YvpMoq_nm{text-overflow:ellipsis;white-space:nowrap;font-size:15px;font-weight:600;line-height:22px;overflow:hidden}.YvpMoq_nmLink{color:inherit;text-decoration:none;display:block}.YvpMoq_nmLink:hover{color:var(--dsw-alias-brand-primary,#4f6ef7);text-decoration:underline}.YvpMoq_byline{flex-wrap:wrap;align-items:center;gap:6px;min-width:0;margin-top:2px;display:flex}.YvpMoq_meta{color:var(--dsw-alias-label-secondary,#9ca3af);margin-top:2px;font-size:11px}.YvpMoq_metaInline{color:var(--dsw-alias-label-secondary,#9ca3af);font-size:11px}.YvpMoq_owner{color:var(--dsw-alias-label-secondary,#9ca3af);text-overflow:ellipsis;white-space:nowrap;flex:0 auto;min-width:44px;font-size:11px;overflow:hidden}.YvpMoq_desc{color:var(--dsw-alias-label-tertiary,#8b93a1);margin:0;font-size:12px;line-height:18px}.YvpMoq_descClamp{-webkit-line-clamp:5;-webkit-box-orient:vertical;display:-webkit-box;overflow:hidden}.YvpMoq_descToggle{width:20px;height:16px;color:var(--dsw-alias-label-tertiary,#8b93a1);cursor:pointer;background:0 0;border:none;justify-content:center;align-items:center;margin-top:2px;padding:0;display:flex}.YvpMoq_descToggle:hover{color:var(--dsw-alias-brand-primary,#4f6ef7)}.YvpMoq_foot{flex-wrap:wrap;align-items:center;gap:8px;display:flex}.YvpMoq_foot .YvpMoq_metaInline,.YvpMoq_foot .YvpMoq_src{white-space:nowrap}.YvpMoq_grow{flex:1}.YvpMoq_titleRow{align-items:center;gap:10px;display:flex}.YvpMoq_version{color:var(--dsw-alias-label-tertiary,#8b93a1);font-variant-numeric:tabular-nums;flex-shrink:0;font-size:12px;line-height:20px}.YvpMoq_repoLink{color:var(--dsw-alias-label-tertiary,#8b93a1);flex-shrink:0;font-size:12px;line-height:20px;text-decoration:none}.YvpMoq_repoLink:hover{color:var(--dsw-alias-brand-primary,#4f6ef7)}.YvpMoq_descTight{min-height:0}.YvpMoq_src{color:var(--dsw-alias-label-secondary,#9ca3af);font-size:11px;text-decoration:none}.YvpMoq_src:hover{color:var(--dsw-alias-brand-primary,#4f6ef7)}.YvpMoq_dot{vertical-align:2px;margin-left:5px}.YvpMoq_act{flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px;font-size:11px;display:flex}.YvpMoq_actLive{color:var(--dsw-alias-state-success-primary,#16a34a);align-items:center;gap:4px;font-weight:600;display:inline-flex}.YvpMoq_actWarn{color:var(--dsw-alias-state-warn-primary,#b45309);align-items:center;gap:4px;font-weight:600;display:inline-flex}.YvpMoq_actBroken{color:var(--dsw-alias-state-error-primary,#dc2626);align-items:center;gap:4px;font-weight:600;display:inline-flex}.YvpMoq_actWhy{color:var(--dsw-alias-label-secondary,#6b7280);margin-top:2px}.YvpMoq_loading{color:var(--dsw-alias-label-secondary,#9ca3af);flex-direction:column;align-items:center;gap:12px;padding:48px;font-size:13px;display:flex}.YvpMoq_spin{color:var(--dsw-alias-brand-primary,#4f6ef7);flex-shrink:0;animation:.8s linear infinite YvpMoq_sp;display:inline-flex}.YvpMoq_logoMark{color:var(--dsw-alias-brand-primary,#4f6ef7);flex-shrink:0;display:inline-flex}.YvpMoq_logoPlug{transform-box:fill-box;transform-origin:50%;animation:1.5s cubic-bezier(.4,0,.2,1) infinite YvpMoq_dshmPlug}@keyframes YvpMoq_dshmPlug{0%,12%{transform:rotate(9deg)}45%,62%{transform:translate(-1.28px,1.27px)rotate(0)}95%,to{transform:rotate(9deg)}}@media (prefers-reduced-motion:reduce){.YvpMoq_logoPlug,.YvpMoq_spin{animation:1.5s ease-in-out infinite YvpMoq_dshmPlugFade}}@keyframes YvpMoq_dshmPlugFade{0%,to{opacity:1}50%{opacity:.35}}@keyframes YvpMoq_sp{to{transform:rotate(360deg)}}.YvpMoq_progress{background:var(--dsw-alias-bg-layer-2,#f3f4f6);border:1px solid var(--dsw-alias-border-l2,#e5e7eb);color:var(--dsw-alias-label-secondary,#6b7280);border-radius:8px;flex-wrap:wrap;align-items:center;gap:9px;margin:0;padding:8px 12px;font-size:12px;display:flex}.YvpMoq_bar{background:var(--dsw-alias-border-l1,#e5e7eb);border-radius:99px;width:100%;height:4px;overflow:hidden}.YvpMoq_barFill{background:var(--dsw-alias-brand-primary,#4f6ef7);border-radius:99px;height:100%;transition:width .6s}.YvpMoq_barWave{width:30%;animation:1.2s ease-in-out infinite YvpMoq_dshmSlide}@keyframes YvpMoq_dshmSlide{0%{margin-left:-30%}to{margin-left:100%}}.YvpMoq_irow .YvpMoq_progress{margin-top:8px}.YvpMoq_progress code{text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,Menlo,monospace;font-size:11px;overflow:hidden}.YvpMoq_empty{color:var(--dsw-alias-label-secondary,#9ca3af);text-align:center;padding:32px;font-size:13px}.YvpMoq_err{color:var(--dsw-alias-state-error-primary,#dc2626);white-space:pre-wrap;word-break:break-all;margin:8px 0;font-size:12px}.YvpMoq_cardBlocked{border-color:var(--dsw-alias-state-error-primary,#dc2626)}.YvpMoq_conflictHead{align-items:flex-start;gap:8px;display:flex}.YvpMoq_conflictIcon{color:var(--dsw-alias-state-error-primary,#dc2626);flex-shrink:0;margin-top:1px}.YvpMoq_conflictTitle{color:var(--dsw-alias-state-error-primary,#dc2626);font-size:13px;font-weight:600;line-height:18px}.YvpMoq_conflictBody{margin:0;font-size:12px;line-height:19px}.YvpMoq_roster{background:var(--dsw-alias-border-l2,#e5e7eb);border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:8px;flex-direction:column;gap:1px;display:flex;overflow:hidden}.YvpMoq_rosterRow{background:var(--dsw-alias-bg-layer-1,#fff);align-items:center;gap:8px;padding:7px 10px;display:flex}.YvpMoq_rosterMain{flex-direction:column;min-width:0;display:flex}.YvpMoq_rosterName{text-overflow:ellipsis;white-space:nowrap;min-width:0;font-size:12px;font-weight:600;overflow:hidden}.YvpMoq_rosterAuthor{color:var(--dsw-alias-label-secondary,#9ca3af);text-overflow:ellipsis;white-space:nowrap;font-size:10.5px;overflow:hidden}.YvpMoq_rosterTag{border-radius:4px;flex-shrink:0;margin-left:auto;padding:1px 6px;font-size:10.5px;font-weight:600}.YvpMoq_rosterTagKeep{color:var(--dsw-alias-state-success-primary,#16a34a);background:#16a34a1f}.YvpMoq_rosterTagDrop{color:var(--dsw-alias-state-error-primary,#dc2626);background:#dc26261f}.YvpMoq_rosterRowOut .YvpMoq_rosterName{text-decoration:line-through}.YvpMoq_rosterRowOut{opacity:.62}.YvpMoq_rosterSplit{background:var(--dsw-alias-border-l2,#e5e7eb);height:1px}.YvpMoq_reassure{color:var(--dsw-alias-label-secondary,#6b7280);align-items:center;gap:5px;margin:0;font-size:11.5px;line-height:17px;display:flex}.YvpMoq_reassureOk{color:var(--dsw-alias-state-success-primary,#16a34a);flex-shrink:0}.YvpMoq_conflictWhy{color:var(--dsw-alias-label-tertiary,#8b93a1);overflow-wrap:anywhere;margin-top:2px;font-family:ui-monospace,Menlo,monospace;font-size:11px;line-height:17px}.YvpMoq_conflictWhyText{margin-top:5px;font-family:-apple-system,BlinkMacSystemFont,PingFang SC,sans-serif}.YvpMoq_choices{flex-direction:column;gap:7px;display:flex}.YvpMoq_choice{text-align:left;font:inherit;cursor:pointer;background:var(--dsw-alias-bg-layer-1,#fff);border:1px solid var(--dsw-alias-border-l3,#d9dde3);border-radius:9px;align-items:flex-start;gap:9px;padding:9px 11px;display:flex}.YvpMoq_choice:has(input:disabled){cursor:default;opacity:.6}.YvpMoq_choiceOn{border-color:var(--dsw-alias-brand-primary,#4f6ef7);background:var(--dsw-alias-bg-layer-2,#f5f7ff)}.YvpMoq_choiceRadio{width:13px;height:13px;accent-color:var(--dsw-alias-brand-primary,#4f6ef7);flex-shrink:0;margin:2px 0 0}.YvpMoq_choiceMain{flex-direction:column;gap:3px;min-width:0;display:flex}.YvpMoq_choiceTitle{font-size:12px;font-weight:600;line-height:17px}.YvpMoq_choiceNote{color:var(--dsw-alias-label-tertiary,#8b93a1);font-size:11px;line-height:16px}.YvpMoq_choiceSafe{color:var(--dsw-alias-state-success-primary,#16a34a)}.YvpMoq_stateTag{white-space:nowrap;background:var(--dsw-alias-bg-layer-2,#f3f4f6);min-height:20px;color:var(--dsw-alias-label-secondary,#6b7280);border-radius:5px;flex-shrink:0;align-items:center;gap:5px;padding:1px 7px;font-size:11px;line-height:16px;display:inline-flex}.YvpMoq_stateTag[data-on=true]{color:var(--dsw-alias-state-success-primary,#16a34a);background:color-mix(in srgb, var(--dsw-alias-state-success-primary,#16a34a) 10%, transparent)}.YvpMoq_stateDot{background:var(--dsw-alias-label-tertiary,#8b93a1);border-radius:999px;flex:none;width:6px;height:6px}.YvpMoq_stateDot[data-on=true]{background:var(--dsw-alias-state-success-primary,#16a34a)}.YvpMoq_metaTag{text-overflow:ellipsis;white-space:nowrap;background:var(--dsw-alias-bg-layer-2,#f3f4f6);min-width:0;max-width:100%;min-height:20px;color:var(--dsw-alias-label-tertiary,#8b93a1);border-radius:5px;flex-shrink:1;padding:1px 7px;font-size:11px;line-height:18px;display:inline-block;overflow:hidden}.YvpMoq_metaTagOk{color:var(--dsw-alias-state-success-primary,#16a34a);background:color-mix(in srgb, var(--dsw-alias-state-success-primary,#16a34a) 10%, transparent)}.YvpMoq_nameLink{color:inherit;text-decoration:none}.YvpMoq_nameLink:hover{color:var(--dsw-alias-brand-primary,#4f6ef7);text-decoration:underline}.YvpMoq_opWrap{flex-shrink:0;display:inline-flex;position:relative}.YvpMoq_opEntry{font:inherit;cursor:pointer;white-space:nowrap;color:var(--dsw-alias-label-primary,#1f2328);background:var(--dsw-alias-bg-layer-1,#fff);border:1px solid var(--dsw-alias-border-l3,#d9dde3);border-radius:7px;align-items:center;gap:6px;padding:4px 10px;font-size:12px;display:inline-flex;position:relative}.YvpMoq_opEntryQuiet{color:var(--dsw-alias-label-secondary,#6b7280);background:0 0;border-color:#0000}.YvpMoq_opEntryAlert{border-color:var(--dsw-alias-state-error-primary,#dc2626);color:var(--dsw-alias-state-error-primary,#dc2626)}.YvpMoq_opDot{background:var(--dsw-alias-state-error-primary,#dc2626);border-radius:99px;width:8px;height:8px;position:absolute;top:-3px;right:-3px}.YvpMoq_opPanel{z-index:40;background:var(--dsw-alias-bg-layer-1,#fff);border:1px solid var(--dsw-alias-border-l3,#d9dde3);border-radius:12px;width:460px;max-width:86vw;max-height:70vh;position:absolute;top:calc(100% + 6px);right:0;overflow-y:auto;box-shadow:0 20px 52px #00000047}.YvpMoq_opHead{border-bottom:1px solid var(--dsw-alias-border-l2,#e5e7eb);align-items:center;gap:8px;padding:9px 14px;display:flex}.YvpMoq_opPanelTitle{font-size:12.5px;font-weight:600}.YvpMoq_opCloseBtn.YvpMoq_opCloseBtn{min-width:0;color:var(--dsw-alias-label-secondary,#6b7280);padding:0 6px}.YvpMoq_opAggregate{border-bottom:1px solid var(--dsw-alias-border-l2,#e5e7eb);background:var(--dsw-alias-bg-layer-2,#f7f8fa);padding:9px 14px}.YvpMoq_opAggregateTop{font-variant-numeric:tabular-nums;font-size:12px;font-weight:600}.YvpMoq_opAggregateHint{color:var(--dsw-alias-label-tertiary,#8b93a1);margin-top:4px;font-size:10.5px}.YvpMoq_opRow{border-bottom:1px solid var(--dsw-alias-border-l2,#e5e7eb);align-items:flex-start;gap:9px;padding:9px 14px;display:flex}.YvpMoq_opRow:last-child{border-bottom:none}.YvpMoq_opRowAlert{background:#dc26260f}.YvpMoq_opIcon{flex-shrink:0;place-items:center;width:14px;margin-top:1px;display:grid}.YvpMoq_opQueuedIcon{color:var(--dsw-alias-label-tertiary,#8b93a1);font-size:12px}.YvpMoq_opMain{flex-direction:column;flex:1;gap:3px;min-width:0;display:flex}.YvpMoq_opTop{align-items:baseline;gap:6px;min-width:0;display:flex}.YvpMoq_opVerb{color:var(--dsw-alias-label-secondary,#6b7280);flex-shrink:0;font-size:12px}.YvpMoq_opName{text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600;overflow:hidden}.YvpMoq_opStatus{color:var(--dsw-alias-label-tertiary,#8b93a1);overflow-wrap:anywhere;font-size:10.5px;line-height:16px}.YvpMoq_opStatusBad{color:var(--dsw-alias-state-error-primary,#dc2626)}.YvpMoq_opActions{flex-shrink:0;align-items:center;gap:6px;margin-top:1px;display:flex}.YvpMoq_opDecision{border-top:1px dashed var(--dsw-alias-border-l2,#e5e7eb);flex-direction:column;gap:8px;margin-top:8px;padding-top:8px;display:flex}.YvpMoq_opDecisionFoot{align-items:center;gap:8px;display:flex}.YvpMoq_conflictDetailsToggle{font:inherit;cursor:pointer;color:var(--dsw-alias-label-tertiary,#8b93a1);background:0 0;border:none;align-items:center;gap:4px;padding:2px 0;font-size:11px;display:inline-flex}.YvpMoq_conflictDetailsToggle:hover{color:var(--dsw-alias-label-secondary,#6b7280)}.YvpMoq_opEmpty{text-align:center;color:var(--dsw-alias-label-secondary,#6b7280);padding:30px 14px;font-size:12px}.YvpMoq_opEmptyHint{color:var(--dsw-alias-label-tertiary,#8b93a1);margin-top:4px;font-size:11px}.YvpMoq_cardBlockedMark{font:inherit;cursor:pointer;color:var(--dsw-alias-state-error-primary,#dc2626);border:1px solid var(--dsw-alias-state-error-primary,#dc2626);background:#dc262614;border-radius:7px;align-items:center;gap:5px;padding:4px 9px;font-size:11px;display:inline-flex}.YvpMoq_dangerBtn.YvpMoq_dangerBtn{color:var(--dsw-alias-state-error-primary,#dc2626);border-color:var(--dsw-alias-state-error-primary,#dc2626)}.YvpMoq_dangerBtn.YvpMoq_dangerBtn:hover:not(:disabled){background:var(--dsw-alias-state-error-primary,#dc2626);color:#fff}.YvpMoq_dangerArmed.YvpMoq_dangerArmed{background:var(--dsw-alias-state-error-primary,#dc2626);border-color:var(--dsw-alias-state-error-primary,#dc2626);color:#fff}.YvpMoq_retryBtn{margin-top:4px}.YvpMoq_irow{background:var(--dsw-alias-bg-layer-1,#fff);border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:10px;flex-direction:column;gap:10px;min-width:0;padding:12px 14px;display:flex}.YvpMoq_irowActions{flex-wrap:wrap;justify-content:flex-start;align-items:center;gap:8px;min-width:0;display:flex}.YvpMoq_irowMissing{filter:grayscale();opacity:.5}.YvpMoq_irow>.YvpMoq_src,.YvpMoq_irow>.YvpMoq_owner,.YvpMoq_irow button{white-space:nowrap;flex-shrink:0}.YvpMoq_tabSearchRow{padding:0 4px 6px;display:flex}.YvpMoq_tabSearch{width:100%}.YvpMoq_spec{color:var(--dsw-alias-label-secondary,#9ca3af);overflow-wrap:anywhere;min-width:0;font-family:ui-monospace,Menlo,monospace;font-size:11px}.YvpMoq_specTag{white-space:nowrap;border-radius:4px;flex-shrink:0;align-items:center;height:16px;padding:0 5px;font-size:10px;font-weight:600;display:inline-flex}.YvpMoq_specTagGit{color:#0b7285;background:#12a3c41f}.YvpMoq_specTagFile{color:#b07d1b;background:#f0b42924}.YvpMoq_backupCheckList .YvpMoq_grow{white-space:nowrap;text-overflow:ellipsis;flex:70%;min-width:0;overflow:hidden}.YvpMoq_backupCheckList .YvpMoq_spec{text-align:right;white-space:nowrap;text-overflow:ellipsis;flex:0 30%;max-width:30%;overflow:hidden}.YvpMoq_staleAction{margin-top:8px}.YvpMoq_pct{color:var(--dsw-alias-label-secondary,#6b7280);flex-shrink:0;font-size:11px;font-weight:600}.YvpMoq_pager{flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;margin:16px 0 4px;display:flex}.YvpMoq_pagerPages{flex-wrap:wrap;flex:1;justify-content:center;align-items:center;gap:6px;min-width:0;display:flex}.YvpMoq_pageEllipsis{color:var(--dsw-alias-label-secondary,#9ca3af);padding:0 2px;font-size:12px}.YvpMoq_pageInfo{color:var(--dsw-alias-label-secondary,#6b7280);white-space:nowrap;font-size:12px}.YvpMoq_depBadge{border:1px solid var(--dsw-alias-state-warn-primary,#b45309);color:var(--dsw-alias-state-warn-primary,#b45309);white-space:nowrap;border-radius:4px;flex-shrink:0;margin-left:6px;padding:1px 6px;font-size:11px;font-weight:600;line-height:16px}.YvpMoq_deprecate{color:var(--dsw-alias-state-warn-primary,#b45309);background:var(--dsw-alias-bg-layer-2,#fdf3e3);border:1px solid var(--dsw-alias-border-l2,#f3e3c3);border-radius:8px;margin:0;padding:8px 10px;font-size:12px;line-height:18px}.YvpMoq_deprecate a{color:var(--dsw-alias-state-warn-primary,#b45309);text-decoration:underline}.YvpMoq_deprecate .YvpMoq_src{margin-left:8px}.YvpMoq_depLine{flex-wrap:wrap;align-items:center;gap:8px;display:flex}.YvpMoq_switch{border:1px solid var(--dsw-alias-border-l2,#d9dde3);background:var(--dsw-alias-bg-layer-2,#e5e7eb);cursor:pointer;border-radius:99px;flex-shrink:0;width:38px;height:22px;padding:0;transition:background .15s,border-color .15s;position:relative}.YvpMoq_switchOn{background:var(--dsw-alias-state-success-primary,#16a34a);border-color:var(--dsw-alias-state-success-primary,#16a34a)}.YvpMoq_switchMixed{background:var(--dsw-alias-state-warn-primary,#b45309);border-color:var(--dsw-alias-state-warn-primary,#b45309)}.YvpMoq_switchKnob{background:#fff;border-radius:99px;width:16px;height:16px;transition:left .15s;position:absolute;top:2px;left:2px;box-shadow:0 1px 2px #00000040}.YvpMoq_switchOn .YvpMoq_switchKnob,.YvpMoq_switchMixed .YvpMoq_switchKnob{left:18px}.YvpMoq_switch:disabled{opacity:.5;cursor:default}.YvpMoq_viewBar{border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:8px;align-items:center;gap:2px;width:fit-content;margin-bottom:12px;padding:2px;display:flex}.YvpMoq_viewBtn{font:inherit;color:var(--dsw-alias-label-secondary,#6b7280);cursor:pointer;white-space:nowrap;background:0 0;border:none;border-radius:6px;padding:4px 10px;font-size:12px;line-height:18px}.YvpMoq_viewBtn:hover{color:var(--dsw-alias-brand-primary,#4f6ef7)}.YvpMoq_viewOn{background:var(--dsw-alias-bg-layer-2,#eef0f4);color:var(--dsw-alias-label-primary,#1f2328);font-weight:600}.YvpMoq_groupRow{background:var(--dsw-alias-bg-layer-1,#fff);border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:12px;margin-bottom:10px;padding:12px 14px}.YvpMoq_groupHead{align-items:center;gap:10px;min-width:0;display:flex}.YvpMoq_groupName{text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600;line-height:20px;overflow:hidden}.YvpMoq_groupActions{flex-shrink:0;align-items:center;gap:6px;display:flex}.YvpMoq_groupMembers{flex-direction:column;gap:6px;margin-top:10px;display:flex}.YvpMoq_groupMember{background:var(--dsw-alias-bg-layer-2,#f7f8fa);border-radius:8px;align-items:center;gap:8px;padding:6px 8px;font-size:12px;line-height:18px;display:flex}.YvpMoq_groupMember .YvpMoq_nm{flex:1;min-width:0;font-size:12px}.YvpMoq_groupAddPanel{border-top:1px dashed var(--dsw-alias-border-l2,#e5e7eb);flex-direction:column;gap:6px;margin-top:10px;padding-top:10px;display:flex}.YvpMoq_groupCreate{align-items:center;gap:8px;margin-bottom:10px;display:flex}.YvpMoq_inlineInput{flex:1;min-width:120px}.YvpMoq_assignRow{flex-wrap:wrap;align-items:center;gap:8px;display:flex}.YvpMoq_assignSelect{border:1px solid var(--dsw-alias-border-l2,#e5e7eb);background:var(--dsw-alias-bg-layer-1,#fff);color:var(--dsw-alias-label-primary,#1f2328);font:inherit;border-radius:6px;padding:3px 6px;font-size:12px;line-height:18px}.YvpMoq_groupHint{color:var(--dsw-alias-label-tertiary,#8b93a1);font-size:11px}.YvpMoq_sectAction{color:var(--dsw-alias-label-secondary,#6b7280);align-items:center;gap:8px;margin:14px 2px 8px;font-size:12px;font-weight:600;display:flex}.YvpMoq_backupGrid{grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;display:grid}.YvpMoq_backupCard{background:var(--dsw-alias-bg-layer-1,#fff);border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:12px;flex-direction:column;gap:10px;padding:16px;display:flex}.YvpMoq_backupCard h3{margin:0;font-size:14px}.YvpMoq_backupCard p{color:var(--dsw-alias-label-secondary,#6b7280);margin:0;font-size:12px;line-height:18px}.YvpMoq_backupActions{flex-wrap:wrap;gap:8px;display:flex;position:relative}.YvpMoq_hiddenFile{opacity:0;pointer-events:none;width:1px;height:1px;position:absolute}.YvpMoq_backupInput{box-sizing:border-box;width:100%}.YvpMoq_backupCheck{cursor:pointer;align-items:center;gap:6px;font-size:12px;display:flex}.YvpMoq_backupWarn{margin:0;font-size:12px;line-height:18px;color:var(--dsw-alias-state-warn-primary,#b45309)!important}.YvpMoq_backupMessage{color:var(--dsw-alias-label-secondary,#6b7280);grid-column:1/-1;font-size:12px}.YvpMoq_backupCheckList{flex-direction:column;gap:6px;max-height:260px;margin:10px 0 4px;padding-right:4px;display:flex;overflow-y:auto}.YvpMoq_backupCheckList .YvpMoq_backupCheck{justify-content:space-between;gap:8px}.YvpMoq_diagPage{flex-direction:column;gap:12px;height:100%;min-height:0;display:flex;overflow-y:auto}.YvpMoq_diagSummary{background:var(--dsw-alias-bg-layer-1,#fff);border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:12px;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 14px;font-size:12px;display:flex}.YvpMoq_diagSummaryItem{color:var(--dsw-alias-label-secondary,#6b7280);white-space:nowrap;align-items:center;gap:6px;display:inline-flex}.YvpMoq_diagSummaryMeta{color:var(--dsw-alias-label-tertiary,#9ca3af);text-overflow:ellipsis;white-space:nowrap;max-width:320px;font-family:ui-monospace,Menlo,monospace;font-size:11px;overflow:hidden}.YvpMoq_diagSection{background:var(--dsw-alias-bg-layer-1,#fff);border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:12px;flex-direction:column;gap:8px;padding:12px 14px;display:flex}.YvpMoq_diagSection h3{color:var(--dsw-alias-label-primary,#1f2328);margin:0;font-size:13px;font-weight:600}.YvpMoq_diagCount{color:var(--dsw-alias-label-tertiary,#9ca3af);font-size:11px;font-weight:400}.YvpMoq_diagEmpty{color:var(--dsw-alias-label-secondary,#9ca3af);padding:8px 0;font-size:12px}.YvpMoq_diagBundle{border-top:1px solid var(--dsw-alias-border-l2,#f0f1f3);flex-direction:column;gap:6px;padding-top:8px;display:flex}.YvpMoq_diagBundle:first-of-type{border-top:none;padding-top:0}.YvpMoq_diagRow{flex-wrap:wrap;align-items:center;gap:8px;min-width:0;font-size:12px;line-height:18px;display:flex}.YvpMoq_diagMeta{align-items:baseline;gap:8px;min-width:0;font-size:12px;display:flex}.YvpMoq_diagKey{color:var(--dsw-alias-label-tertiary,#9ca3af);flex-shrink:0;min-width:64px;font-size:11px}.YvpMoq_diagVal{color:var(--dsw-alias-label-primary,#1f2328);overflow-wrap:anywhere;min-width:0;font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:500}.YvpMoq_diagIndex{background:var(--dsw-alias-bg-layer-2,#f3f4f6);min-width:18px;height:18px;color:var(--dsw-alias-label-secondary,#6b7280);border-radius:9px;flex-shrink:0;justify-content:center;align-items:center;font-size:11px;font-weight:600;display:inline-flex}.YvpMoq_diagArrow{color:var(--dsw-alias-label-tertiary,#9ca3af);flex-shrink:0;font-size:12px}.YvpMoq_diagBadgeOfficial{background:var(--dsw-alias-brand-primary,#4f6ef7);color:#fff;border-radius:9px;flex-shrink:0;align-items:center;height:18px;padding:0 8px;font-size:11px;font-weight:600;display:inline-flex}.YvpMoq_diagBadgeCommunity{background:var(--dsw-alias-bg-layer-2,#f3f4f6);height:18px;color:var(--dsw-alias-label-secondary,#6b7280);border-radius:9px;flex-shrink:0;align-items:center;padding:0 8px;font-size:11px;display:inline-flex}.YvpMoq_diagBadgeShadow{background:var(--dsw-alias-state-error-primary,#dc2626);color:#fff;border-radius:9px;flex-shrink:0;align-items:center;height:18px;padding:0 8px;font-size:11px;font-weight:600;display:inline-flex}.YvpMoq_diagList{flex-direction:column;gap:6px;display:flex}.YvpMoq_sectionOverview{color:var(--dsw-alias-label-tertiary,#8b93a1);text-overflow:ellipsis;white-space:nowrap;max-width:100%;padding:2px 0 6px;font-size:12px;line-height:18px;overflow:hidden}.YvpMoq_diagAlert{color:var(--dsw-alias-state-warn-primary,#b45309)}.YvpMoq_ovRow{background:var(--dsw-alias-bg-layer-2,#f7f8fa);border-radius:8px;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;padding:6px 10px;font-size:12px;line-height:18px;display:flex}.YvpMoq_ovArrow{color:var(--dsw-alias-label-tertiary,#9ca3af);flex-shrink:0;font-size:12px}.YvpMoq_ovByTag{background:var(--dsw-alias-brand-primary,#4f6ef7);color:#fff;text-overflow:ellipsis;white-space:nowrap;border-radius:9px;flex-shrink:0;align-items:center;max-width:260px;height:18px;padding:0 8px;font-size:11px;font-weight:600;display:inline-flex;overflow:hidden}.YvpMoq_ovFrom{color:var(--dsw-alias-label-secondary,#6b7280);text-overflow:ellipsis;white-space:nowrap;min-width:0;font-size:12px;overflow:hidden}.YvpMoq_orphRow{background:var(--dsw-alias-bg-layer-2,#f7f8fa);border-radius:8px;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;padding:6px 10px;font-size:12px;line-height:18px;display:flex}.YvpMoq_orphBadge{background:var(--dsw-alias-state-warn-primary,#b45309);color:#fff;white-space:nowrap;border-radius:9px;flex-shrink:0;align-items:center;height:18px;padding:0 8px;font-size:11px;font-weight:600;display:inline-flex}.YvpMoq_dragHandle{width:20px;height:20px;color:var(--dsw-alias-label-tertiary,#9ca3af);cursor:grab;-webkit-user-select:none;user-select:none;flex-shrink:0;justify-content:center;align-items:center;font-size:12px;line-height:20px;display:inline-flex}.YvpMoq_dragOver{outline:2px dashed var(--dsw-alias-brand-primary,#4f6ef7);outline-offset:2px;background:var(--dsw-alias-bg-layer-2,#f0f2f8);border-radius:8px}.YvpMoq_dragging{opacity:.45;background:var(--dsw-alias-bg-layer-2,#f3f4f6)}.YvpMoq_collapseHead{font:inherit;color:var(--dsw-alias-label-primary,#1f2328);cursor:pointer;text-align:left;background:0 0;border:none;align-items:center;gap:8px;width:100%;padding:0;font-size:13px;font-weight:600;display:flex}.YvpMoq_collapseIcon{color:var(--dsw-alias-label-secondary,#6b7280);flex-shrink:0;display:inline-flex}.YvpMoq_collapseTitle{flex:1;min-width:0}.YvpMoq_collapseBody{border-top:1px solid var(--dsw-alias-border-l2,#f0f1f3);overflow-wrap:anywhere;flex-direction:column;gap:10px;min-width:0;margin-top:8px;padding-top:10px;display:flex}.YvpMoq_panelNote{color:var(--dsw-alias-label-secondary,#6b7280);margin:0;font-size:12px;line-height:18px}.YvpMoq_fixFallback{flex-direction:column;gap:6px;margin:8px 0;display:flex}.YvpMoq_fixFallbackText{box-sizing:border-box;width:100%;color:var(--dsw-alias-label-primary,#1f2328);background:var(--dsw-alias-bg-layer-2,#f3f4f6);border:1px solid var(--dsw-alias-border-l2,#e5e7eb);resize:vertical;white-space:pre-wrap;word-break:break-all;border-radius:6px;padding:8px 10px;font-family:ui-monospace,Menlo,monospace;font-size:11px;line-height:16px}.YvpMoq_setCard{border:1px solid var(--dsw-alias-border-l2,#e5e7eb);background:var(--dsw-alias-bg-layer-3,#fff);border-radius:12px;list-style:none;transition:border-color .16s,background .16s}.YvpMoq_setCard:hover{border-color:var(--dsw-alias-label-dimmed,#c8ccd4)}.YvpMoq_setCardOpen{background:var(--dsw-alias-bg-layer-2,#f7f8fa);border-color:var(--dsw-alias-label-dimmed,#c8ccd4)}.YvpMoq_setHeader{-webkit-appearance:none;appearance:none;width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer;background:0 0;border:0;border-radius:12px;align-items:center;gap:12px;padding:14px 16px;display:flex}.YvpMoq_setHeader:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,#4f6ef7);outline-offset:-2px}.YvpMoq_setHeadText{flex-direction:column;flex:1;gap:4px;min-width:0;display:flex}.YvpMoq_setName{color:var(--dsw-alias-label-primary,#1f2328);font-size:15px;font-weight:600;line-height:1.4}.YvpMoq_setDesc{color:var(--dsw-alias-label-tertiary,#8b93a1);font-size:13px;line-height:1.5}.YvpMoq_setChevron{color:var(--dsw-alias-label-tertiary,#8b93a1);flex:none;transition:transform .16s;display:inline-flex}.YvpMoq_setChevronOpen{transform:rotate(180deg)}.YvpMoq_setBody{border-top:1px solid var(--dsw-alias-border-l2,#e5e7eb);margin:0 16px;padding-bottom:8px}.YvpMoq_setRow{align-items:center;gap:12px;padding:12px 0;display:flex}.YvpMoq_setRow+.YvpMoq_setRow{border-top:1px solid var(--dsw-alias-border-l2,#e5e7eb)}.YvpMoq_setLabelBox{flex-direction:column;flex:1;gap:3px;min-width:0;display:flex}.YvpMoq_setLabel{font-size:13px;line-height:20px}.YvpMoq_setHint{color:var(--dsw-alias-label-tertiary,#8b93a1);font-size:12px;line-height:18px}.YvpMoq_setConfirm{border-top:1px solid var(--dsw-alias-border-l2,#e5e7eb);flex-direction:column;gap:8px;padding:12px 0 4px;display:flex}.YvpMoq_setCheck{cursor:pointer;align-items:center;gap:8px;font-size:12px;line-height:18px;display:flex}.YvpMoq_setActions{border-top:1px solid var(--dsw-alias-border-l2,#e5e7eb);justify-content:flex-end;align-items:center;gap:8px;padding:12px 0 4px;display:flex}.YvpMoq_setDanger{color:var(--dsw-alias-state-error-primary,#dc2626)}.YvpMoq_setSeg{border:1px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:8px;flex-shrink:0;gap:2px;padding:2px;display:inline-flex}.YvpMoq_setSegBtn{font:inherit;color:var(--dsw-alias-label-secondary,#6b7280);cursor:pointer;background:0 0;border:none;border-radius:6px;padding:3px 10px;font-size:12px;line-height:18px}.YvpMoq_setSegBtn:disabled{cursor:default;opacity:.5}.YvpMoq_setSegOn{background:var(--dsw-alias-bg-layer-2,#eef0f4);color:var(--dsw-alias-label-primary,#1f2328);font-weight:600}.YvpMoq_setBetaTag{background:var(--dsw-alias-bg-module-platform,#eef0f4);color:var(--dsw-alias-label-secondary,#6b7280);border-radius:9px;margin-left:6px;padding:0 6px;font-size:11px;font-weight:600;line-height:17px}";
+		const tagId = "dsh-desktop-market/Market.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
 			const tag = document.createElement("style");
-			tag.dataset.plugin = "dshmarket";
+			tag.dataset.plugin = "dsh-desktop-market";
 			tag.dataset.pluginCss = tagId;
 			tag.textContent = css;
 			document.head.appendChild(tag);
 		}
 		var Market_module_css_default = {
-			"spec": "eGUBIq_spec",
-			"setDanger": "eGUBIq_setDanger",
-			"logoMark": "eGUBIq_logoMark",
-			"tabs": "eGUBIq_tabs",
-			"cardBlockedMark": "eGUBIq_cardBlockedMark",
-			"setHint": "eGUBIq_setHint",
-			"backupActions": "eGUBIq_backupActions",
-			"warnLine": "eGUBIq_warnLine",
-			"spin": "eGUBIq_spin",
-			"opDecisionFoot": "eGUBIq_opDecisionFoot",
-			"submitLink": "eGUBIq_submitLink",
-			"rosterName": "eGUBIq_rosterName",
-			"dragging": "eGUBIq_dragging",
-			"reassure": "eGUBIq_reassure",
-			"meta": "eGUBIq_meta",
-			"repoLink": "eGUBIq_repoLink",
-			"backupGrid": "eGUBIq_backupGrid",
-			"setName": "eGUBIq_setName",
-			"setSegBtn": "eGUBIq_setSegBtn",
-			"av": "eGUBIq_av",
-			"orphRow": "eGUBIq_orphRow",
-			"backupInput": "eGUBIq_backupInput",
-			"setBody": "eGUBIq_setBody",
-			"groupRow": "eGUBIq_groupRow",
-			"diagAlert": "eGUBIq_diagAlert",
-			"irow": "eGUBIq_irow",
-			"diagSummaryMeta": "eGUBIq_diagSummaryMeta",
-			"modalNote": "eGUBIq_modalNote",
-			"orphBadge": "eGUBIq_orphBadge",
-			"backupMessage": "eGUBIq_backupMessage",
-			"card": "eGUBIq_card",
-			"setHeader": "eGUBIq_setHeader",
-			"setLabelBox": "eGUBIq_setLabelBox",
-			"root": "eGUBIq_root",
-			"opMain": "eGUBIq_opMain",
-			"rosterAuthor": "eGUBIq_rosterAuthor",
-			"choice": "eGUBIq_choice",
-			"sub": "eGUBIq_sub",
-			"diagSection": "eGUBIq_diagSection",
-			"backupCheck": "eGUBIq_backupCheck",
-			"pct": "eGUBIq_pct",
-			"opWrap": "eGUBIq_opWrap",
-			"owner": "eGUBIq_owner",
-			"grow": "eGUBIq_grow",
-			"conflictWhyText": "eGUBIq_conflictWhyText",
-			"nameLink": "eGUBIq_nameLink",
-			"progress": "eGUBIq_progress",
-			"nm": "eGUBIq_nm",
-			"specTag": "eGUBIq_specTag",
-			"setConfirm": "eGUBIq_setConfirm",
-			"groupActions": "eGUBIq_groupActions",
-			"lightboxClose": "eGUBIq_lightboxClose",
-			"pager": "eGUBIq_pager",
-			"topBtn": "eGUBIq_topBtn",
-			"byline": "eGUBIq_byline",
-			"setBetaTag": "eGUBIq_setBetaTag",
-			"diagVal": "eGUBIq_diagVal",
-			"conflictIcon": "eGUBIq_conflictIcon",
-			"setSeg": "eGUBIq_setSeg",
-			"rosterMain": "eGUBIq_rosterMain",
-			"diagBadgeOfficial": "eGUBIq_diagBadgeOfficial",
-			"ovByTag": "eGUBIq_ovByTag",
-			"panelNote": "eGUBIq_panelNote",
-			"setHeadText": "eGUBIq_setHeadText",
-			"titleRow": "eGUBIq_titleRow",
-			"sectAction": "eGUBIq_sectAction",
-			"diagKey": "eGUBIq_diagKey",
-			"sectionOverview": "eGUBIq_sectionOverview",
-			"metaTagOk": "eGUBIq_metaTagOk",
-			"setRow": "eGUBIq_setRow",
-			"lightbox": "eGUBIq_lightbox",
-			"dshmPlug": "eGUBIq_dshmPlug",
-			"tag": "eGUBIq_tag",
-			"backupCheckList": "eGUBIq_backupCheckList",
-			"cardShots": "eGUBIq_cardShots",
-			"banner": "eGUBIq_banner",
-			"actBroken": "eGUBIq_actBroken",
-			"conflictDetailsToggle": "eGUBIq_conflictDetailsToggle",
-			"irowActions": "eGUBIq_irowActions",
-			"switchKnob": "eGUBIq_switchKnob",
-			"tabSearch": "eGUBIq_tabSearch",
-			"cardShot": "eGUBIq_cardShot",
-			"tabSearchRow": "eGUBIq_tabSearchRow",
-			"lightboxNav": "eGUBIq_lightboxNav",
-			"grid": "eGUBIq_grid",
-			"opQueuedIcon": "eGUBIq_opQueuedIcon",
-			"masonryCol": "eGUBIq_masonryCol",
-			"assignSelect": "eGUBIq_assignSelect",
-			"actWarn": "eGUBIq_actWarn",
-			"groupName": "eGUBIq_groupName",
-			"opName": "eGUBIq_opName",
-			"opDot": "eGUBIq_opDot",
-			"shots": "eGUBIq_shots",
-			"backupCard": "eGUBIq_backupCard",
-			"opHead": "eGUBIq_opHead",
-			"foot": "eGUBIq_foot",
-			"deprecate": "eGUBIq_deprecate",
-			"diagIndex": "eGUBIq_diagIndex",
-			"groupCreate": "eGUBIq_groupCreate",
-			"diagArrow": "eGUBIq_diagArrow",
-			"body": "eGUBIq_body",
-			"top": "eGUBIq_top",
-			"depBadge": "eGUBIq_depBadge",
-			"staleAction": "eGUBIq_staleAction",
-			"pagerPages": "eGUBIq_pagerPages",
-			"dragOver": "eGUBIq_dragOver",
-			"row1": "eGUBIq_row1",
-			"lightboxNext": "eGUBIq_lightboxNext",
-			"hiddenFile": "eGUBIq_hiddenFile",
-			"rosterTagKeep": "eGUBIq_rosterTagKeep",
-			"cats": "eGUBIq_cats",
-			"version": "eGUBIq_version",
-			"diagEmpty": "eGUBIq_diagEmpty",
-			"conflictWhy": "eGUBIq_conflictWhy",
-			"groupHead": "eGUBIq_groupHead",
-			"setCard": "eGUBIq_setCard",
-			"opCloseBtn": "eGUBIq_opCloseBtn",
-			"subTabs": "eGUBIq_subTabs",
-			"lightboxDots": "eGUBIq_lightboxDots",
-			"catsToggle": "eGUBIq_catsToggle",
-			"dangerArmed": "eGUBIq_dangerArmed",
-			"groupAddPanel": "eGUBIq_groupAddPanel",
-			"empty": "eGUBIq_empty",
-			"irowMissing": "eGUBIq_irowMissing",
-			"dshmPlugFade": "eGUBIq_dshmPlugFade",
-			"opStatusBad": "eGUBIq_opStatusBad",
-			"viewBar": "eGUBIq_viewBar",
-			"shot": "eGUBIq_shot",
-			"title": "eGUBIq_title",
-			"desc": "eGUBIq_desc",
-			"diagCount": "eGUBIq_diagCount",
-			"diagBundle": "eGUBIq_diagBundle",
-			"pageEllipsis": "eGUBIq_pageEllipsis",
-			"retryBtn": "eGUBIq_retryBtn",
-			"barFill": "eGUBIq_barFill",
-			"roster": "eGUBIq_roster",
-			"opTop": "eGUBIq_opTop",
-			"opStatus": "eGUBIq_opStatus",
-			"src": "eGUBIq_src",
-			"setCardOpen": "eGUBIq_setCardOpen",
-			"setChevronOpen": "eGUBIq_setChevronOpen",
-			"viewOn": "eGUBIq_viewOn",
-			"switch": "eGUBIq_switch",
-			"setLabel": "eGUBIq_setLabel",
-			"setCheck": "eGUBIq_setCheck",
-			"dragHandle": "eGUBIq_dragHandle",
-			"setActions": "eGUBIq_setActions",
-			"loading": "eGUBIq_loading",
-			"rosterTagDrop": "eGUBIq_rosterTagDrop",
-			"rosterTag": "eGUBIq_rosterTag",
-			"pageInfo": "eGUBIq_pageInfo",
-			"tab": "eGUBIq_tab",
-			"okState": "eGUBIq_okState",
-			"rosterRow": "eGUBIq_rosterRow",
-			"ovRow": "eGUBIq_ovRow",
-			"ovFrom": "eGUBIq_ovFrom",
-			"logoPlug": "eGUBIq_logoPlug",
-			"groupMember": "eGUBIq_groupMember",
-			"reassureOk": "eGUBIq_reassureOk",
-			"diagRow": "eGUBIq_diagRow",
-			"choiceMain": "eGUBIq_choiceMain",
-			"catsCollapsed": "eGUBIq_catsCollapsed",
-			"ovArrow": "eGUBIq_ovArrow",
-			"installBtn": "eGUBIq_installBtn",
-			"descClamp": "eGUBIq_descClamp",
-			"rosterRowOut": "eGUBIq_rosterRowOut",
-			"groupMembers": "eGUBIq_groupMembers",
-			"err": "eGUBIq_err",
-			"choiceTitle": "eGUBIq_choiceTitle",
-			"opActions": "eGUBIq_opActions",
-			"diagList": "eGUBIq_diagList",
-			"fixFallbackText": "eGUBIq_fixFallbackText",
-			"opIcon": "eGUBIq_opIcon",
-			"swatches": "eGUBIq_swatches",
-			"diagSummaryItem": "eGUBIq_diagSummaryItem",
-			"conflictBody": "eGUBIq_conflictBody",
-			"conflictTitle": "eGUBIq_conflictTitle",
-			"setChevron": "eGUBIq_setChevron",
-			"actWhy": "eGUBIq_actWhy",
-			"bannerHint": "eGUBIq_bannerHint",
-			"metaInline": "eGUBIq_metaInline",
-			"pairGrid": "eGUBIq_pairGrid",
-			"lightboxDotOn": "eGUBIq_lightboxDotOn",
-			"opAggregate": "eGUBIq_opAggregate",
-			"choices": "eGUBIq_choices",
-			"depLine": "eGUBIq_depLine",
-			"fixFallback": "eGUBIq_fixFallback",
-			"opEmpty": "eGUBIq_opEmpty",
-			"dangerBtn": "eGUBIq_dangerBtn",
-			"diagPage": "eGUBIq_diagPage",
-			"cmd": "eGUBIq_cmd",
-			"sp": "eGUBIq_sp",
-			"catsWrap": "eGUBIq_catsWrap",
-			"stateDot": "eGUBIq_stateDot",
-			"stickyHead": "eGUBIq_stickyHead",
-			"conflictHead": "eGUBIq_conflictHead",
-			"opRowAlert": "eGUBIq_opRowAlert",
-			"opEntry": "eGUBIq_opEntry",
-			"star": "eGUBIq_star",
-			"opRow": "eGUBIq_opRow",
-			"switchMixed": "eGUBIq_switchMixed",
-			"setDesc": "eGUBIq_setDesc",
-			"specTagFile": "eGUBIq_specTagFile",
-			"opVerb": "eGUBIq_opVerb",
-			"choiceNote": "eGUBIq_choiceNote",
-			"opEmptyHint": "eGUBIq_opEmptyHint",
-			"rosterSplit": "eGUBIq_rosterSplit",
-			"descTight": "eGUBIq_descTight",
-			"setSegOn": "eGUBIq_setSegOn",
-			"opPanel": "eGUBIq_opPanel",
-			"actLive": "eGUBIq_actLive",
-			"bar": "eGUBIq_bar",
-			"act": "eGUBIq_act",
-			"dot": "eGUBIq_dot",
-			"switchOn": "eGUBIq_switchOn",
-			"dshmSlide": "eGUBIq_dshmSlide",
-			"nmLink": "eGUBIq_nmLink",
-			"diagMeta": "eGUBIq_diagMeta",
-			"lightboxDot": "eGUBIq_lightboxDot",
-			"on": "eGUBIq_on",
-			"opEntryAlert": "eGUBIq_opEntryAlert",
-			"opDecision": "eGUBIq_opDecision",
-			"specTagGit": "eGUBIq_specTagGit",
-			"collapseTitle": "eGUBIq_collapseTitle",
-			"cardAction": "eGUBIq_cardAction",
-			"head": "eGUBIq_head",
-			"inlineInput": "eGUBIq_inlineInput",
-			"metaTag": "eGUBIq_metaTag",
-			"lightboxPrev": "eGUBIq_lightboxPrev",
-			"choiceOn": "eGUBIq_choiceOn",
-			"opPanelTitle": "eGUBIq_opPanelTitle",
-			"diagBadgeShadow": "eGUBIq_diagBadgeShadow",
-			"themesGrid": "eGUBIq_themesGrid",
-			"catsRow": "eGUBIq_catsRow",
-			"backupWarn": "eGUBIq_backupWarn",
-			"cardBlocked": "eGUBIq_cardBlocked",
-			"opAggregateHint": "eGUBIq_opAggregateHint",
-			"diagSummary": "eGUBIq_diagSummary",
-			"barWave": "eGUBIq_barWave",
-			"diagBadgeCommunity": "eGUBIq_diagBadgeCommunity",
-			"collapseIcon": "eGUBIq_collapseIcon",
-			"viewBtn": "eGUBIq_viewBtn",
-			"masonry": "eGUBIq_masonry",
-			"assignRow": "eGUBIq_assignRow",
-			"stateTag": "eGUBIq_stateTag",
-			"descToggle": "eGUBIq_descToggle",
-			"choiceRadio": "eGUBIq_choiceRadio",
-			"collapseBody": "eGUBIq_collapseBody",
-			"collapseHead": "eGUBIq_collapseHead",
-			"opEntryQuiet": "eGUBIq_opEntryQuiet",
-			"choiceSafe": "eGUBIq_choiceSafe",
-			"lightboxImg": "eGUBIq_lightboxImg",
-			"opAggregateTop": "eGUBIq_opAggregateTop",
-			"bannerIcon": "eGUBIq_bannerIcon",
-			"groupHint": "eGUBIq_groupHint"
+			"act": "YvpMoq_act",
+			"actBroken": "YvpMoq_actBroken",
+			"actLive": "YvpMoq_actLive",
+			"actWarn": "YvpMoq_actWarn",
+			"actWhy": "YvpMoq_actWhy",
+			"assignRow": "YvpMoq_assignRow",
+			"assignSelect": "YvpMoq_assignSelect",
+			"av": "YvpMoq_av",
+			"backupActions": "YvpMoq_backupActions",
+			"backupCard": "YvpMoq_backupCard",
+			"backupCheck": "YvpMoq_backupCheck",
+			"backupCheckList": "YvpMoq_backupCheckList",
+			"backupGrid": "YvpMoq_backupGrid",
+			"backupInput": "YvpMoq_backupInput",
+			"backupMessage": "YvpMoq_backupMessage",
+			"backupWarn": "YvpMoq_backupWarn",
+			"banner": "YvpMoq_banner",
+			"bannerHint": "YvpMoq_bannerHint",
+			"bannerIcon": "YvpMoq_bannerIcon",
+			"bar": "YvpMoq_bar",
+			"barFill": "YvpMoq_barFill",
+			"barWave": "YvpMoq_barWave",
+			"body": "YvpMoq_body",
+			"byline": "YvpMoq_byline",
+			"card": "YvpMoq_card",
+			"cardAction": "YvpMoq_cardAction",
+			"cardBlocked": "YvpMoq_cardBlocked",
+			"cardBlockedMark": "YvpMoq_cardBlockedMark",
+			"cardShot": "YvpMoq_cardShot",
+			"cardShots": "YvpMoq_cardShots",
+			"cats": "YvpMoq_cats",
+			"catsCollapsed": "YvpMoq_catsCollapsed",
+			"catsRow": "YvpMoq_catsRow",
+			"catsToggle": "YvpMoq_catsToggle",
+			"catsWrap": "YvpMoq_catsWrap",
+			"choice": "YvpMoq_choice",
+			"choiceMain": "YvpMoq_choiceMain",
+			"choiceNote": "YvpMoq_choiceNote",
+			"choiceOn": "YvpMoq_choiceOn",
+			"choiceRadio": "YvpMoq_choiceRadio",
+			"choices": "YvpMoq_choices",
+			"choiceSafe": "YvpMoq_choiceSafe",
+			"choiceTitle": "YvpMoq_choiceTitle",
+			"cmd": "YvpMoq_cmd",
+			"collapseBody": "YvpMoq_collapseBody",
+			"collapseHead": "YvpMoq_collapseHead",
+			"collapseIcon": "YvpMoq_collapseIcon",
+			"collapseTitle": "YvpMoq_collapseTitle",
+			"conflictBody": "YvpMoq_conflictBody",
+			"conflictDetailsToggle": "YvpMoq_conflictDetailsToggle",
+			"conflictHead": "YvpMoq_conflictHead",
+			"conflictIcon": "YvpMoq_conflictIcon",
+			"conflictTitle": "YvpMoq_conflictTitle",
+			"conflictWhy": "YvpMoq_conflictWhy",
+			"conflictWhyText": "YvpMoq_conflictWhyText",
+			"contextNotices": "YvpMoq_contextNotices",
+			"dangerArmed": "YvpMoq_dangerArmed",
+			"dangerBtn": "YvpMoq_dangerBtn",
+			"depBadge": "YvpMoq_depBadge",
+			"depLine": "YvpMoq_depLine",
+			"deprecate": "YvpMoq_deprecate",
+			"desc": "YvpMoq_desc",
+			"descClamp": "YvpMoq_descClamp",
+			"descTight": "YvpMoq_descTight",
+			"descToggle": "YvpMoq_descToggle",
+			"diagAlert": "YvpMoq_diagAlert",
+			"diagArrow": "YvpMoq_diagArrow",
+			"diagBadgeCommunity": "YvpMoq_diagBadgeCommunity",
+			"diagBadgeOfficial": "YvpMoq_diagBadgeOfficial",
+			"diagBadgeShadow": "YvpMoq_diagBadgeShadow",
+			"diagBundle": "YvpMoq_diagBundle",
+			"diagCount": "YvpMoq_diagCount",
+			"diagEmpty": "YvpMoq_diagEmpty",
+			"diagIndex": "YvpMoq_diagIndex",
+			"diagKey": "YvpMoq_diagKey",
+			"diagList": "YvpMoq_diagList",
+			"diagMeta": "YvpMoq_diagMeta",
+			"diagPage": "YvpMoq_diagPage",
+			"diagRow": "YvpMoq_diagRow",
+			"diagSection": "YvpMoq_diagSection",
+			"diagSummary": "YvpMoq_diagSummary",
+			"diagSummaryItem": "YvpMoq_diagSummaryItem",
+			"diagSummaryMeta": "YvpMoq_diagSummaryMeta",
+			"diagVal": "YvpMoq_diagVal",
+			"dot": "YvpMoq_dot",
+			"dragging": "YvpMoq_dragging",
+			"dragHandle": "YvpMoq_dragHandle",
+			"dragOver": "YvpMoq_dragOver",
+			"dshmPlug": "YvpMoq_dshmPlug",
+			"dshmPlugFade": "YvpMoq_dshmPlugFade",
+			"dshmSlide": "YvpMoq_dshmSlide",
+			"empty": "YvpMoq_empty",
+			"envRepairError": "YvpMoq_envRepairError",
+			"err": "YvpMoq_err",
+			"fixFallback": "YvpMoq_fixFallback",
+			"fixFallbackText": "YvpMoq_fixFallbackText",
+			"foot": "YvpMoq_foot",
+			"grid": "YvpMoq_grid",
+			"groupActions": "YvpMoq_groupActions",
+			"groupAddPanel": "YvpMoq_groupAddPanel",
+			"groupCreate": "YvpMoq_groupCreate",
+			"groupHead": "YvpMoq_groupHead",
+			"groupHint": "YvpMoq_groupHint",
+			"groupMember": "YvpMoq_groupMember",
+			"groupMembers": "YvpMoq_groupMembers",
+			"groupName": "YvpMoq_groupName",
+			"groupRow": "YvpMoq_groupRow",
+			"grow": "YvpMoq_grow",
+			"head": "YvpMoq_head",
+			"hiddenFile": "YvpMoq_hiddenFile",
+			"inlineInput": "YvpMoq_inlineInput",
+			"installBtn": "YvpMoq_installBtn",
+			"irow": "YvpMoq_irow",
+			"irowActions": "YvpMoq_irowActions",
+			"irowMissing": "YvpMoq_irowMissing",
+			"lightbox": "YvpMoq_lightbox",
+			"lightboxClose": "YvpMoq_lightboxClose",
+			"lightboxDot": "YvpMoq_lightboxDot",
+			"lightboxDotOn": "YvpMoq_lightboxDotOn",
+			"lightboxDots": "YvpMoq_lightboxDots",
+			"lightboxImg": "YvpMoq_lightboxImg",
+			"lightboxNav": "YvpMoq_lightboxNav",
+			"lightboxNext": "YvpMoq_lightboxNext",
+			"lightboxPrev": "YvpMoq_lightboxPrev",
+			"loading": "YvpMoq_loading",
+			"logoMark": "YvpMoq_logoMark",
+			"logoPlug": "YvpMoq_logoPlug",
+			"masonry": "YvpMoq_masonry",
+			"masonryCol": "YvpMoq_masonryCol",
+			"meta": "YvpMoq_meta",
+			"metaInline": "YvpMoq_metaInline",
+			"metaTag": "YvpMoq_metaTag",
+			"metaTagOk": "YvpMoq_metaTagOk",
+			"modalNote": "YvpMoq_modalNote",
+			"nameLink": "YvpMoq_nameLink",
+			"nm": "YvpMoq_nm",
+			"nmLink": "YvpMoq_nmLink",
+			"okState": "YvpMoq_okState",
+			"on": "YvpMoq_on",
+			"opActions": "YvpMoq_opActions",
+			"opAggregate": "YvpMoq_opAggregate",
+			"opAggregateHint": "YvpMoq_opAggregateHint",
+			"opAggregateTop": "YvpMoq_opAggregateTop",
+			"opCloseBtn": "YvpMoq_opCloseBtn",
+			"opDecision": "YvpMoq_opDecision",
+			"opDecisionFoot": "YvpMoq_opDecisionFoot",
+			"opDot": "YvpMoq_opDot",
+			"opEmpty": "YvpMoq_opEmpty",
+			"opEmptyHint": "YvpMoq_opEmptyHint",
+			"opEntry": "YvpMoq_opEntry",
+			"opEntryAlert": "YvpMoq_opEntryAlert",
+			"opEntryQuiet": "YvpMoq_opEntryQuiet",
+			"opHead": "YvpMoq_opHead",
+			"opIcon": "YvpMoq_opIcon",
+			"opMain": "YvpMoq_opMain",
+			"opName": "YvpMoq_opName",
+			"opPanel": "YvpMoq_opPanel",
+			"opPanelTitle": "YvpMoq_opPanelTitle",
+			"opQueuedIcon": "YvpMoq_opQueuedIcon",
+			"opRow": "YvpMoq_opRow",
+			"opRowAlert": "YvpMoq_opRowAlert",
+			"opStatus": "YvpMoq_opStatus",
+			"opStatusBad": "YvpMoq_opStatusBad",
+			"opTop": "YvpMoq_opTop",
+			"opVerb": "YvpMoq_opVerb",
+			"opWrap": "YvpMoq_opWrap",
+			"orphBadge": "YvpMoq_orphBadge",
+			"orphRow": "YvpMoq_orphRow",
+			"ovArrow": "YvpMoq_ovArrow",
+			"ovByTag": "YvpMoq_ovByTag",
+			"ovFrom": "YvpMoq_ovFrom",
+			"ovRow": "YvpMoq_ovRow",
+			"owner": "YvpMoq_owner",
+			"pageEllipsis": "YvpMoq_pageEllipsis",
+			"pageInfo": "YvpMoq_pageInfo",
+			"pager": "YvpMoq_pager",
+			"pagerPages": "YvpMoq_pagerPages",
+			"pairGrid": "YvpMoq_pairGrid",
+			"panelNote": "YvpMoq_panelNote",
+			"pct": "YvpMoq_pct",
+			"progress": "YvpMoq_progress",
+			"reassure": "YvpMoq_reassure",
+			"reassureOk": "YvpMoq_reassureOk",
+			"repoLink": "YvpMoq_repoLink",
+			"restartIconButton": "YvpMoq_restartIconButton",
+			"retryBtn": "YvpMoq_retryBtn",
+			"root": "YvpMoq_root",
+			"roster": "YvpMoq_roster",
+			"rosterAuthor": "YvpMoq_rosterAuthor",
+			"rosterMain": "YvpMoq_rosterMain",
+			"rosterName": "YvpMoq_rosterName",
+			"rosterRow": "YvpMoq_rosterRow",
+			"rosterRowOut": "YvpMoq_rosterRowOut",
+			"rosterSplit": "YvpMoq_rosterSplit",
+			"rosterTag": "YvpMoq_rosterTag",
+			"rosterTagDrop": "YvpMoq_rosterTagDrop",
+			"rosterTagKeep": "YvpMoq_rosterTagKeep",
+			"row1": "YvpMoq_row1",
+			"sectAction": "YvpMoq_sectAction",
+			"sectionOverview": "YvpMoq_sectionOverview",
+			"setActions": "YvpMoq_setActions",
+			"setBetaTag": "YvpMoq_setBetaTag",
+			"setBody": "YvpMoq_setBody",
+			"setCard": "YvpMoq_setCard",
+			"setCardOpen": "YvpMoq_setCardOpen",
+			"setCheck": "YvpMoq_setCheck",
+			"setChevron": "YvpMoq_setChevron",
+			"setChevronOpen": "YvpMoq_setChevronOpen",
+			"setConfirm": "YvpMoq_setConfirm",
+			"setDanger": "YvpMoq_setDanger",
+			"setDesc": "YvpMoq_setDesc",
+			"setHeader": "YvpMoq_setHeader",
+			"setHeadText": "YvpMoq_setHeadText",
+			"setHint": "YvpMoq_setHint",
+			"setLabel": "YvpMoq_setLabel",
+			"setLabelBox": "YvpMoq_setLabelBox",
+			"setName": "YvpMoq_setName",
+			"setRow": "YvpMoq_setRow",
+			"setSeg": "YvpMoq_setSeg",
+			"setSegBtn": "YvpMoq_setSegBtn",
+			"setSegOn": "YvpMoq_setSegOn",
+			"shot": "YvpMoq_shot",
+			"shots": "YvpMoq_shots",
+			"sp": "YvpMoq_sp",
+			"spec": "YvpMoq_spec",
+			"specTag": "YvpMoq_specTag",
+			"specTagFile": "YvpMoq_specTagFile",
+			"specTagGit": "YvpMoq_specTagGit",
+			"spin": "YvpMoq_spin",
+			"src": "YvpMoq_src",
+			"staleAction": "YvpMoq_staleAction",
+			"star": "YvpMoq_star",
+			"stateDot": "YvpMoq_stateDot",
+			"stateTag": "YvpMoq_stateTag",
+			"stickyHead": "YvpMoq_stickyHead",
+			"sub": "YvpMoq_sub",
+			"submitLink": "YvpMoq_submitLink",
+			"subTabs": "YvpMoq_subTabs",
+			"swatches": "YvpMoq_swatches",
+			"switch": "YvpMoq_switch",
+			"switchKnob": "YvpMoq_switchKnob",
+			"switchMixed": "YvpMoq_switchMixed",
+			"switchOn": "YvpMoq_switchOn",
+			"tab": "YvpMoq_tab",
+			"tabs": "YvpMoq_tabs",
+			"tabSearch": "YvpMoq_tabSearch",
+			"tabSearchRow": "YvpMoq_tabSearchRow",
+			"tag": "YvpMoq_tag",
+			"themesGrid": "YvpMoq_themesGrid",
+			"title": "YvpMoq_title",
+			"titleRow": "YvpMoq_titleRow",
+			"top": "YvpMoq_top",
+			"topBtn": "YvpMoq_topBtn",
+			"topNotices": "YvpMoq_topNotices",
+			"version": "YvpMoq_version",
+			"viewBar": "YvpMoq_viewBar",
+			"viewBtn": "YvpMoq_viewBtn",
+			"viewOn": "YvpMoq_viewOn",
+			"warnLine": "YvpMoq_warnLine"
 		};
 		//#endregion
 		//#region src/client/operations.ts
@@ -3387,13 +4011,12 @@ window.__ModuleLoader__.load({
 		*/
 		function useMediaWide() {
 			const query = "(min-width: 681px)";
-			const subscribe = (0, react.useCallback)((notify) => {
+			return (0, react.useSyncExternalStore)((0, react.useCallback)((notify) => {
 				if (typeof matchMedia !== "function") return () => {};
 				const list = matchMedia(query);
 				list.addEventListener("change", notify);
 				return () => list.removeEventListener("change", notify);
-			}, []);
-			return (0, react.useSyncExternalStore)(subscribe, () => typeof matchMedia === "function" ? matchMedia(query).matches : true, () => true);
+			}, []), () => typeof matchMedia === "function" ? matchMedia(query).matches : true, () => true);
 		}
 		/**
 		* A card's description, clamped to 5 lines so one wordy entry doesn't blow
@@ -3706,6 +4329,10 @@ window.__ModuleLoader__.load({
 			const themeSnap = (0, react.useSyncExternalStore)(props.themeStore.subscribe, props.themeStore.getSnapshot);
 			const [data, setData] = (0, react.useState)(cachedRegistry);
 			const [loadError, setLoadError] = (0, react.useState)(null);
+			const [catalogChecking, setCatalogChecking] = (0, react.useState)(false);
+			const [catalogUpdateAvailable, setCatalogUpdateAvailable] = (0, react.useState)(false);
+			const [catalogUpdating, setCatalogUpdating] = (0, react.useState)(false);
+			const [catalogUpdateError, setCatalogUpdateError] = (0, react.useState)(null);
 			const [installed, setInstalledState] = (0, react.useState)(cachedInstalled ?? {});
 			const setInstalled = (0, react.useCallback)((value) => {
 				cachedInstalled = value;
@@ -3891,13 +4518,16 @@ window.__ModuleLoader__.load({
 			const [refreshNames, setRefreshNames] = (0, react.useState)([]);
 			const [envReady, setEnvReady] = (0, react.useState)(true);
 			const [envFixing, setEnvFixing] = (0, react.useState)(false);
-			const [envFailed, setEnvFailed] = (0, react.useState)(false);
+			const [envDialogOpen, setEnvDialogOpen] = (0, react.useState)(false);
+			const [envRepairError, setEnvRepairError] = (0, react.useState)(null);
 			const [bootId, setBootId] = (0, react.useState)(null);
 			/** One-click restart (#14 by @ysyyhhh): server capability + in-flight state. */
 			const [restartEnabled, setRestartEnabled] = (0, react.useState)(false);
 			/** Supervisor the host detected around itself, when it named one (#229). */
 			const [supervisor, setSupervisor] = (0, react.useState)(null);
 			const [restarting, setRestarting] = (0, react.useState)(false);
+			/** Confirmation shared by the banner icon and the web-host restart button. */
+			const [restartConfirmOpen, setRestartConfirmOpen] = (0, react.useState)(false);
 			const [showTop, setShowTop] = (0, react.useState)(false);
 			const [backupBusy, setBackupBusy] = (0, react.useState)(false);
 			const [backupMessage, setBackupMessage] = (0, react.useState)(null);
@@ -3975,8 +4605,7 @@ window.__ModuleLoader__.load({
 					if (Array.isArray(body.groupOrder)) setGroupOrder(body.groupOrder);
 					setInstalledBundles(Array.isArray(body.bundles) ? body.bundles.filter((name) => typeof name === "string") : []);
 					if (body.activation && typeof body.activation === "object") setActivations(body.activation);
-					const findings = body.diagnostics?.schema === "dsh-market/diagnostics/v1" && Array.isArray(body.diagnostics.findings) ? body.diagnostics.findings.filter(isHostDependencyFinding) : [];
-					setHostDependencyFindings(findings);
+					setHostDependencyFindings(body.diagnostics?.schema === "dsh-market/diagnostics/v1" && Array.isArray(body.diagnostics.findings) ? body.diagnostics.findings.filter(isHostDependencyFinding) : []);
 				}).catch(() => {});
 				fetch("/dsh-market/updates" + (force === true ? "?force=1" : ""), { cache: "no-store" }).then((res) => res.json()).then((body) => setUpdates(body.updates || {})).catch(() => {});
 			}, []);
@@ -3987,7 +4616,12 @@ window.__ModuleLoader__.load({
 			}, [refreshInstalled, tab]);
 			(0, react.useMemo)(() => new Set(disabledNames), [disabledNames]);
 			/** Effective switch state: market disable list ∪ user-patch-layer disables. */
-			const effectiveDisabledSet = (0, react.useMemo)(() => /* @__PURE__ */ new Set([...disabledNames, ...patchDisabledNames]), [disabledNames, patchDisabledNames]);
+			const effectiveDisabledSet = (0, react.useMemo)(() => new Set([...disabledNames, ...patchDisabledNames]), [disabledNames, patchDisabledNames]);
+			const applyCatalogStatus = (0, react.useCallback)((next) => {
+				setCatalogChecking(next?.checking === true);
+				setCatalogUpdateAvailable(next?.updateAvailable === true);
+				if (next?.updateAvailable !== true) setCatalogUpdateError(null);
+			}, []);
 			const loadCatalog = (0, react.useCallback)(() => {
 				setLoadError(null);
 				return fetch("/dsh-market/registry", { cache: "no-store" }).then(async (res) => {
@@ -3998,15 +4632,57 @@ window.__ModuleLoader__.load({
 					if (body.registry === void 0) throw new Error("the catalog response carried no data");
 					cachedRegistry = body.registry;
 					setData(body.registry);
+					applyCatalogStatus(body.catalog);
 					setLoadError(null);
 				}).catch((error) => {
 					setLoadError(error instanceof Error ? error.message : String(error));
 				});
-			}, []);
+			}, [applyCatalogStatus]);
+			(0, react.useEffect)(() => {
+				if (!catalogChecking) return;
+				let cancelled = false;
+				let timer;
+				const poll = () => {
+					fetch("/dsh-market/registry/status", { cache: "no-store" }).then(async (res) => {
+						const body = await res.json().catch(() => ({}));
+						if (!res.ok) throw new Error(`HTTP ${String(res.status)}`);
+						if (cancelled) return;
+						applyCatalogStatus(body.catalog);
+						if (body.catalog?.checking === true) timer = setTimeout(poll, 800);
+					}).catch(() => {
+						if (!cancelled) timer = setTimeout(poll, 2e3);
+					});
+				};
+				timer = setTimeout(poll, 500);
+				return () => {
+					cancelled = true;
+					if (timer !== void 0) clearTimeout(timer);
+				};
+			}, [applyCatalogStatus, catalogChecking]);
+			const applyCatalogUpdate = (0, react.useCallback)(() => {
+				setCatalogUpdating(true);
+				setCatalogUpdateError(null);
+				fetch("/dsh-market/registry/update", {
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: "{}"
+				}).then(async (res) => {
+					const body = await res.json().catch(() => ({}));
+					if (!res.ok) throw new Error(typeof body.error === "string" ? body.error : `HTTP ${String(res.status)}`);
+					return body;
+				}).then((body) => {
+					if (body.registry === void 0) throw new Error("the catalog update carried no data");
+					cachedRegistry = body.registry;
+					setData(body.registry);
+					applyCatalogStatus(body.catalog);
+				}).catch((error) => setCatalogUpdateError(error instanceof Error ? error.message : String(error))).finally(() => setCatalogUpdating(false));
+			}, [applyCatalogStatus]);
 			(0, react.useEffect)(() => {
 				loadCatalog();
 				fetch("/dsh-market/status", { cache: "no-store" }).then((res) => res.json()).then((status) => {
-					setEnvReady(status.pnpm !== false);
+					const ready = status.pnpm !== false;
+					setEnvReady(ready);
+					if (!ready) setEnvDialogOpen(true);
 					if (typeof status.boot === "string") {
 						setBootId(status.boot);
 						try {
@@ -4054,19 +4730,22 @@ window.__ModuleLoader__.load({
 			]);
 			const fixEnv = (0, react.useCallback)(() => {
 				setEnvFixing(true);
-				setEnvFailed(false);
+				setEnvRepairError(null);
 				fetch("/dsh-market/setup-pnpm", {
 					method: "POST",
 					headers: { "content-type": "application/json" },
 					body: "{}"
-				}).then((res) => res.json()).then((body) => {
-					if (body.ok) setEnvReady(true);
-					else {
-						setEnvFailed(true);
-						if (typeof body.error === "string") setInstallError(body.error);
-					}
-				}).catch(() => setEnvFailed(true)).finally(() => setEnvFixing(false));
-			}, []);
+				}).then(async (res) => {
+					const body = await res.json().catch(() => ({}));
+					if (!res.ok && typeof body.error !== "string") throw new Error(`HTTP ${String(res.status)}`);
+					return body;
+				}).then((body) => {
+					if (body.ok) {
+						setEnvReady(true);
+						setEnvDialogOpen(false);
+					} else setEnvRepairError(typeof body.error === "string" ? body.error : t("envFixFail"));
+				}).catch((error) => setEnvRepairError(error instanceof Error ? error.message : t("envFixFail"))).finally(() => setEnvFixing(false));
+			}, [t]);
 			(0, react.useEffect)(() => {
 				const pending = readSession("dshm-pending");
 				if (pending !== null && typeof pending.url === "string") setBusyUrl(pending.url);
@@ -4149,13 +4828,11 @@ window.__ModuleLoader__.load({
 			]);
 			const scrollToTop = () => {
 				const el = bodyRef.current;
-				if (el) {
-					if (typeof el.scrollTo === "function") el.scrollTo({
-						top: 0,
-						behavior: "smooth"
-					});
-					else el.scrollTop = 0;
-				}
+				if (el) if (typeof el.scrollTo === "function") el.scrollTo({
+					top: 0,
+					behavior: "smooth"
+				});
+				else el.scrollTop = 0;
 			};
 			const plugins = (0, react.useMemo)(() => data === null ? [] : visiblePlugins(data.plugins, {
 				category: cat,
@@ -4251,6 +4928,11 @@ window.__ModuleLoader__.load({
 				return `${first.name} — ${first.layers.join(" / ")}${rest}`;
 			};
 			const doInstall = (0, react.useCallback)((plugin) => {
+				if (!envReady) {
+					setConfirming(null);
+					setEnvDialogOpen(true);
+					return;
+				}
 				setBuildsSkipped(null);
 				setConfirming(null);
 				setInstallError(null);
@@ -4294,11 +4976,10 @@ window.__ModuleLoader__.load({
 								...prev,
 								...body.activation
 							}));
-							const warns = Object.entries(body.activation).filter(([, info]) => info.state !== "live" && info.state !== "missing").map(([name, info]) => ({
+							setActivationWarnings(Object.entries(body.activation).filter(([, info]) => info.state !== "live" && info.state !== "missing").map(([name, info]) => ({
 								name,
 								info
-							}));
-							setActivationWarnings(warns);
+							})));
 						}
 						if (body.hot) {
 							setDoneUrls((urls) => urls.filter((url) => url !== plugin.url));
@@ -4346,6 +5027,7 @@ window.__ModuleLoader__.load({
 					}
 				}).catch(() => {});
 			}, [
+				envReady,
 				nextRecordId,
 				refreshInstalled,
 				t
@@ -4420,12 +5102,27 @@ window.__ModuleLoader__.load({
 				t
 			]);
 			/**
-			* Restart the host and reload once the boot id changes (#14 by @ysyyhhh).
+			* Desktop owns the Harness child lifecycle, so its preload bridge is the
+			* primary restart path there. Standalone web hosts keep the original
+			* self-restart route and reload once the boot id changes (#14 by @ysyyhhh).
 			* The 202 races the process's SIGTERM, so network errors on the initial
 			* request are expected and treated as "restart under way".
 			*/
 			const doRestart = (0, react.useCallback)(() => {
-				if (bootId === null || restarting) return;
+				if (restarting) return;
+				const desktopRestart = window.dshDesktop?.restartHarness;
+				if (typeof desktopRestart === "function") {
+					setRestarting(true);
+					setInstallError(null);
+					desktopRestart().then((result) => {
+						if (!result.ok) throw new Error(t("restartFail"));
+					}).catch((error) => {
+						setRestarting(false);
+						setInstallError(t("restartFail") + ": " + (error instanceof Error ? error.message : String(error)));
+					});
+					return;
+				}
+				if (bootId === null) return;
 				const previousBoot = bootId;
 				setRestarting(true);
 				setInstallError(null);
@@ -4486,6 +5183,10 @@ window.__ModuleLoader__.load({
 				}).catch(() => {});
 			}, []);
 			const doUpdate = (0, react.useCallback)((name, force = false) => {
+				if (!envReady) {
+					setEnvDialogOpen(true);
+					return Promise.resolve();
+				}
 				setInstallError(null);
 				setActivationWarnings([]);
 				setStaleName(null);
@@ -4538,7 +5239,11 @@ window.__ModuleLoader__.load({
 						setInstallError(t("updateFail") + ": " + name + " — " + detail.trim().slice(-600));
 					}
 				}).catch(() => {});
-			}, [refreshInstalled, t]);
+			}, [
+				envReady,
+				refreshInstalled,
+				t
+			]);
 			const doUseSkin = (0, react.useCallback)((name) => {
 				setInstallError(null);
 				fetch("/dsh-market/use-skin", {
@@ -4558,6 +5263,11 @@ window.__ModuleLoader__.load({
 				}).catch((error) => setInstallError(String(error)));
 			}, []);
 			const doUninstall = (0, react.useCallback)((name) => {
+				if (!envReady) {
+					setRemoveConfirm(null);
+					setEnvDialogOpen(true);
+					return Promise.resolve();
+				}
 				setRemoveConfirm(null);
 				setInstallError(null);
 				setActivationWarnings([]);
@@ -4583,7 +5293,7 @@ window.__ModuleLoader__.load({
 						setInstallError((text(body.error) || humanOutput(text(body.stderr)) || "error").trim().slice(-600));
 					}
 				}).catch((error) => setInstallError(String(error))).finally(() => setRemovingName(null));
-			}, [refreshInstalled]);
+			}, [envReady, refreshInstalled]);
 			/** Live enable/disable of one installed plugin (#60). `reload` opts the
 			* card-level theme flow into a page refresh so the visual result lands
 			* immediately (mirrors the use-skin reload on activate). */
@@ -4645,14 +5355,14 @@ window.__ModuleLoader__.load({
 					if (status === 200 && body.ok) {
 						setGroupPayload(body);
 						if (Array.isArray(body.restartMembers) && body.restartMembers.length > 0) setToggleRestart((n) => n + body.restartMembers.length);
-						if (Array.isArray(body.refreshMembers) && body.refreshMembers.length > 0) setRefreshNames((names) => [.../* @__PURE__ */ new Set([...names, ...body.refreshMembers])]);
+						if (Array.isArray(body.refreshMembers) && body.refreshMembers.length > 0) setRefreshNames((names) => [...new Set([...names, ...body.refreshMembers])]);
 						refreshInstalled();
 						return true;
 					}
 					const text = (v) => typeof v === "string" ? v : v == null ? "" : JSON.stringify(v);
 					setInstallError(text(body.error) || t("toggleFail"));
 					if (Array.isArray(body.restartMembers) && body.restartMembers.length > 0) setToggleRestart((n) => n + body.restartMembers.length);
-					if (Array.isArray(body.refreshMembers) && body.refreshMembers.length > 0) setRefreshNames((names) => [.../* @__PURE__ */ new Set([...names, ...body.refreshMembers])]);
+					if (Array.isArray(body.refreshMembers) && body.refreshMembers.length > 0) setRefreshNames((names) => [...new Set([...names, ...body.refreshMembers])]);
 					return false;
 				}).catch((error) => {
 					setInstallError(String(error));
@@ -4711,11 +5421,10 @@ window.__ModuleLoader__.load({
 			const doAssign = (0, react.useCallback)((name) => {
 				const group = assignTarget;
 				if (group === "") return;
-				const members = groups[group] ?? [];
 				doGroupAction({
 					action: "set-members",
 					name: group,
-					members: [...members, name]
+					members: [...groups[group] ?? [], name]
 				}).then((ok) => {
 					if (ok) {
 						setAssignFor(null);
@@ -4728,26 +5437,28 @@ window.__ModuleLoader__.load({
 				groups
 			]);
 			const doRemoveMember = (0, react.useCallback)((group, name) => {
-				const members = (groups[group] ?? []).filter((member) => member !== name);
 				doGroupAction({
 					action: "set-members",
 					name: group,
-					members
+					members: (groups[group] ?? []).filter((member) => member !== name)
 				});
 			}, [doGroupAction, groups]);
 			/** Add one installed plugin to a group (picker stays open for batch adds). */
 			const doAddMember = (0, react.useCallback)((group, name) => {
-				const members = groups[group] ?? [];
 				doGroupAction({
 					action: "set-members",
 					name: group,
-					members: [...members, name]
+					members: [...groups[group] ?? [], name]
 				});
 			}, [doGroupAction, groups]);
 			const selfName = installed["dshmarket"] !== void 0 ? "dshmarket" : "dsh-market";
 			const updatableNames = Object.keys(installed).filter((name) => name !== selfName && !updatedNames.includes(name) && updates[name] && updates[name].updateAvailable);
 			const installedOtherCount = Object.keys(installed).filter((name) => name !== selfName).length;
 			const doUpdateAll = (0, react.useCallback)(() => {
+				if (!envReady) {
+					setEnvDialogOpen(true);
+					return;
+				}
 				const names = updatableNames.slice();
 				setUpdatingAll(true);
 				const next = () => {
@@ -4759,7 +5470,11 @@ window.__ModuleLoader__.load({
 					doUpdate(name).then(next, next);
 				};
 				next();
-			}, [updatableNames, doUpdate]);
+			}, [
+				envReady,
+				updatableNames,
+				doUpdate
+			]);
 			const finishRestore = (0, react.useCallback)((body) => {
 				const errors = Array.isArray(body.errors) ? body.errors : [];
 				const unportable = Array.isArray(body.unportable) ? body.unportable : [];
@@ -4783,6 +5498,11 @@ window.__ModuleLoader__.load({
 			/** Actually run the restore; the confirm dialog gates this (previously window.confirm). */
 			const doRestore = (0, react.useCallback)(() => {
 				if (pendingBackup === null) return Promise.resolve();
+				if (!envReady) {
+					setRestoreConfirmOpen(false);
+					setEnvDialogOpen(true);
+					return Promise.resolve();
+				}
 				setRestoreConfirmOpen(false);
 				setBackupBusy(true);
 				setBackupMessage(null);
@@ -4796,7 +5516,11 @@ window.__ModuleLoader__.load({
 					if (!response.ok) throw new Error(String(body.error || "restore failed"));
 					finishRestore(body);
 				}).catch((error) => setBackupMessage(String(error))).finally(() => setBackupBusy(false));
-			}, [finishRestore, pendingBackup]);
+			}, [
+				envReady,
+				finishRestore,
+				pendingBackup
+			]);
 			const runWebdav = (0, react.useCallback)((action) => {
 				if (webdavUrl.trim() === "") return;
 				setBackupBusy(true);
@@ -4872,7 +5596,7 @@ window.__ModuleLoader__.load({
 					body.gistId = gistId.trim();
 				}
 				if (action === "export") {
-					const allNames = /* @__PURE__ */ new Set([...Object.keys(installed), ...installedBundles]);
+					const allNames = new Set([...Object.keys(installed), ...installedBundles]);
 					if (!(exportSelection.size === allNames.size && exportSelection.size > 0)) {
 						body.includeDeps = [...exportSelection];
 						if (exportIncludeConfig) body.includeConfig = true;
@@ -4930,17 +5654,17 @@ window.__ModuleLoader__.load({
 			]);
 			/** The picker list: dependency plugins + bundle-only plugins, deduplicated. */
 			const exportOptions = (0, react.useMemo)(() => {
-				return [.../* @__PURE__ */ new Set([...Object.keys(installed), ...installedBundles])].sort();
+				return [...new Set([...Object.keys(installed), ...installedBundles])].sort();
 			}, [installed, installedBundles]);
 			/** Classify an install spec for the export picker badge. */
 			const specKind = (spec) => {
 				if (spec === void 0) return "bundle";
 				if (/^file:/i.test(spec)) return "file";
-				if (/^(github:|git\+|git:)/i.test(spec)) return "git";
+				if (/^(github:|git\+|git:)/i.test(spec) || /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/archive\/[0-9a-f]{40,64}\.tar\.gz$/i.test(spec)) return "git";
 				return "npm";
 			};
 			const openExportPicker = (0, react.useCallback)(() => {
-				const names = /* @__PURE__ */ new Set([...Object.keys(installed), ...installedBundles]);
+				const names = new Set([...Object.keys(installed), ...installedBundles]);
 				setExportSelection(new Set(names));
 				setExportIncludeConfig(false);
 				setExportOpen(true);
@@ -4958,7 +5682,7 @@ window.__ModuleLoader__.load({
 				try {
 					last = Number(localStorage.getItem("dshm-webdav-last")) || 0;
 				} catch {}
-				if (Date.now() - last >= 864e5) runWebdav("backup");
+				if (Date.now() - last >= 1440 * 60 * 1e3) runWebdav("backup");
 			}, [
 				autoBackup,
 				runWebdav,
@@ -4979,6 +5703,9 @@ window.__ModuleLoader__.load({
 			const hostPendingNames = Object.keys(activations).filter((name) => activations[name]?.state === "restart");
 			const showHostPending = hostPendingNames.length > 0 && !restartNoticeDismissed && sessionPendingRestart === 0;
 			const pendingRestart = sessionPendingRestart > 0 ? sessionPendingRestart : showHostPending ? hostPendingNames.length : 0;
+			const desktopRestartAvailable = typeof window.dshDesktop?.restartHarness === "function";
+			const restartAvailable = restartEnabled || desktopRestartAvailable;
+			const restartBlocked = restarting || hostBusy || busyUrl !== null || updatingName !== null || removingName !== null || !desktopRestartAvailable && bootId === null;
 			const displayedInstalled = pendingBackup === null ? installed : {
 				...pendingDependencies,
 				...installed
@@ -5090,8 +5817,11 @@ window.__ModuleLoader__.load({
 										variant: "primary",
 										size: "sm",
 										className: Market_module_css_default.installBtn,
-										disabled: busyUrl !== null || !envReady,
-										onClick: () => setConfirming(p),
+										disabled: busyUrl !== null,
+										onClick: () => {
+											if (envReady) setConfirming(p);
+											else setEnvDialogOpen(true);
+										},
 										children: t("install")
 									})
 								})
@@ -5339,7 +6069,7 @@ window.__ModuleLoader__.load({
 			* restart banner (a full host restart, a different action entirely) stays
 			* separate.
 			*/
-			const pendingRefreshNames = (0, react.useMemo)(() => [.../* @__PURE__ */ new Set([...hotNames, ...refreshNames])], [hotNames, refreshNames]);
+			const pendingRefreshNames = (0, react.useMemo)(() => [...new Set([...hotNames, ...refreshNames])], [hotNames, refreshNames]);
 			/** Installed plugins the market itself cannot group (#60). */
 			const groupableNames = Object.keys(installed).filter((name) => name !== "dsh-market" && name !== "dshmarket" && name !== "dsh-desktop-market");
 			/** Names already inside some group; everything else shows under "ungrouped". */
@@ -5377,8 +6107,80 @@ window.__ModuleLoader__.load({
 			});
 			const advanced = tab === "backup" || tab === "diagnostics";
 			const showEmbeddedOperations = records.length > 0 || operationsOpen || advanced;
-			const showEmbeddedHead = showEmbeddedOperations || tab === "installed" && updatableNames.length >= 2 || !envReady || backupMessage !== null || restoreErrors.length > 0 || tab === "installed" && pendingBackup !== null || pendingRefreshNames.length > 0 || pendingRestart > 0 || activationWarnings.length > 0 || tab === "installed" && hostDependencyFindings.length > 0;
+			const showEmbeddedHead = showEmbeddedOperations || tab === "installed" && updatableNames.length >= 2;
 			const showHead = props.embedded !== true || showEmbeddedHead;
+			const topNotices = /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [catalogUpdateAvailable && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: Market_module_css_default.banner,
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconDownloadOutline16, {
+						size: 14,
+						className: Market_module_css_default.bannerIcon
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						className: Market_module_css_default.grow,
+						title: catalogUpdateError ?? void 0,
+						children: catalogUpdateError === null ? t("catalogUpdateAvailable") : t("catalogUpdateFailed")
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+						variant: "primary",
+						size: "sm",
+						disabled: catalogUpdating,
+						onClick: applyCatalogUpdate,
+						children: catalogUpdating ? t("catalogUpdating") : t("catalogUpdateAction")
+					})
+				]
+			}), pendingRestart > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: Market_module_css_default.banner,
+				children: [
+					restartAvailable ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: Market_module_css_default.restartIconButton,
+						"aria-label": t("restartNow"),
+						title: t("restartNow"),
+						disabled: restartBlocked,
+						onClick: () => setRestartConfirmOpen(true),
+						children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconRefreshOutline14, { size: 14 })
+					}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconRefreshOutline14, {
+						size: 14,
+						className: Market_module_css_default.bannerIcon
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+						className: Market_module_css_default.grow,
+						children: [
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", { children: pendingRestart }),
+							" ",
+							t("restartBanner")
+						]
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Tooltip, {
+						label: desktopRestartAvailable ? t("restartHintDesktop") : supervisor === null ? t("restartHint") : t("restartHintSupervised").replace("{0}", supervisor),
+						side: "bottom",
+						children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							className: Market_module_css_default.bannerHint,
+							children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconQuestionOutline14, { size: 14 })
+						})
+					}),
+					restartEnabled && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+						variant: "primary",
+						size: "sm",
+						disabled: restartBlocked,
+						onClick: () => setRestartConfirmOpen(true),
+						children: restarting ? t("restarting") : t("restartNow")
+					}),
+					showHostPending && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+						variant: "ghost",
+						size: "sm",
+						"aria-label": t("dismissNotice"),
+						onClick: () => {
+							setRestartNoticeDismissed(true);
+							try {
+								sessionStorage.setItem("dshm-restart-dismissed", String(bootId ?? ""));
+							} catch {}
+						},
+						children: t("dismiss")
+					})
+				]
+			})] });
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: Market_module_css_default.root,
 				style: props.embedded ? { minHeight: 0 } : void 0,
@@ -5552,257 +6354,10 @@ window.__ModuleLoader__.load({
 									}),
 									/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: Market_module_css_default.grow })
 								]
-							}),
-							!envReady && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-								className: Market_module_css_default.banner,
-								children: [
-									/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconCordisPluginOutline14, {
-										size: 14,
-										className: Market_module_css_default.bannerIcon
-									}),
-									/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-										className: Market_module_css_default.grow,
-										children: envFailed ? t("envFixFail") : t("envMissing")
-									}),
-									!envFailed && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-										variant: "primary",
-										size: "sm",
-										disabled: envFixing,
-										onClick: fixEnv,
-										children: envFixing ? t("envFixing") : t("envFix")
-									})
-								]
-							}),
-							backupMessage !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-								className: Market_module_css_default.backupMessage,
-								children: backupMessage
-							}),
-							restoreErrors.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-								className: Market_module_css_default.banner,
-								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconWarningOutline16, {
-									size: 14,
-									className: Market_module_css_default.bannerIcon
-								}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-									className: Market_module_css_default.grow,
-									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", { children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", { children: t("restorePartial") }) }), restoreErrors.map((error) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-										className: Market_module_css_default.spec,
-										children: error
-									}, error))]
-								})]
-							}),
-							tab === "installed" && pendingBackup !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-								className: Market_module_css_default.banner,
-								children: [
-									/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconRefreshOutline14, {
-										size: 14,
-										className: Market_module_css_default.bannerIcon
-									}),
-									/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-										className: Market_module_css_default.grow,
-										children: t("restoreMissing").replace("{0}", String(missingRestoreCount))
-									}),
-									/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-										variant: "primary",
-										size: "sm",
-										disabled: backupBusy,
-										onClick: () => setRestoreConfirmOpen(true),
-										children: backupBusy ? t("backupWorking") : t("restoreStart")
-									})
-								]
-							}),
-							pendingRefreshNames.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-								className: Market_module_css_default.banner,
-								children: [
-									/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconSparkle16, {
-										size: 14,
-										className: Market_module_css_default.bannerIcon
-									}),
-									/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-										className: Market_module_css_default.grow,
-										children: [
-											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", { children: pendingRefreshNames.length }),
-											" ",
-											t("refreshBanner")
-										]
-									}),
-									/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-										variant: "primary",
-										size: "sm",
-										onClick: () => {
-											if (hotNames.length > 0) sessionStorage.setItem("dshm-toast", JSON.stringify(hotNames));
-											sessionStorage.setItem("dshm-tab", "installed");
-											location.reload();
-										},
-										children: t("refresh")
-									})
-								]
-							}),
-							pendingRestart > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-								className: Market_module_css_default.banner,
-								children: [
-									/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconRefreshOutline14, {
-										size: 14,
-										className: Market_module_css_default.bannerIcon
-									}),
-									/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-										className: Market_module_css_default.grow,
-										children: [
-											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", { children: pendingRestart }),
-											" ",
-											t("restartBanner")
-										]
-									}),
-									/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Tooltip, {
-										label: supervisor === null ? t("restartHint") : t("restartHintSupervised").replace("{0}", supervisor),
-										side: "bottom",
-										children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-											className: Market_module_css_default.bannerHint,
-											children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconQuestionOutline14, { size: 14 })
-										})
-									}),
-									restartEnabled && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-										variant: "primary",
-										size: "sm",
-										disabled: restarting || hostBusy || busyUrl !== null || updatingName !== null || removingName !== null,
-										onClick: doRestart,
-										children: restarting ? t("restarting") : t("restartNow")
-									}),
-									showHostPending && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-										variant: "ghost",
-										size: "sm",
-										"aria-label": t("dismissNotice"),
-										onClick: () => {
-											setRestartNoticeDismissed(true);
-											try {
-												sessionStorage.setItem("dshm-restart-dismissed", String(bootId ?? ""));
-											} catch {}
-										},
-										children: t("dismiss")
-									})
-								]
-							}),
-							activationWarnings.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-								className: Market_module_css_default.banner,
-								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconWarningOutline16, {
-									size: 14,
-									className: Market_module_css_default.bannerIcon
-								}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-									className: Market_module_css_default.grow,
-									children: activationWarnings.map(({ name, info }) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", { children: name }),
-										" — ",
-										activationMeta(info.state, t).label,
-										info.reasons.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-											className: Market_module_css_default.spec,
-											children: [
-												"（",
-												info.reasons.join(" / "),
-												"）"
-											]
-										})
-									] }, name))
-								})]
-							}),
-							tab === "installed" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(HostDependencyDiagnostics, {
-								findings: hostDependencyFindings,
-								t
 							})
 						]
 					}),
-					buildsSkipped !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-						className: Market_module_css_default.banner,
-						children: [
-							/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconWarningOutline16, {
-								size: 14,
-								className: Market_module_css_default.bannerIcon
-							}),
-							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-								className: Market_module_css_default.grow,
-								children: [
-									t("buildsSkipped"),
-									" ",
-									buildsSkipped.names.join(", ")
-								]
-							}),
-							/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-								size: "sm",
-								disabled: busyUrl !== null,
-								onClick: () => {
-									const { plugin, updateName, names } = buildsSkipped;
-									setBuildsSkipped(null);
-									fetch("/dsh-market/approve-builds", {
-										method: "POST",
-										headers: { "content-type": "application/json" },
-										body: JSON.stringify({ packages: names })
-									}).then((res) => res.json()).then((body) => {
-										if (!body.ok) setInstallError(String(body.error || "approve failed"));
-										else if (plugin !== void 0) doInstall(plugin);
-										else if (updateName !== void 0) doUpdate(updateName);
-									}).catch((error) => setInstallError(String(error)));
-								},
-								children: t("approveBuilds")
-							})
-						]
-					}),
-					compatibilityNotice !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-						className: Market_module_css_default.banner,
-						children: [
-							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-								className: Market_module_css_default.grow,
-								children: [
-									compatibilityNotice.risks.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", { children: t("compatRiskBanner") }),
-										" ",
-										compatibilitySummary(compatibilityNotice.risks)
-									] }),
-									compatibilityNotice.shadowedNames !== void 0 && compatibilityNotice.shadowedNames.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
-										compatibilityNotice.risks.length > 0 && " · ",
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", { children: t("shadowNameBanner") }),
-										" ",
-										shadowSummary(compatibilityNotice.shadowedNames)
-									] }),
-									compatibilityNotice.brokenBundles !== void 0 && compatibilityNotice.brokenBundles.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
-										(compatibilityNotice.risks.length > 0 || (compatibilityNotice.shadowedNames?.length ?? 0) > 0) && " · ",
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", { children: t("brokenBundleBanner") }),
-										" ",
-										compatibilityNotice.brokenBundles.map((entry) => entry.name).join(", ")
-									] })
-								]
-							}),
-							/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-								variant: "outline",
-								size: "sm",
-								onClick: () => setTab("diagnostics"),
-								children: t("goDiagnose")
-							}),
-							/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-								variant: "primary",
-								size: "sm",
-								disabled: rollingBack,
-								onClick: () => void doRollback(compatibilityNotice.rollbackId),
-								children: rollingBack ? t("rollingBack") : t("rollbackNow")
-							})
-						]
-					}),
-					installError !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-						className: Market_module_css_default.err,
-						children: [installError, /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-							className: Market_module_css_default.staleAction,
-							children: [staleName !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-								size: "sm",
-								onClick: () => doUpdate(staleName, true),
-								children: t("updateNow")
-							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-								size: "sm",
-								variant: "outline",
-								icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconDownloadOutline16, { size: 14 }),
-								disabled: exportState === "busy",
-								onClick: doExportLog,
-								children: exportState === "busy" ? t("exportingLog") : t("exportLog")
-							})]
-						})]
-					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 						className: Market_module_css_default.body,
 						style: props.embedded ? {
 							paddingTop: 0,
@@ -5810,369 +6365,450 @@ window.__ModuleLoader__.load({
 						} : void 0,
 						ref: bodyRef,
 						onScroll: (e) => setShowTop(e.currentTarget.scrollTop > 400),
-						children: tab === "backup" ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-							className: Market_module_css_default.backupGrid,
-							children: [
-								/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
-									className: Market_module_css_default.backupCard,
-									children: [
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h3", { children: t("backupLocal") }),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: t("backupHint") }),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-											className: Market_module_css_default.backupWarn,
-											children: t("credsWarning")
-										}),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-											className: Market_module_css_default.backupActions,
-											children: [
-												/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-													variant: "primary",
-													size: "sm",
-													icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconDownloadOutline16, { size: 14 }),
-													disabled: backupBusy,
-													onClick: () => downloadFile("/dsh-market/backup", "dsh-profile-backup.json"),
-													children: backupBusy ? t("backupWorking") : t("backupDownload")
-												}),
-												/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-													variant: "outline",
-													size: "sm",
-													icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconFolderOpen16, { size: 14 }),
-													disabled: backupBusy,
-													onClick: () => fileInputRef.current?.click(),
-													children: backupBusy ? t("backupWorking") : t("backupImport")
-												}),
-												/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
-													ref: fileInputRef,
-													type: "file",
-													accept: "application/json,.json",
-													className: Market_module_css_default.hiddenFile,
-													tabIndex: -1,
-													"aria-hidden": "true",
-													disabled: backupBusy,
-													onChange: (event) => {
-														const file = event.currentTarget.files?.[0];
-														event.currentTarget.value = "";
-														if (file !== void 0) file.text().then((text) => previewBackup(JSON.parse(text))).catch((error) => setBackupMessage(String(error)));
-													}
-												})
-											]
-										})
-									]
-								}),
-								/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
-									className: Market_module_css_default.backupCard,
-									children: [
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h3", { children: t("webdav") }),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Menu, {
-											open: presetOpen,
-											onClose: () => setPresetOpen(false),
-											onSelect: (id) => {
-												const urls = {
-													jianguoyun: "https://dav.jianguoyun.com/dav/dsh-profile-backup.json",
-													koofr: "https://app.koofr.net/dav/Koofr/dsh-profile-backup.json",
-													nextcloud: "https://nextcloud.example/remote.php/dav/files/USERNAME/dsh-profile-backup.json"
-												};
-												if (urls[id] !== void 0) setWebdavUrl(urls[id]);
-											},
-											align: "start",
-											anchor: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-												variant: "outline",
-												size: "sm",
-												icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronDownOutline14, { size: 14 }),
-												onClick: () => setPresetOpen((o) => !o),
-												children: t("webdavPreset")
+						children: [
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+								className: Market_module_css_default.topNotices,
+								children: topNotices
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+								className: Market_module_css_default.contextNotices,
+								children: [
+									backupMessage !== null && tab === "backup" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+										className: Market_module_css_default.backupMessage,
+										children: backupMessage
+									}),
+									restoreErrors.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+										className: Market_module_css_default.banner,
+										children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconWarningOutline16, {
+											size: 14,
+											className: Market_module_css_default.bannerIcon
+										}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+											className: Market_module_css_default.grow,
+											children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", { children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", { children: t("restorePartial") }) }), restoreErrors.map((error) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+												className: Market_module_css_default.spec,
+												children: error
+											}, error))]
+										})]
+									}),
+									tab === "installed" && pendingBackup !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+										className: Market_module_css_default.banner,
+										children: [
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconRefreshOutline14, {
+												size: 14,
+												className: Market_module_css_default.bannerIcon
 											}),
-											items: [
-												{
-													id: "custom",
-													label: t("webdavPreset")
-												},
-												{
-													id: "jianguoyun",
-													label: "坚果云 / Nutstore"
-												},
-												{
-													id: "koofr",
-													label: "Koofr"
-												},
-												{
-													id: "nextcloud",
-													label: "Nextcloud"
-												}
-											]
-										}),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
-											className: Market_module_css_default.backupInput,
-											icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconLinkOutline14, { size: 14 }),
-											type: "url",
-											value: webdavUrl,
-											placeholder: t("webdavUrl"),
-											onChange: (e) => setWebdavUrl(e.target.value)
-										}),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
-											className: Market_module_css_default.backupInput,
-											autoComplete: "username",
-											value: webdavUser,
-											placeholder: t("webdavUser"),
-											onChange: (e) => setWebdavUser(e.target.value)
-										}),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
-											className: Market_module_css_default.backupInput,
-											type: "password",
-											autoComplete: "current-password",
-											value: webdavPassword,
-											placeholder: t("webdavPassword"),
-											onChange: (e) => setWebdavPassword(e.target.value)
-										}),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-											className: Market_module_css_default.backupActions,
-											children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+												className: Market_module_css_default.grow,
+												children: t("restoreMissing").replace("{0}", String(missingRestoreCount))
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
 												variant: "primary",
 												size: "sm",
-												disabled: backupBusy || webdavUrl.trim() === "",
-												onClick: () => runWebdav("backup"),
-												children: backupBusy ? t("backupWorking") : t("webdavUpload")
-											}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+												disabled: backupBusy,
+												onClick: () => setRestoreConfirmOpen(true),
+												children: backupBusy ? t("backupWorking") : t("restoreStart")
+											})
+										]
+									}),
+									pendingRefreshNames.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+										className: Market_module_css_default.banner,
+										children: [
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconSparkle16, {
+												size: 14,
+												className: Market_module_css_default.bannerIcon
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+												className: Market_module_css_default.grow,
+												children: [
+													/* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", { children: pendingRefreshNames.length }),
+													" ",
+													t("refreshBanner")
+												]
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+												variant: "primary",
+												size: "sm",
+												onClick: () => {
+													if (hotNames.length > 0) sessionStorage.setItem("dshm-toast", JSON.stringify(hotNames));
+													sessionStorage.setItem("dshm-tab", "installed");
+													location.reload();
+												},
+												children: t("refresh")
+											})
+										]
+									}),
+									activationWarnings.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+										className: Market_module_css_default.banner,
+										children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconWarningOutline16, {
+											size: 14,
+											className: Market_module_css_default.bannerIcon
+										}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+											className: Market_module_css_default.grow,
+											children: activationWarnings.map(({ name, info }) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [
+												/* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", { children: name }),
+												" — ",
+												activationMeta(info.state, t).label,
+												info.reasons.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+													className: Market_module_css_default.spec,
+													children: [
+														"（",
+														info.reasons.join(" / "),
+														"）"
+													]
+												})
+											] }, name))
+										})]
+									}),
+									tab === "installed" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(HostDependencyDiagnostics, {
+										findings: hostDependencyFindings,
+										t
+									}),
+									buildsSkipped !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+										className: Market_module_css_default.banner,
+										children: [
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconWarningOutline16, {
+												size: 14,
+												className: Market_module_css_default.bannerIcon
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+												className: Market_module_css_default.grow,
+												children: [
+													t("buildsSkipped"),
+													" ",
+													buildsSkipped.names.join(", ")
+												]
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+												size: "sm",
+												disabled: busyUrl !== null,
+												onClick: () => {
+													const { plugin, updateName, names } = buildsSkipped;
+													setBuildsSkipped(null);
+													fetch("/dsh-market/approve-builds", {
+														method: "POST",
+														headers: { "content-type": "application/json" },
+														body: JSON.stringify({ packages: names })
+													}).then((res) => res.json()).then((body) => {
+														if (!body.ok) setInstallError(String(body.error || "approve failed"));
+														else if (plugin !== void 0) doInstall(plugin);
+														else if (updateName !== void 0) doUpdate(updateName);
+													}).catch((error) => setInstallError(String(error)));
+												},
+												children: t("approveBuilds")
+											})
+										]
+									}),
+									compatibilityNotice !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+										className: Market_module_css_default.banner,
+										children: [
+											/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+												className: Market_module_css_default.grow,
+												children: [
+													compatibilityNotice.risks.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+														/* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", { children: t("compatRiskBanner") }),
+														" ",
+														compatibilitySummary(compatibilityNotice.risks)
+													] }),
+													compatibilityNotice.shadowedNames !== void 0 && compatibilityNotice.shadowedNames.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+														compatibilityNotice.risks.length > 0 && " · ",
+														/* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", { children: t("shadowNameBanner") }),
+														" ",
+														shadowSummary(compatibilityNotice.shadowedNames)
+													] }),
+													compatibilityNotice.brokenBundles !== void 0 && compatibilityNotice.brokenBundles.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+														(compatibilityNotice.risks.length > 0 || (compatibilityNotice.shadowedNames?.length ?? 0) > 0) && " · ",
+														/* @__PURE__ */ (0, react_jsx_runtime.jsx)("b", { children: t("brokenBundleBanner") }),
+														" ",
+														compatibilityNotice.brokenBundles.map((entry) => entry.name).join(", ")
+													] })
+												]
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
 												variant: "outline",
 												size: "sm",
-												disabled: backupBusy || webdavUrl.trim() === "",
-												onClick: () => runWebdav("restore"),
-												children: t("webdavRestore")
+												onClick: () => setTab("diagnostics"),
+												children: t("goDiagnose")
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+												variant: "primary",
+												size: "sm",
+												disabled: rollingBack,
+												onClick: () => void doRollback(compatibilityNotice.rollbackId),
+												children: rollingBack ? t("rollingBack") : t("rollbackNow")
+											})
+										]
+									}),
+									installError !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+										className: Market_module_css_default.err,
+										children: [installError, /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+											className: Market_module_css_default.staleAction,
+											children: [staleName !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+												size: "sm",
+												onClick: () => doUpdate(staleName, true),
+												children: t("updateNow")
+											}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+												size: "sm",
+												variant: "outline",
+												icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconDownloadOutline16, { size: 14 }),
+												disabled: exportState === "busy",
+												onClick: doExportLog,
+												children: exportState === "busy" ? t("exportingLog") : t("exportLog")
 											})]
-										}),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
-											className: Market_module_css_default.backupCheck,
-											children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
-												type: "checkbox",
-												checked: autoBackup,
-												onChange: (e) => setAutoBackup(e.target.checked)
-											}), t("autoBackup")]
-										}),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: t("webdavNote") }),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-											className: Market_module_css_default.backupWarn,
-											children: t("credsWarning")
-										})
-									]
-								}),
-								/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
-									className: Market_module_css_default.backupCard,
-									children: [
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h3", { children: t("gist") }),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
-											className: Market_module_css_default.backupInput,
-											type: "password",
-											autoComplete: "off",
-											value: gistToken,
-											placeholder: t("gistToken"),
-											onChange: (e) => setGistToken(e.target.value)
-										}),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
-											className: Market_module_css_default.backupInput,
-											icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconLinkOutline14, { size: 14 }),
-											value: gistId,
-											placeholder: t("gistId"),
-											onChange: (e) => setGistId(e.target.value)
-										}),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-											className: Market_module_css_default.backupActions,
-											children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
-												className: Market_module_css_default.backupCheck,
-												children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
-													type: "radio",
-													name: "gist-mode",
-													checked: gistMode === "update",
-													onChange: () => setGistMode("update")
-												}), t("gistModeUpdate")]
-											}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
-												className: Market_module_css_default.backupCheck,
-												children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
-													type: "radio",
-													name: "gist-mode",
-													checked: gistMode === "create",
-													onChange: () => setGistMode("create")
-												}), t("gistModeCreate")]
-											})]
-										}),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-											className: Market_module_css_default.backupActions,
-											children: [
-												/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+										})]
+									})
+								]
+							}),
+							tab === "backup" ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+								className: Market_module_css_default.backupGrid,
+								children: [
+									/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+										className: Market_module_css_default.backupCard,
+										children: [
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h3", { children: t("backupLocal") }),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: t("backupHint") }),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+												className: Market_module_css_default.backupWarn,
+												children: t("credsWarning")
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+												className: Market_module_css_default.backupActions,
+												children: [
+													/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+														variant: "primary",
+														size: "sm",
+														icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconDownloadOutline16, { size: 14 }),
+														disabled: backupBusy,
+														onClick: () => downloadFile("/dsh-market/backup", "dsh-profile-backup.json"),
+														children: backupBusy ? t("backupWorking") : t("backupDownload")
+													}),
+													/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+														variant: "outline",
+														size: "sm",
+														icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconFolderOpen16, { size: 14 }),
+														disabled: backupBusy,
+														onClick: () => fileInputRef.current?.click(),
+														children: backupBusy ? t("backupWorking") : t("backupImport")
+													}),
+													/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
+														ref: fileInputRef,
+														type: "file",
+														accept: "application/json,.json",
+														className: Market_module_css_default.hiddenFile,
+														tabIndex: -1,
+														"aria-hidden": "true",
+														disabled: backupBusy,
+														onChange: (event) => {
+															const file = event.currentTarget.files?.[0];
+															event.currentTarget.value = "";
+															if (file !== void 0) file.text().then((text) => previewBackup(JSON.parse(text))).catch((error) => setBackupMessage(String(error)));
+														}
+													})
+												]
+											})
+										]
+									}),
+									/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+										className: Market_module_css_default.backupCard,
+										children: [
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h3", { children: t("webdav") }),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Menu, {
+												open: presetOpen,
+												onClose: () => setPresetOpen(false),
+												onSelect: (id) => {
+													const urls = {
+														jianguoyun: "https://dav.jianguoyun.com/dav/dsh-profile-backup.json",
+														koofr: "https://app.koofr.net/dav/Koofr/dsh-profile-backup.json",
+														nextcloud: "https://nextcloud.example/remote.php/dav/files/USERNAME/dsh-profile-backup.json"
+													};
+													if (urls[id] !== void 0) setWebdavUrl(urls[id]);
+												},
+												align: "start",
+												anchor: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
 													variant: "outline",
 													size: "sm",
-													disabled: gistBusy,
-													onClick: () => runGist("verify"),
-													children: gistBusy ? t("backupWorking") : t("gistVerify")
+													icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronDownOutline14, { size: 14 }),
+													onClick: () => setPresetOpen((o) => !o),
+													children: t("webdavPreset")
 												}),
-												/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+												items: [
+													{
+														id: "custom",
+														label: t("webdavPreset")
+													},
+													{
+														id: "jianguoyun",
+														label: "坚果云 / Nutstore"
+													},
+													{
+														id: "koofr",
+														label: "Koofr"
+													},
+													{
+														id: "nextcloud",
+														label: "Nextcloud"
+													}
+												]
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
+												className: Market_module_css_default.backupInput,
+												icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconLinkOutline14, { size: 14 }),
+												type: "url",
+												value: webdavUrl,
+												placeholder: t("webdavUrl"),
+												onChange: (e) => setWebdavUrl(e.target.value)
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
+												className: Market_module_css_default.backupInput,
+												autoComplete: "username",
+												value: webdavUser,
+												placeholder: t("webdavUser"),
+												onChange: (e) => setWebdavUser(e.target.value)
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
+												className: Market_module_css_default.backupInput,
+												type: "password",
+												autoComplete: "current-password",
+												value: webdavPassword,
+												placeholder: t("webdavPassword"),
+												onChange: (e) => setWebdavPassword(e.target.value)
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+												className: Market_module_css_default.backupActions,
+												children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
 													variant: "primary",
 													size: "sm",
-													disabled: gistBusy || gistMode === "update" && gistId.trim() === "",
-													onClick: openExportPicker,
-													children: gistBusy ? t("backupWorking") : t("gistExport")
-												}),
-												/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+													disabled: backupBusy || webdavUrl.trim() === "",
+													onClick: () => runWebdav("backup"),
+													children: backupBusy ? t("backupWorking") : t("webdavUpload")
+												}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
 													variant: "outline",
 													size: "sm",
-													disabled: gistBusy || gistId.trim() === "",
-													onClick: () => runGist("import"),
-													children: t("gistImport")
-												})
-											]
-										}),
-										gistResult !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
-											className: Market_module_css_default.backupCheck,
-											children: [
-												/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: t("gistCreated") }),
-												" ",
-												/* @__PURE__ */ (0, react_jsx_runtime.jsx)("a", {
-													className: Market_module_css_default.src,
-													href: gistResult.gistUrl,
-													target: "_blank",
-													rel: "noreferrer",
-													children: gistResult.gistUrl
-												})
-											]
-										}),
-										gistMessage !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-											className: gistOk ? Market_module_css_default.backupMessage : Market_module_css_default.backupWarn,
-											children: gistMessage
-										}),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: t("gistNote") })
-									]
-								})
-							]
-						}) : tab === "discover" ? loadError !== null ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-							className: Market_module_css_default.empty,
-							children: [
-								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", { children: t("loadFail") }),
-								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-									className: Market_module_css_default.err,
-									children: loadError
-								}),
-								/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-									variant: "outline",
-									size: "sm",
-									className: Market_module_css_default.retryBtn,
-									onClick: () => {
-										loadCatalog();
-									},
-									children: t("loadRetry")
-								})
-							]
-						}) : data === null ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-							className: Market_module_css_default.loading,
-							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-								className: Market_module_css_default.logoMark,
-								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MarketLogo, {
-									size: 26,
-									animated: true
-								})
-							}), t("loading")]
-						}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-							className: Market_module_css_default.stickyHead,
-							style: props.embedded ? { top: 0 } : void 0,
-							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-								className: Market_module_css_default.tabSearchRow,
-								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
-									className: Market_module_css_default.tabSearch,
-									icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconSearchOutline16, { size: 14 }),
-									placeholder: t("searchPh"),
-									value: q,
-									onChange: (e) => setQ(e.target.value)
-								})
-							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-								className: Market_module_css_default.cats,
-								children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-									className: Market_module_css_default.catsRow,
-									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-										ref: catsWrapRef,
-										className: visibleCats === null ? `${Market_module_css_default.catsWrap} ${Market_module_css_default.catsCollapsed}` : Market_module_css_default.catsWrap,
-										children: (() => {
-											const budget = visibleCats;
-											const ordered = orderedCategories(categories, cat, catsOpen, budget);
-											const shown = catsOpen || budget === null ? ordered : ordered.slice(0, Math.max(0, budget - 1));
-											return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
-												/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Pill, {
-													"data-chip": "1",
-													active: cat === "all",
-													onClick: () => setCat("all"),
-													children: t("all") + " (" + formatCount(data.count) + ")"
-												}),
-												shown.map((id) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Pill, {
-													"data-chip": "1",
-													active: cat === id,
-													onClick: () => setCat(id),
-													children: data.categories[id] && (data.categories[id][lang] || data.categories[id].en) || id
-												}, id)),
-												/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-													variant: "ghost",
-													size: "sm",
-													className: Market_module_css_default.catsToggle,
-													icon: catsOpen ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronUpOutline14, { size: 14 }) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronDownOutline14, { size: 14 }),
-													"aria-label": catsOpen ? t("catsLess") : t("catsMore"),
-													onClick: () => setCatsOpen((o) => !o)
-												})
-											] });
-										})()
-									}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(FilterMenu, {
-										sortField,
-										sortDir,
-										timeRange,
-										onSortField: setSortField,
-										onSortDir: setSortDir,
-										onTimeRange: setTimeRange,
-										t
-									})]
-								})
-							})]
-						}), plugins.length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-							className: Market_module_css_default.empty,
-							children: t("empty")
-						}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Masonry, {
-							items: pagePlugins,
-							render: pluginCard
-						}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Pager, {
-							currentPage,
-							totalPages,
-							pageSize,
-							onGoToPage: goToPage,
-							onChangePageSize: changePageSize,
-							t
-						})] })] }) : tab === "themes" && themeSnap !== null ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
-							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-								className: Market_module_css_default.tabSearchRow,
-								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
-									className: Market_module_css_default.tabSearch,
-									icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconSearchOutline16, { size: 14 }),
-									placeholder: t("searchPh"),
-									value: qThemes,
-									onChange: (e) => setQThemes(e.target.value)
-								})
-							}),
-							(() => {
-								const extra = themeSnap.themes.filter((def) => def.id !== "light" && def.id !== "dark");
-								return extra.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-									className: `${Market_module_css_default.grid} ${Market_module_css_default.themesGrid}`,
-									children: extra.map((def) => themeCard(def.id, def.id, themeSwatch(def)))
-								});
-							})(),
-							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-								className: Market_module_css_default.cats,
-								children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-									className: Market_module_css_default.catsRow,
-									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: Market_module_css_default.grow }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(FilterMenu, {
-										sortField: themeSortField,
-										sortDir: themeSortDir,
-										timeRange: themeTimeRange,
-										onSortField: setThemeSortField,
-										onSortDir: setThemeSortDir,
-										onTimeRange: setThemeTimeRange,
-										t
-									})]
-								})
-							}),
-							data === null ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+													disabled: backupBusy || webdavUrl.trim() === "",
+													onClick: () => runWebdav("restore"),
+													children: t("webdavRestore")
+												})]
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
+												className: Market_module_css_default.backupCheck,
+												children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
+													type: "checkbox",
+													checked: autoBackup,
+													onChange: (e) => setAutoBackup(e.target.checked)
+												}), t("autoBackup")]
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: t("webdavNote") }),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+												className: Market_module_css_default.backupWarn,
+												children: t("credsWarning")
+											})
+										]
+									}),
+									/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+										className: Market_module_css_default.backupCard,
+										children: [
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h3", { children: t("gist") }),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
+												className: Market_module_css_default.backupInput,
+												type: "password",
+												autoComplete: "off",
+												value: gistToken,
+												placeholder: t("gistToken"),
+												onChange: (e) => setGistToken(e.target.value)
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
+												className: Market_module_css_default.backupInput,
+												icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconLinkOutline14, { size: 14 }),
+												value: gistId,
+												placeholder: t("gistId"),
+												onChange: (e) => setGistId(e.target.value)
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+												className: Market_module_css_default.backupActions,
+												children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
+													className: Market_module_css_default.backupCheck,
+													children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
+														type: "radio",
+														name: "gist-mode",
+														checked: gistMode === "update",
+														onChange: () => setGistMode("update")
+													}), t("gistModeUpdate")]
+												}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("label", {
+													className: Market_module_css_default.backupCheck,
+													children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
+														type: "radio",
+														name: "gist-mode",
+														checked: gistMode === "create",
+														onChange: () => setGistMode("create")
+													}), t("gistModeCreate")]
+												})]
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+												className: Market_module_css_default.backupActions,
+												children: [
+													/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+														variant: "outline",
+														size: "sm",
+														disabled: gistBusy,
+														onClick: () => runGist("verify"),
+														children: gistBusy ? t("backupWorking") : t("gistVerify")
+													}),
+													/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+														variant: "primary",
+														size: "sm",
+														disabled: gistBusy || gistMode === "update" && gistId.trim() === "",
+														onClick: openExportPicker,
+														children: gistBusy ? t("backupWorking") : t("gistExport")
+													}),
+													/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+														variant: "outline",
+														size: "sm",
+														disabled: gistBusy || gistId.trim() === "",
+														onClick: () => runGist("import"),
+														children: t("gistImport")
+													})
+												]
+											}),
+											gistResult !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+												className: Market_module_css_default.backupCheck,
+												children: [
+													/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: t("gistCreated") }),
+													" ",
+													/* @__PURE__ */ (0, react_jsx_runtime.jsx)("a", {
+														className: Market_module_css_default.src,
+														href: gistResult.gistUrl,
+														target: "_blank",
+														rel: "noreferrer",
+														children: gistResult.gistUrl
+													})
+												]
+											}),
+											gistMessage !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+												className: gistOk ? Market_module_css_default.backupMessage : Market_module_css_default.backupWarn,
+												children: gistMessage
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: t("gistNote") })
+										]
+									})
+								]
+							}) : tab === "discover" ? loadError !== null ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+								className: Market_module_css_default.empty,
+								children: [
+									/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", { children: t("loadFail") }),
+									/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+										className: Market_module_css_default.err,
+										children: loadError
+									}),
+									/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+										variant: "outline",
+										size: "sm",
+										className: Market_module_css_default.retryBtn,
+										onClick: () => {
+											loadCatalog();
+										},
+										children: t("loadRetry")
+									})
+								]
+							}) : data === null ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 								className: Market_module_css_default.loading,
 								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 									className: Market_module_css_default.logoMark,
@@ -6181,566 +6817,681 @@ window.__ModuleLoader__.load({
 										animated: true
 									})
 								}), t("loading")]
-							}) : anyThemePlugins.length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-								className: Market_module_css_default.empty,
-								children: t("themeEmpty")
-							}) : themePlugins$1.length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+							}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+								className: Market_module_css_default.stickyHead,
+								style: props.embedded ? { top: 0 } : void 0,
+								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+									className: Market_module_css_default.tabSearchRow,
+									children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
+										className: Market_module_css_default.tabSearch,
+										icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconSearchOutline16, { size: 14 }),
+										placeholder: t("searchPh"),
+										value: q,
+										onChange: (e) => setQ(e.target.value)
+									})
+								}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+									className: Market_module_css_default.cats,
+									children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+										className: Market_module_css_default.catsRow,
+										children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+											ref: catsWrapRef,
+											className: visibleCats === null ? `${Market_module_css_default.catsWrap} ${Market_module_css_default.catsCollapsed}` : Market_module_css_default.catsWrap,
+											children: (() => {
+												const budget = visibleCats;
+												const ordered = orderedCategories(categories, cat, catsOpen, budget);
+												const shown = catsOpen || budget === null ? ordered : ordered.slice(0, Math.max(0, budget - 1));
+												return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+													/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Pill, {
+														"data-chip": "1",
+														active: cat === "all",
+														onClick: () => setCat("all"),
+														children: t("all") + " (" + formatCount(data.count) + ")"
+													}),
+													shown.map((id) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Pill, {
+														"data-chip": "1",
+														active: cat === id,
+														onClick: () => setCat(id),
+														children: data.categories[id] && (data.categories[id][lang] || data.categories[id].en) || id
+													}, id)),
+													/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+														variant: "ghost",
+														size: "sm",
+														className: Market_module_css_default.catsToggle,
+														icon: catsOpen ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronUpOutline14, { size: 14 }) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronDownOutline14, { size: 14 }),
+														"aria-label": catsOpen ? t("catsLess") : t("catsMore"),
+														onClick: () => setCatsOpen((o) => !o)
+													})
+												] });
+											})()
+										}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(FilterMenu, {
+											sortField,
+											sortDir,
+											timeRange,
+											onSortField: setSortField,
+											onSortDir: setSortDir,
+											onTimeRange: setTimeRange,
+											t
+										})]
+									})
+								})]
+							}), plugins.length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 								className: Market_module_css_default.empty,
 								children: t("empty")
 							}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Masonry, {
-								items: themePagePlugins,
-								render: themePluginCard
+								items: pagePlugins,
+								render: pluginCard
 							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Pager, {
-								currentPage: themePagination.currentPage,
-								totalPages: themePagination.totalPages,
-								pageSize: themePagination.pageSize,
-								onGoToPage: themePagination.goToPage,
-								onChangePageSize: themePagination.changePageSize,
+								currentPage,
+								totalPages,
+								pageSize,
+								onGoToPage: goToPage,
+								onChangePageSize: changePageSize,
 								t
-							})] })
-						] }) : tab === "diagnostics" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Diagnostics, { t }) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
-							/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-								className: Market_module_css_default.viewBar,
-								children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-									type: "button",
-									className: installedView === "list" ? `${Market_module_css_default.viewBtn} ${Market_module_css_default.viewOn}` : Market_module_css_default.viewBtn,
-									onClick: () => setInstalledView("list"),
-									children: t("tabList")
-								}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-									type: "button",
-									className: installedView === "groups" ? `${Market_module_css_default.viewBtn} ${Market_module_css_default.viewOn}` : Market_module_css_default.viewBtn,
-									onClick: () => setInstalledView("groups"),
-									children: t("tabGroups")
-								})]
-							}),
-							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-								className: Market_module_css_default.tabSearchRow,
-								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
-									className: Market_module_css_default.tabSearch,
-									icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconSearchOutline16, { size: 14 }),
-									placeholder: t("searchPh"),
-									value: qInstalled,
-									onChange: (e) => setQInstalled(e.target.value)
-								})
-							}),
-							installedView === "groups" ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+							})] })] }) : tab === "themes" && themeSnap !== null ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
 								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-									className: Market_module_css_default.groupCreate,
-									children: creatingGroup ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
-											className: Market_module_css_default.inlineInput,
-											placeholder: t("groupNamePh"),
-											value: newGroupName,
-											onChange: (e) => setNewGroupName(e.target.value),
-											onKeyDown: (e) => {
-												if (e.key === "Enter") doCreateGroup();
-											},
-											autoFocus: true
-										}),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-											variant: "primary",
-											size: "sm",
-											onClick: doCreateGroup,
-											children: t("groupCreate")
-										}),
-										/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-											variant: "ghost",
-											size: "sm",
-											onClick: () => {
-												setCreatingGroup(false);
-												setNewGroupName("");
-											},
-											children: t("cancel")
-										})
-									] }) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-										variant: "outline",
-										size: "sm",
-										onClick: () => setCreatingGroup(true),
-										children: t("groupNew")
+									className: Market_module_css_default.tabSearchRow,
+									children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
+										className: Market_module_css_default.tabSearch,
+										icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconSearchOutline16, { size: 14 }),
+										placeholder: t("searchPh"),
+										value: qThemes,
+										onChange: (e) => setQThemes(e.target.value)
 									})
 								}),
-								groupOrder.length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+								(() => {
+									const extra = themeSnap.themes.filter((def) => def.id !== "light" && def.id !== "dark");
+									return extra.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+										className: `${Market_module_css_default.grid} ${Market_module_css_default.themesGrid}`,
+										children: extra.map((def) => themeCard(def.id, def.id, themeSwatch(def)))
+									});
+								})(),
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+									className: Market_module_css_default.cats,
+									children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+										className: Market_module_css_default.catsRow,
+										children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: Market_module_css_default.grow }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(FilterMenu, {
+											sortField: themeSortField,
+											sortDir: themeSortDir,
+											timeRange: themeTimeRange,
+											onSortField: setThemeSortField,
+											onSortDir: setThemeSortDir,
+											onTimeRange: setThemeTimeRange,
+											t
+										})]
+									})
+								}),
+								data === null ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+									className: Market_module_css_default.loading,
+									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+										className: Market_module_css_default.logoMark,
+										children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(MarketLogo, {
+											size: 26,
+											animated: true
+										})
+									}), t("loading")]
+								}) : anyThemePlugins.length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 									className: Market_module_css_default.empty,
-									children: t("noGroups")
-								}) : groupOrder.map((gid) => {
-									const members = groups[gid] ?? [];
-									const sw = groupSwitchState(members, effectiveDisabledSet);
-									return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-										className: Market_module_css_default.groupRow,
-										children: [
-											/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-												className: Market_module_css_default.groupHead,
-												children: [
-													/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-														type: "button",
-														role: "switch",
-														"aria-checked": sw === "on" ? true : sw === "off" ? false : "mixed",
-														"aria-label": (sw !== "on" ? t("enable") : t("disable")) + " " + gid,
-														className: sw === "on" ? `${Market_module_css_default.switch} ${Market_module_css_default.switchOn}` : sw === "mixed" ? `${Market_module_css_default.switch} ${Market_module_css_default.switchMixed}` : Market_module_css_default.switch,
-														disabled: togglingName !== null || sw === "empty",
-														onClick: () => doGroupToggle(gid, sw !== "on"),
-														children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: Market_module_css_default.switchKnob })
-													}),
-													/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-														className: Market_module_css_default.groupName,
-														children: gid
-													}),
-													sw === "mixed" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-														className: Market_module_css_default.groupHint,
-														children: t("groupMixed")
-													}),
-													/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: Market_module_css_default.grow }),
-													/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-														className: Market_module_css_default.groupActions,
-														children: [
-															renamingGroup === gid ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
-																/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
-																	className: Market_module_css_default.inlineInput,
-																	placeholder: t("groupNamePh"),
-																	value: renamingValue,
-																	onChange: (e) => setRenamingValue(e.target.value),
-																	onKeyDown: (e) => {
-																		if (e.key === "Enter") doRenameGroup(gid);
-																	},
-																	autoFocus: true
-																}),
-																/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-																	variant: "primary",
-																	size: "sm",
-																	onClick: () => doRenameGroup(gid),
-																	children: t("groupRename")
-																}),
-																/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+									children: t("themeEmpty")
+								}) : themePlugins$1.length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+									className: Market_module_css_default.empty,
+									children: t("empty")
+								}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Masonry, {
+									items: themePagePlugins,
+									render: themePluginCard
+								}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Pager, {
+									currentPage: themePagination.currentPage,
+									totalPages: themePagination.totalPages,
+									pageSize: themePagination.pageSize,
+									onGoToPage: themePagination.goToPage,
+									onChangePageSize: themePagination.changePageSize,
+									t
+								})] })
+							] }) : tab === "diagnostics" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Diagnostics, { t }) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+								/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+									className: Market_module_css_default.viewBar,
+									children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+										type: "button",
+										className: installedView === "list" ? `${Market_module_css_default.viewBtn} ${Market_module_css_default.viewOn}` : Market_module_css_default.viewBtn,
+										onClick: () => setInstalledView("list"),
+										children: t("tabList")
+									}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+										type: "button",
+										className: installedView === "groups" ? `${Market_module_css_default.viewBtn} ${Market_module_css_default.viewOn}` : Market_module_css_default.viewBtn,
+										onClick: () => setInstalledView("groups"),
+										children: t("tabGroups")
+									})]
+								}),
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+									className: Market_module_css_default.tabSearchRow,
+									children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
+										className: Market_module_css_default.tabSearch,
+										icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconSearchOutline16, { size: 14 }),
+										placeholder: t("searchPh"),
+										value: qInstalled,
+										onChange: (e) => setQInstalled(e.target.value)
+									})
+								}),
+								installedView === "groups" ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+									/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+										className: Market_module_css_default.groupCreate,
+										children: creatingGroup ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
+												className: Market_module_css_default.inlineInput,
+												placeholder: t("groupNamePh"),
+												value: newGroupName,
+												onChange: (e) => setNewGroupName(e.target.value),
+												onKeyDown: (e) => {
+													if (e.key === "Enter") doCreateGroup();
+												},
+												autoFocus: true
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+												variant: "primary",
+												size: "sm",
+												onClick: doCreateGroup,
+												children: t("groupCreate")
+											}),
+											/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+												variant: "ghost",
+												size: "sm",
+												onClick: () => {
+													setCreatingGroup(false);
+													setNewGroupName("");
+												},
+												children: t("cancel")
+											})
+										] }) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+											variant: "outline",
+											size: "sm",
+											onClick: () => setCreatingGroup(true),
+											children: t("groupNew")
+										})
+									}),
+									groupOrder.length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+										className: Market_module_css_default.empty,
+										children: t("noGroups")
+									}) : groupOrder.map((gid) => {
+										const members = groups[gid] ?? [];
+										const sw = groupSwitchState(members, effectiveDisabledSet);
+										return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+											className: Market_module_css_default.groupRow,
+											children: [
+												/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+													className: Market_module_css_default.groupHead,
+													children: [
+														/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+															type: "button",
+															role: "switch",
+															"aria-checked": sw === "on" ? true : sw === "off" ? false : "mixed",
+															"aria-label": (sw !== "on" ? t("enable") : t("disable")) + " " + gid,
+															className: sw === "on" ? `${Market_module_css_default.switch} ${Market_module_css_default.switchOn}` : sw === "mixed" ? `${Market_module_css_default.switch} ${Market_module_css_default.switchMixed}` : Market_module_css_default.switch,
+															disabled: togglingName !== null || sw === "empty",
+															onClick: () => doGroupToggle(gid, sw !== "on"),
+															children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: Market_module_css_default.switchKnob })
+														}),
+														/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+															className: Market_module_css_default.groupName,
+															children: gid
+														}),
+														sw === "mixed" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+															className: Market_module_css_default.groupHint,
+															children: t("groupMixed")
+														}),
+														/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: Market_module_css_default.grow }),
+														/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+															className: Market_module_css_default.groupActions,
+															children: [
+																renamingGroup === gid ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+																	/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
+																		className: Market_module_css_default.inlineInput,
+																		placeholder: t("groupNamePh"),
+																		value: renamingValue,
+																		onChange: (e) => setRenamingValue(e.target.value),
+																		onKeyDown: (e) => {
+																			if (e.key === "Enter") doRenameGroup(gid);
+																		},
+																		autoFocus: true
+																	}),
+																	/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+																		variant: "primary",
+																		size: "sm",
+																		onClick: () => doRenameGroup(gid),
+																		children: t("groupRename")
+																	}),
+																	/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+																		variant: "ghost",
+																		size: "sm",
+																		onClick: () => {
+																			setRenamingGroup(null);
+																			setRenamingValue("");
+																		},
+																		children: t("cancel")
+																	})
+																] }) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
 																	variant: "ghost",
 																	size: "sm",
 																	onClick: () => {
-																		setRenamingGroup(null);
-																		setRenamingValue("");
+																		setRenamingGroup(gid);
+																		setRenamingValue(gid);
 																	},
-																	children: t("cancel")
+																	children: t("groupRename")
+																}),
+																deletingGroup === gid ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+																	variant: "primary",
+																	size: "sm",
+																	className: Market_module_css_default.dangerArmed,
+																	onClick: () => doDeleteGroup(gid),
+																	children: t("groupConfirmDelete")
+																}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+																	variant: "outline",
+																	size: "sm",
+																	className: Market_module_css_default.dangerBtn,
+																	onClick: () => setDeletingGroup(gid),
+																	children: t("groupDelete")
+																}),
+																/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+																	variant: "outline",
+																	size: "sm",
+																	onClick: () => setAddPanel(addPanel !== null && addPanel.group === gid && addPanel.kind === "plugin" ? null : {
+																		group: gid,
+																		kind: "plugin"
+																	}),
+																	children: t("groupAdd")
+																}),
+																/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+																	variant: "outline",
+																	size: "sm",
+																	disabled: members.some((member) => installedThemeNames.has(member)),
+																	onClick: () => setAddPanel(addPanel !== null && addPanel.group === gid && addPanel.kind === "theme" ? null : {
+																		group: gid,
+																		kind: "theme"
+																	}),
+																	children: t("groupAddTheme")
 																})
-															] }) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-																variant: "ghost",
-																size: "sm",
-																onClick: () => {
-																	setRenamingGroup(gid);
-																	setRenamingValue(gid);
-																},
-																children: t("groupRename")
-															}),
-															deletingGroup === gid ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-																variant: "primary",
-																size: "sm",
-																className: Market_module_css_default.dangerArmed,
-																onClick: () => doDeleteGroup(gid),
-																children: t("groupConfirmDelete")
-															}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-																variant: "outline",
-																size: "sm",
-																className: Market_module_css_default.dangerBtn,
-																onClick: () => setDeletingGroup(gid),
-																children: t("groupDelete")
-															}),
-															/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-																variant: "outline",
-																size: "sm",
-																onClick: () => setAddPanel(addPanel !== null && addPanel.group === gid && addPanel.kind === "plugin" ? null : {
-																	group: gid,
-																	kind: "plugin"
+															]
+														})
+													]
+												}),
+												addPanel !== null && addPanel.group === gid && (() => {
+													const candidates = addPanel.kind === "theme" ? [...installedThemeNames].filter((name) => !members.includes(name)) : groupableNames.filter((name) => !members.includes(name) && !installedThemeNames.has(name));
+													return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+														className: Market_module_css_default.groupAddPanel,
+														children: candidates.length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+															className: Market_module_css_default.groupHint,
+															children: t("groupAddEmpty")
+														}) : candidates.map((name) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+															className: Market_module_css_default.groupMember,
+															children: [
+																/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+																	className: Market_module_css_default.nm,
+																	children: name
 																}),
-																children: t("groupAdd")
-															}),
-															/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-																variant: "outline",
-																size: "sm",
-																disabled: members.some((member) => installedThemeNames.has(member)),
-																onClick: () => setAddPanel(addPanel !== null && addPanel.group === gid && addPanel.kind === "theme" ? null : {
-																	group: gid,
-																	kind: "theme"
+																effectiveDisabledSet.has(name) && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+																	className: Market_module_css_default.spec,
+																	children: t("disabledState")
 																}),
-																children: t("groupAddTheme")
-															})
-														]
-													})
-												]
-											}),
-											addPanel !== null && addPanel.group === gid && (() => {
-												const candidates = addPanel.kind === "theme" ? [...installedThemeNames].filter((name) => !members.includes(name)) : groupableNames.filter((name) => !members.includes(name) && !installedThemeNames.has(name));
-												return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-													className: Market_module_css_default.groupAddPanel,
-													children: candidates.length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+																/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: Market_module_css_default.grow }),
+																/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+																	variant: "outline",
+																	size: "sm",
+																	onClick: () => doAddMember(gid, name),
+																	children: addPanel.kind === "theme" ? t("groupAddTheme") : t("groupAdd")
+																})
+															]
+														}, name))
+													});
+												})(),
+												/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+													className: Market_module_css_default.groupMembers,
+													children: [members.length === 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 														className: Market_module_css_default.groupHint,
-														children: t("groupAddEmpty")
-													}) : candidates.map((name) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+														children: t("groupEmpty")
+													}), members.map((member) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 														className: Market_module_css_default.groupMember,
 														children: [
 															/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 																className: Market_module_css_default.nm,
-																children: name
+																children: member
 															}),
-															effectiveDisabledSet.has(name) && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+															effectiveDisabledSet.has(member) && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 																className: Market_module_css_default.spec,
 																children: t("disabledState")
 															}),
 															/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: Market_module_css_default.grow }),
+															/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+																type: "button",
+																role: "switch",
+																"aria-checked": !effectiveDisabledSet.has(member),
+																"aria-label": (effectiveDisabledSet.has(member) ? t("enable") : t("disable")) + " " + member,
+																className: effectiveDisabledSet.has(member) ? Market_module_css_default.switch : `${Market_module_css_default.switch} ${Market_module_css_default.switchOn}`,
+																disabled: togglingName !== null,
+																onClick: () => doToggle(member, effectiveDisabledSet.has(member)),
+																children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: Market_module_css_default.switchKnob })
+															}),
 															/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-																variant: "outline",
+																variant: "ghost",
 																size: "sm",
-																onClick: () => doAddMember(gid, name),
-																children: addPanel.kind === "theme" ? t("groupAddTheme") : t("groupAdd")
+																onClick: () => doRemoveMember(gid, member),
+																children: t("groupRemove")
 															})
 														]
-													}, name))
-												});
-											})(),
-											/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-												className: Market_module_css_default.groupMembers,
-												children: [members.length === 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-													className: Market_module_css_default.groupHint,
-													children: t("groupEmpty")
-												}), members.map((member) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-													className: Market_module_css_default.groupMember,
+													}, member))]
+												})
+											]
+										}, gid);
+									}),
+									/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+										className: Market_module_css_default.sect,
+										children: t("ungrouped")
+									}),
+									ungroupedNames.length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+										className: Market_module_css_default.empty,
+										children: t("installedEmpty")
+									}) : ungroupedNames.map((name) => {
+										const entry = data === null ? void 0 : entryForDep(data.plugins, name, String(installed[name]), repoIdentities[name], repoHints[name]);
+										const off = effectiveDisabledSet.has(name);
+										return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+											className: Market_module_css_default.irow,
+											children: [
+												/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+													style: { minWidth: 0 },
+													children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+														className: Market_module_css_default.nm,
+														children: [name, entry?.deprecated === true && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+															className: Market_module_css_default.depBadge,
+															children: t("deprecatedBadge")
+														})]
+													}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+														className: Market_module_css_default.act,
+														children: off ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+															className: Market_module_css_default.actWarn,
+															children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.StateDot, {
+																state: "warning",
+																size: 7
+															}), t("disabledState")]
+														}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+															className: Market_module_css_default.actLive,
+															children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.StateDot, {
+																state: "done",
+																size: 7
+															}), t("stateLive")]
+														})
+													})]
+												}),
+												/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: Market_module_css_default.grow }),
+												assignFor === name ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+													className: Market_module_css_default.assignRow,
 													children: [
-														/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-															className: Market_module_css_default.nm,
-															children: member
+														/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("select", {
+															className: Market_module_css_default.assignSelect,
+															value: assignTarget,
+															onChange: (e) => setAssignTarget(e.target.value),
+															children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("option", {
+																value: "",
+																children: t("groupNamePh")
+															}), groupOrder.map((gid) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("option", {
+																value: gid,
+																children: gid
+															}, gid))]
 														}),
-														effectiveDisabledSet.has(member) && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-															className: Market_module_css_default.spec,
-															children: t("disabledState")
-														}),
-														/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: Market_module_css_default.grow }),
-														/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-															type: "button",
-															role: "switch",
-															"aria-checked": !effectiveDisabledSet.has(member),
-															"aria-label": (effectiveDisabledSet.has(member) ? t("enable") : t("disable")) + " " + member,
-															className: effectiveDisabledSet.has(member) ? Market_module_css_default.switch : `${Market_module_css_default.switch} ${Market_module_css_default.switchOn}`,
-															disabled: togglingName !== null,
-															onClick: () => doToggle(member, effectiveDisabledSet.has(member)),
-															children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: Market_module_css_default.switchKnob })
+														/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+															variant: "primary",
+															size: "sm",
+															disabled: assignTarget === "",
+															onClick: () => doAssign(name),
+															children: t("groupAssign")
 														}),
 														/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
 															variant: "ghost",
 															size: "sm",
-															onClick: () => doRemoveMember(gid, member),
-															children: t("groupRemove")
+															onClick: () => {
+																setAssignFor(null);
+																setAssignTarget("");
+															},
+															children: t("cancel")
 														})
 													]
-												}, member))]
-											})
-										]
-									}, gid);
-								}),
-								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-									className: Market_module_css_default.sect,
-									children: t("ungrouped")
-								}),
-								ungroupedNames.length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-									className: Market_module_css_default.empty,
-									children: t("installedEmpty")
-								}) : ungroupedNames.map((name) => {
-									const entry = data === null ? void 0 : entryForDep(data.plugins, name, String(installed[name]), repoIdentities[name], repoHints[name]);
-									const off = effectiveDisabledSet.has(name);
-									return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-										className: Market_module_css_default.irow,
-										children: [
-											/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-												style: { minWidth: 0 },
-												children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-													className: Market_module_css_default.nm,
-													children: [name, entry?.deprecated === true && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-														className: Market_module_css_default.depBadge,
-														children: t("deprecatedBadge")
-													})]
-												}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-													className: Market_module_css_default.act,
-													children: off ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-														className: Market_module_css_default.actWarn,
-														children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.StateDot, {
-															state: "warning",
-															size: 7
-														}), t("disabledState")]
-													}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-														className: Market_module_css_default.actLive,
-														children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.StateDot, {
-															state: "done",
-															size: 7
-														}), t("stateLive")]
-													})
-												})]
-											}),
-											/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: Market_module_css_default.grow }),
-											assignFor === name ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-												className: Market_module_css_default.assignRow,
-												children: [
-													/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("select", {
-														className: Market_module_css_default.assignSelect,
-														value: assignTarget,
-														onChange: (e) => setAssignTarget(e.target.value),
-														children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("option", {
-															value: "",
-															children: t("groupNamePh")
-														}), groupOrder.map((gid) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("option", {
-															value: gid,
-															children: gid
-														}, gid))]
-													}),
-													/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-														variant: "primary",
-														size: "sm",
-														disabled: assignTarget === "",
-														onClick: () => doAssign(name),
-														children: t("groupAssign")
-													}),
-													/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-														variant: "ghost",
-														size: "sm",
-														onClick: () => {
-															setAssignFor(null);
-															setAssignTarget("");
-														},
-														children: t("cancel")
-													})
-												]
-											}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-												variant: "outline",
-												size: "sm",
-												disabled: groupOrder.length === 0,
-												onClick: () => {
-													setAssignFor(name);
-													setAssignTarget("");
-												},
-												children: t("groupAssign")
-											})
-										]
-									}, "ug-" + name);
-								})
-							] }) : Object.keys(displayedInstalled).filter((name) => name !== selfName).length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-								className: Market_module_css_default.empty,
-								children: t("installedEmpty")
-							}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-								className: Market_module_css_default.pairGrid,
-								children: Object.entries(displayedInstalled).filter(([name, spec]) => {
-									if (name === selfName) return false;
-									const needle = qInstalled.trim().toLowerCase();
-									if (needle === "") return true;
-									if (name.toLowerCase().includes(needle)) return true;
-									if (String(spec).toLowerCase().includes(needle)) return true;
-									const entry = data === null ? void 0 : entryForDep(data.plugins, name, String(spec), repoIdentities[name], repoHints[name]);
-									if (entry !== void 0) {
-										if ((entry.description && (entry.description[lang] || entry.description.en) || "").toLowerCase().includes(needle)) return true;
-										if ((entry.owner || "").toLowerCase().includes(needle)) return true;
-									}
-									return false;
-								}).map(([name, spec]) => {
-									const missing = pendingBackup !== null && !installedFiles.includes(name);
-									const entry = data === null ? void 0 : entryForDep(data.plugins, name, String(spec), repoIdentities[name], repoHints[name]);
-									const status = updates[name];
-									const act = activations[name];
-									const meta = act !== void 0 ? activationMeta(act.state, t) : null;
-									const version = status && status.version ? "v" + status.version : "";
-									const specText = String(spec);
-									const specRedundant = version !== "" && /^[\^~]?\d/.test(specText);
-									const ghSpec = /^github:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:#|$)/.exec(specText);
-									const repoUrl = entry !== void 0 ? entry.url : ghSpec !== null ? "https://github.com/" + ghSpec[1] : null;
-									const off = effectiveDisabledSet.has(name);
-									const toggleable = off || act !== void 0 && (act.state === "live" || act.state === "restart");
-									return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-										className: missing ? `${Market_module_css_default.irow} ${Market_module_css_default.irowMissing}` : Market_module_css_default.irow,
-										children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-											style: { minWidth: 0 },
-											children: [
-												/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-													className: Market_module_css_default.nm,
-													children: [
-														repoUrl !== null ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("a", {
-															className: Market_module_css_default.nameLink,
-															href: repoUrl + "#readme",
-															target: "_blank",
-															rel: "noreferrer",
-															title: t("readme"),
-															children: name
-														}) : name,
-														entry?.deprecated === true && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-															className: Market_module_css_default.depBadge,
-															children: t("deprecatedBadge")
-														}),
-														version && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-															className: Market_module_css_default.owner,
-															children: " " + version
-														})
-													]
-												}),
-												specRedundant ? null : repoUrl !== null ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("a", {
-													className: `${Market_module_css_default.spec} ${Market_module_css_default.src}`,
-													href: repoUrl,
-													target: "_blank",
-													rel: "noreferrer",
-													style: { display: "inline-block" },
-													children: specText
-												}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-													className: Market_module_css_default.spec,
-													children: specText
-												}),
-												entry !== void 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-													className: `${Market_module_css_default.desc} ${Market_module_css_default.descTight}`,
-													children: entry.description && (entry.description[lang] || entry.description.en) || ""
-												}),
-												!off && act !== void 0 && meta !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-													className: Market_module_css_default.act,
-													children: [meta.dot !== "done" && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-														className: meta.dot === "error" ? Market_module_css_default.actBroken : Market_module_css_default.actWarn,
-														children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.StateDot, {
-															state: meta.dot,
-															size: 7
-														}), meta.label]
-													}), act.state !== "live" && act.reasons.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.DisclosureRow, {
-														icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconQuestionOutline14, { size: 14 }),
-														title: t("actWhy"),
-														open: whyOpen === name,
-														expandable: true,
-														expandOnRowClick: true,
-														onToggle: () => setWhyOpen(whyOpen === name ? null : name),
-														className: Market_module_css_default.actWhy,
-														children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-															className: Market_module_css_default.spec,
-															children: act.reasons.join(" / ")
-														})
-													})]
-												}),
-												entry !== void 0 && entry.deprecated === true && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-													className: Market_module_css_default.deprecate,
-													style: { marginTop: 8 },
-													children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-														className: Market_module_css_default.depLine,
-														children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: ["⚠️ ", t("deprecatedWarn")] }), entry.replacement !== void 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-															className: Market_module_css_default.src,
-															children: t("replacementHint") + " " + entry.replacement
-														})]
-													})
-												}),
-												updatingName === name && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-													className: Market_module_css_default.progress,
-													children: [
-														/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-															className: Market_module_css_default.spin,
-															children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconLoadingOutline16, { size: 14 })
-														}),
-														/* @__PURE__ */ (0, react_jsx_runtime.jsx)("code", {
-															className: Market_module_css_default.grow,
-															children: progressText
-														}),
-														progressPct !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-															className: Market_module_css_default.pct,
-															children: [progressPct, "%"]
-														}),
-														/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-															variant: "outline",
-															size: "sm",
-															disabled: cancelling,
-															onClick: doCancel,
-															children: cancelling ? t("cancelling") : t("cancelOp")
-														}),
-														/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-															className: Market_module_css_default.bar,
-															children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-																className: progressPct !== null ? Market_module_css_default.barFill : `${Market_module_css_default.barFill} ${Market_module_css_default.barWave}`,
-																style: progressPct !== null ? { width: `${progressPct}%` } : void 0
-															})
-														})
-													]
-												})
-											]
-										}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-											className: Market_module_css_default.irowActions,
-											children: [
-												!missing && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-													className: Market_module_css_default.stateTag,
-													"data-on": off ? "false" : "true",
-													children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-														className: Market_module_css_default.stateDot,
-														"data-on": off ? "false" : "true"
-													}), off ? t("disabledState") : t("switchOnLabel")]
-												}),
-												toggleable && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-													type: "button",
-													role: "switch",
-													"aria-checked": !off,
-													"aria-label": (off ? t("enable") : t("disable")) + " " + name,
-													className: off ? Market_module_css_default.switch : `${Market_module_css_default.switch} ${Market_module_css_default.switchOn}`,
-													disabled: togglingName !== null || busyUrl !== null || updatingName !== null || removingName !== null,
-													onClick: () => doToggle(name, off),
-													children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: Market_module_css_default.switchKnob })
-												}),
-												/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: Market_module_css_default.grow }),
-												entry !== void 0 && entry.deprecated === true && entry.replacement !== void 0 && (() => {
-													const replacement = data?.plugins.find((r) => r.name === entry.replacement);
-													if (replacement === void 0) return null;
-													return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-														variant: "outline",
-														size: "sm",
-														onClick: () => {
-															setCat("all");
-															setQ(entry.replacement);
-															setTab("discover");
-														},
-														children: t("viewReplacement")
-													}), !isInstalled(replacement, installed, repoIdentities, data?.plugins, repoHints) && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-														variant: "outline",
-														size: "sm",
-														onClick: () => setConfirming(replacement),
-														children: t("installReplacement")
-													})] });
-												})(),
-												missing ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-													className: Market_module_css_default.metaTag,
-													children: t("notInstalled")
-												}) : updatedNames.includes(name) ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-													className: `${Market_module_css_default.metaTag} ${Market_module_css_default.metaTagOk}`,
-													children: act?.state === "live" ? t("updatedLive") : t("updated")
-												}) : updatingName === name ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-													variant: "primary",
-													size: "sm",
-													className: Market_module_css_default.warnBtn,
-													disabled: true,
-													children: t("updating")
-												}) : status && status.updateAvailable ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-													variant: "primary",
-													size: "sm",
-													className: Market_module_css_default.warnBtn,
-													disabled: updatingName !== null,
-													onClick: () => doUpdate(name),
-													children: t("update")
-												}) : status && status.kind === "linked" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-													className: Market_module_css_default.metaTag,
-													title: t("linkedDev"),
-													children: t("linkedDev")
-												}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-													className: Market_module_css_default.metaTag,
-													title: t("upToDate"),
-													children: t("upToDate")
-												}),
-												!missing && name !== "dsh-market" && name !== "dshmarket" && name !== "dsh-desktop-market" && (removingName === name ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-													variant: "outline",
-													size: "sm",
-													className: Market_module_css_default.dangerBtn,
-													disabled: true,
-													children: t("uninstalling")
 												}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
 													variant: "outline",
 													size: "sm",
-													className: Market_module_css_default.dangerBtn,
-													disabled: removingName !== null || busyUrl !== null || updatingName !== null,
-													onClick: () => setRemoveConfirm(name),
-													children: t("uninstall")
-												}))
+													disabled: groupOrder.length === 0,
+													onClick: () => {
+														setAssignFor(name);
+														setAssignTarget("");
+													},
+													children: t("groupAssign")
+												})
 											]
-										})]
-									}, name);
+										}, "ug-" + name);
+									})
+								] }) : Object.keys(displayedInstalled).filter((name) => name !== selfName).length === 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+									className: Market_module_css_default.empty,
+									children: t("installedEmpty")
+								}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+									className: Market_module_css_default.pairGrid,
+									children: Object.entries(displayedInstalled).filter(([name, spec]) => {
+										if (name === selfName) return false;
+										const needle = qInstalled.trim().toLowerCase();
+										if (needle === "") return true;
+										if (name.toLowerCase().includes(needle)) return true;
+										if (String(spec).toLowerCase().includes(needle)) return true;
+										const entry = data === null ? void 0 : entryForDep(data.plugins, name, String(spec), repoIdentities[name], repoHints[name]);
+										if (entry !== void 0) {
+											if ((entry.description && (entry.description[lang] || entry.description.en) || "").toLowerCase().includes(needle)) return true;
+											if ((entry.owner || "").toLowerCase().includes(needle)) return true;
+										}
+										return false;
+									}).map(([name, spec]) => {
+										const missing = pendingBackup !== null && !installedFiles.includes(name);
+										const entry = data === null ? void 0 : entryForDep(data.plugins, name, String(spec), repoIdentities[name], repoHints[name]);
+										const status = updates[name];
+										const act = activations[name];
+										const meta = act !== void 0 ? activationMeta(act.state, t) : null;
+										const version = status && status.version ? "v" + status.version : "";
+										const specText = String(spec);
+										const specRedundant = version !== "" && /^[\^~]?\d/.test(specText);
+										const ghSpec = /^github:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:#|$)/.exec(specText);
+										const archiveSpec = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/archive\/[0-9a-f]{40,64}\.tar\.gz$/i.exec(specText);
+										const repo = ghSpec?.[1] ?? archiveSpec?.[1] ?? null;
+										const repoUrl = entry !== void 0 ? entry.url : repo !== null ? "https://github.com/" + repo : null;
+										const off = effectiveDisabledSet.has(name);
+										const toggleable = off || act !== void 0 && (act.state === "live" || act.state === "restart");
+										return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+											className: missing ? `${Market_module_css_default.irow} ${Market_module_css_default.irowMissing}` : Market_module_css_default.irow,
+											children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+												style: { minWidth: 0 },
+												children: [
+													/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+														className: Market_module_css_default.nm,
+														children: [
+															repoUrl !== null ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("a", {
+																className: Market_module_css_default.nameLink,
+																href: repoUrl + "#readme",
+																target: "_blank",
+																rel: "noreferrer",
+																title: t("readme"),
+																children: name
+															}) : name,
+															entry?.deprecated === true && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+																className: Market_module_css_default.depBadge,
+																children: t("deprecatedBadge")
+															}),
+															version && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+																className: Market_module_css_default.owner,
+																children: " " + version
+															})
+														]
+													}),
+													specRedundant ? null : repoUrl !== null ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("a", {
+														className: `${Market_module_css_default.spec} ${Market_module_css_default.src}`,
+														href: repoUrl,
+														target: "_blank",
+														rel: "noreferrer",
+														style: { display: "inline-block" },
+														children: specText
+													}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+														className: Market_module_css_default.spec,
+														children: specText
+													}),
+													entry !== void 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+														className: `${Market_module_css_default.desc} ${Market_module_css_default.descTight}`,
+														children: entry.description && (entry.description[lang] || entry.description.en) || ""
+													}),
+													!off && act !== void 0 && meta !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+														className: Market_module_css_default.act,
+														children: [meta.dot !== "done" && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+															className: meta.dot === "error" ? Market_module_css_default.actBroken : Market_module_css_default.actWarn,
+															children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.StateDot, {
+																state: meta.dot,
+																size: 7
+															}), meta.label]
+														}), act.state !== "live" && act.reasons.length > 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.DisclosureRow, {
+															icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconQuestionOutline14, { size: 14 }),
+															title: t("actWhy"),
+															open: whyOpen === name,
+															expandable: true,
+															expandOnRowClick: true,
+															onToggle: () => setWhyOpen(whyOpen === name ? null : name),
+															className: Market_module_css_default.actWhy,
+															children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+																className: Market_module_css_default.spec,
+																children: act.reasons.join(" / ")
+															})
+														})]
+													}),
+													entry !== void 0 && entry.deprecated === true && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+														className: Market_module_css_default.deprecate,
+														style: { marginTop: 8 },
+														children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+															className: Market_module_css_default.depLine,
+															children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: ["⚠️ ", t("deprecatedWarn")] }), entry.replacement !== void 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+																className: Market_module_css_default.src,
+																children: t("replacementHint") + " " + entry.replacement
+															})]
+														})
+													}),
+													updatingName === name && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+														className: Market_module_css_default.progress,
+														children: [
+															/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+																className: Market_module_css_default.spin,
+																children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconLoadingOutline16, { size: 14 })
+															}),
+															/* @__PURE__ */ (0, react_jsx_runtime.jsx)("code", {
+																className: Market_module_css_default.grow,
+																children: progressText
+															}),
+															progressPct !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+																className: Market_module_css_default.pct,
+																children: [progressPct, "%"]
+															}),
+															/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+																variant: "outline",
+																size: "sm",
+																disabled: cancelling,
+																onClick: doCancel,
+																children: cancelling ? t("cancelling") : t("cancelOp")
+															}),
+															/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+																className: Market_module_css_default.bar,
+																children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+																	className: progressPct !== null ? Market_module_css_default.barFill : `${Market_module_css_default.barFill} ${Market_module_css_default.barWave}`,
+																	style: progressPct !== null ? { width: `${progressPct}%` } : void 0
+																})
+															})
+														]
+													})
+												]
+											}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+												className: Market_module_css_default.irowActions,
+												children: [
+													!missing && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+														className: Market_module_css_default.stateTag,
+														"data-on": off ? "false" : "true",
+														children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+															className: Market_module_css_default.stateDot,
+															"data-on": off ? "false" : "true"
+														}), off ? t("disabledState") : t("switchOnLabel")]
+													}),
+													toggleable && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+														type: "button",
+														role: "switch",
+														"aria-checked": !off,
+														"aria-label": (off ? t("enable") : t("disable")) + " " + name,
+														className: off ? Market_module_css_default.switch : `${Market_module_css_default.switch} ${Market_module_css_default.switchOn}`,
+														disabled: togglingName !== null || busyUrl !== null || updatingName !== null || removingName !== null,
+														onClick: () => doToggle(name, off),
+														children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: Market_module_css_default.switchKnob })
+													}),
+													/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: Market_module_css_default.grow }),
+													entry !== void 0 && entry.deprecated === true && entry.replacement !== void 0 && (() => {
+														const replacement = data?.plugins.find((r) => r.name === entry.replacement);
+														if (replacement === void 0) return null;
+														return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+															variant: "outline",
+															size: "sm",
+															onClick: () => {
+																setCat("all");
+																setQ(entry.replacement);
+																setTab("discover");
+															},
+															children: t("viewReplacement")
+														}), !isInstalled(replacement, installed, repoIdentities, data?.plugins, repoHints) && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+															variant: "outline",
+															size: "sm",
+															onClick: () => setConfirming(replacement),
+															children: t("installReplacement")
+														})] });
+													})(),
+													missing ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+														className: Market_module_css_default.metaTag,
+														children: t("notInstalled")
+													}) : updatedNames.includes(name) ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+														className: `${Market_module_css_default.metaTag} ${Market_module_css_default.metaTagOk}`,
+														children: act?.state === "live" ? t("updatedLive") : t("updated")
+													}) : updatingName === name ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+														variant: "primary",
+														size: "sm",
+														className: Market_module_css_default.warnBtn,
+														disabled: true,
+														children: t("updating")
+													}) : status && status.updateAvailable ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+														variant: "primary",
+														size: "sm",
+														className: Market_module_css_default.warnBtn,
+														disabled: updatingName !== null,
+														onClick: () => doUpdate(name),
+														children: t("update")
+													}) : status && status.kind === "linked" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+														className: Market_module_css_default.metaTag,
+														title: t("linkedDev"),
+														children: t("linkedDev")
+													}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+														className: Market_module_css_default.metaTag,
+														title: t("upToDate"),
+														children: t("upToDate")
+													}),
+													!missing && name !== "dsh-market" && name !== "dshmarket" && name !== "dsh-desktop-market" && (removingName === name ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+														variant: "outline",
+														size: "sm",
+														className: Market_module_css_default.dangerBtn,
+														disabled: true,
+														children: t("uninstalling")
+													}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+														variant: "outline",
+														size: "sm",
+														className: Market_module_css_default.dangerBtn,
+														disabled: removingName !== null || busyUrl !== null || updatingName !== null,
+														onClick: () => setRemoveConfirm(name),
+														children: t("uninstall")
+													}))
+												]
+											})]
+										}, name);
+									})
 								})
-							})
-						] })
+							] })
+						]
 					}),
 					showTop && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Tooltip, {
 						label: t("backTop"),
@@ -6761,6 +7512,58 @@ window.__ModuleLoader__.load({
 								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronUpOutline14, { size: 16 })
 							})
 						})
+					}),
+					envDialogOpen && !envReady && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Modal, {
+						open: true,
+						onClose: () => {
+							if (!envFixing) setEnvDialogOpen(false);
+						},
+						title: t("envDialogTitle"),
+						description: t("envDialogDesc"),
+						footer: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+								variant: "ghost",
+								disabled: envFixing,
+								onClick: () => setEnvDialogOpen(false),
+								children: t("cancel")
+							}),
+							envRepairError !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+								variant: "outline",
+								disabled: exportState === "busy" || envFixing,
+								icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconDownloadOutline16, { size: 14 }),
+								onClick: doExportLog,
+								children: exportState === "busy" ? t("exportingLog") : t("exportLog")
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+								variant: "primary",
+								disabled: envFixing,
+								onClick: fixEnv,
+								children: envFixing ? t("envFixing") : envRepairError === null ? t("envFix") : t("envFixRetry")
+							})
+						] }),
+						children: envRepairError !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+							className: Market_module_css_default.envRepairError,
+							children: envRepairError
+						})
+					}),
+					restartConfirmOpen && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Modal, {
+						open: true,
+						onClose: () => setRestartConfirmOpen(false),
+						title: t("restartConfirmTitle"),
+						description: t("restartConfirmDesc"),
+						footer: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+							variant: "ghost",
+							onClick: () => setRestartConfirmOpen(false),
+							children: t("cancel")
+						}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+							variant: "primary",
+							disabled: restartBlocked,
+							onClick: () => {
+								setRestartConfirmOpen(false);
+								doRestart();
+							},
+							children: restarting ? t("restarting") : t("restartConfirmAction")
+						})] })
 					}),
 					confirming !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(_deepseek_ai_dsh_client_ui_primitives.Modal, {
 						open: true,
@@ -7050,246 +7853,6 @@ window.__ModuleLoader__.load({
 		* mirror it one for one, so the market stops looking like it wandered in
 		* from another product.
 		*/
-		/** Keys the market leaves in the browser; cleared when the user purges. */
-		const BROWSER_KEYS = ["dshm-webdav", "dshm-gist-id"];
-		const CHANNELS = [
-			"stable",
-			"beta",
-			"dev"
-		];
-		const asChannel = (value) => CHANNELS.includes(value) ? value : null;
-		const CHANNEL_LABEL = {
-			stable: "setChannelStable",
-			beta: "setChannelBeta",
-			dev: "setChannelDev"
-		};
-		const CHANNEL_HINT = {
-			stable: "setChannelStableHint",
-			beta: "setChannelBetaHint",
-			dev: "setChannelDevHint"
-		};
-		/**
-		* Read the server's answer, taking the list of channels FROM it.
-		*
-		* The card does not decide which channels exist: the server is what accepts
-		* or refuses a selection, so a card drawing its own list could only ever
-		* disagree with it.
-		*/
-		function readStatus(body) {
-			const offered = (body.channels ?? []).map(asChannel).filter((c) => c !== null);
-			return {
-				version: body.version ?? null,
-				restart: body.restart === true,
-				channel: asChannel(body.channel) ?? "stable",
-				channels: offered.length > 0 ? offered : ["stable", "beta"]
-			};
-		}
-		function readUpdate(own) {
-			return {
-				updateAvailable: own.updateAvailable === true,
-				latest: own.latest ?? null,
-				channelSwitch: own.channelSwitch ?? null
-			};
-		}
-		/**
-		* Clear the market's browser-side leftovers.
-		*
-		* These are the only two things the market keeps in the browser, and the
-		* server cannot reach either. Neither holds a credential — the WebDAV
-		* password is never persisted and a Gist token is read from the environment,
-		* never from disk — so this is tidiness, not a security step, and the copy
-		* must not imply otherwise.
-		*/
-		function clearBrowserState(storage) {
-			for (const key of BROWSER_KEYS) try {
-				storage.removeItem(key);
-			} catch {}
-		}
-		function SettingsCard({ t, onRemoved }) {
-			const [open, setOpen] = (0, react.useState)(false);
-			const [status, setStatus] = (0, react.useState)(null);
-			const [update, setUpdate] = (0, react.useState)(null);
-			const [phase, setPhase] = (0, react.useState)("idle");
-			const [purge, setPurge] = (0, react.useState)(false);
-			const [error, setError] = (0, react.useState)(null);
-			const probed = (0, react.useRef)(false);
-			(0, react.useEffect)(() => {
-				if (!open || probed.current) return;
-				probed.current = true;
-				let live = true;
-				(async () => {
-					try {
-						const body = await (await fetch("/dsh-market/status", { cache: "no-store" })).json();
-						if (live) setStatus(readStatus(body));
-					} catch {
-						if (live) setStatus({
-							version: null,
-							restart: false,
-							channel: "stable",
-							channels: ["stable", "beta"]
-						});
-					}
-					try {
-						const body = await (await fetch("/dsh-market/updates", { cache: "no-store" })).json();
-						const own = body.updates?.["dshmarket"] ?? body.updates?.["dsh-market"];
-						if (live && own !== void 0) setUpdate(readUpdate(own));
-					} catch {}
-				})();
-				return () => {
-					live = false;
-				};
-			}, [open]);
-			const post = (0, react.useCallback)(async (path, payload) => {
-				return await (await fetch(path, {
-					method: "POST",
-					headers: { "content-type": "application/json" },
-					body: JSON.stringify(payload)
-				})).json();
-			}, []);
-			const onUpdate = (0, react.useCallback)(() => {
-				setPhase("working");
-				setError(null);
-				(async () => {
-					try {
-						const body = await post("/dsh-market/update", { name: "dshmarket" });
-						if (body.ok === true) setPhase("updated");
-						else {
-							setError(body.error ?? t("setSelfFailed"));
-							setPhase("failed");
-						}
-					} catch (cause) {
-						setError(cause instanceof Error ? cause.message : String(cause));
-						setPhase("failed");
-					}
-				})();
-			}, [post, t]);
-			const onRemove = (0, react.useCallback)(() => {
-				setPhase("working");
-				setError(null);
-				(async () => {
-					try {
-						const body = await post("/dsh-market/self-uninstall", {
-							confirm: true,
-							purge
-						});
-						if (body.ok === true) {
-							if (purge) clearBrowserState(localStorage);
-							setPhase("removed");
-							onRemoved?.();
-						} else {
-							setError(body.error ?? t("setSelfFailed"));
-							setPhase("failed");
-						}
-					} catch (cause) {
-						setError(cause instanceof Error ? cause.message : String(cause));
-						setPhase("failed");
-					}
-				})();
-			}, [
-				onRemoved,
-				post,
-				purge,
-				t
-			]);
-			const busy = phase === "working";
-			const version = status?.version ?? null;
-			const prerelease = version !== null && version.includes("-");
-			/** Re-ask what this channel offers; the previous answer was for another one. */
-			const refreshUpdate = (0, react.useCallback)(async () => {
-				const body = await (await fetch("/dsh-market/updates?force=1", { cache: "no-store" })).json();
-				const own = body.updates?.["dshmarket"] ?? body.updates?.["dsh-market"];
-				setUpdate(own === void 0 ? null : readUpdate(own));
-			}, []);
-			/**
-			* Select a channel — and show the one the SERVER accepted.
-			*
-			* This used to move the control first and ignore the answer, which was
-			* harmless while every channel was permitted. It stopped being harmless
-			* the moment one of them can be refused: a 403 would have left "dev"
-			* highlighted on a profile that is not on it.
-			*/
-			const onChannel = (0, react.useCallback)((next) => {
-				setError(null);
-				(async () => {
-					try {
-						const body = await post("/dsh-market/channel", { channel: next });
-						if (body.ok !== true) {
-							setError(body.error ?? t("setSelfFailed"));
-							return;
-						}
-						setStatus((current) => current === null ? current : {
-							...current,
-							channel: asChannel(body.channel) ?? next
-						});
-						await refreshUpdate();
-					} catch (cause) {
-						setError(cause instanceof Error ? cause.message : String(cause));
-					}
-				})();
-			}, [
-				post,
-				refreshUpdate,
-				t
-			]);
-			/** One label + hint block with an optional action, the host's row shape. */
-			const row = (label, hint, action) => (0, react.createElement)("div", { className: Market_module_css_default.setRow }, (0, react.createElement)("div", { className: Market_module_css_default.setLabelBox }, (0, react.createElement)("div", { className: Market_module_css_default.setLabel }, label), (0, react.createElement)("div", { className: Market_module_css_default.setHint }, hint)), action);
-			const body = phase === "removed" ? row(t("setSelfRemoved"), t("setSelfRemovedHint"), null) : (0, react.createElement)(react.Fragment, null, row(update?.updateAvailable === true && update.latest !== null ? `${t("setSelfUpdateReady")} ${update.latest}` : update?.channelSwitch != null ? `${t("setChannelSwitch")} ${update.channelSwitch}` : t("setSelfUpToDate"), phase === "updated" ? t("setSelfUpdatedHint") : update?.channelSwitch != null ? t("setChannelSwitchHint") : update?.updateAvailable === true ? t("setSelfUpdateHint") : t("setSelfUpToDateHint"), phase === "updated" ? null : update?.updateAvailable === true ? (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-				variant: "primary",
-				size: "sm",
-				disabled: busy,
-				onClick: onUpdate
-			}, t("setSelfUpdate")) : update?.channelSwitch != null ? (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-				variant: "outline",
-				size: "sm",
-				disabled: busy,
-				onClick: onUpdate
-			}, t("setChannelSwitch")) : null), row(t("setChannel"), t(CHANNEL_HINT[status?.channel ?? "stable"]), (0, react.createElement)("div", { className: Market_module_css_default.setSeg }, (status?.channels ?? ["stable", "beta"]).map((id) => (0, react.createElement)("button", {
-				key: id,
-				type: "button",
-				className: status?.channel === id ? `${Market_module_css_default.setSegBtn} ${Market_module_css_default.setSegOn}` : Market_module_css_default.setSegBtn,
-				disabled: busy || status === null,
-				title: id === "dev" ? t("setChannelDevHint") : void 0,
-				onClick: () => {
-					onChannel(id);
-				}
-			}, t(CHANNEL_LABEL[id]))))), row(t("setSelfRemove"), t("setSelfRemoveHint"), phase === "confirming" || busy ? null : (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-				variant: "outline",
-				size: "sm",
-				className: Market_module_css_default.setDanger,
-				disabled: busy,
-				onClick: () => {
-					setPhase("confirming");
-				}
-			}, t("setSelfRemove"))), phase === "confirming" || busy ? (0, react.createElement)("div", { className: Market_module_css_default.setConfirm }, (0, react.createElement)("div", { className: Market_module_css_default.setHint }, t("setSelfConfirm")), (0, react.createElement)("label", { className: Market_module_css_default.setCheck }, (0, react.createElement)("input", {
-				type: "checkbox",
-				checked: purge,
-				onChange: () => {
-					setPurge(!purge);
-				}
-			}), (0, react.createElement)("span", null, t("setSelfPurge"))), (0, react.createElement)("div", { className: Market_module_css_default.setHint }, purge ? t("setSelfPurgeOn") : t("setSelfPurgeOff")), (0, react.createElement)("div", { className: Market_module_css_default.setActions }, busy ? null : (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-				variant: "ghost",
-				size: "sm",
-				onClick: () => {
-					setPhase("idle");
-					setPurge(false);
-				}
-			}, t("setSelfCancel")), (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-				variant: "primary",
-				size: "sm",
-				className: Market_module_css_default.setDanger,
-				disabled: busy,
-				icon: busy ? (0, react.createElement)("span", { className: Market_module_css_default.spin }, (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconLoadingOutline16, { size: 16 })) : void 0,
-				onClick: onRemove
-			}, busy ? t("setSelfWorking") : t("setSelfRemoveConfirm")))) : null, error !== null ? (0, react.createElement)("div", { className: Market_module_css_default.err }, error) : null);
-			return (0, react.createElement)("div", { className: open ? `${Market_module_css_default.setCard} ${Market_module_css_default.setCardOpen}` : Market_module_css_default.setCard }, (0, react.createElement)("button", {
-				type: "button",
-				className: Market_module_css_default.setHeader,
-				"aria-expanded": open,
-				onClick: () => {
-					setOpen(!open);
-				}
-			}, (0, react.createElement)("div", { className: Market_module_css_default.setHeadText }, (0, react.createElement)("div", { className: Market_module_css_default.setName }, t("nav"), version !== null ? (0, react.createElement)("span", { className: Market_module_css_default.version }, ` v${version}`) : null, prerelease ? (0, react.createElement)("span", { className: Market_module_css_default.setBetaTag }, t("setChannelBeta")) : null), (0, react.createElement)("div", { className: Market_module_css_default.setDesc }, t("setCardDesc"))), (0, react.createElement)("span", { className: open ? `${Market_module_css_default.setChevron} ${Market_module_css_default.setChevronOpen}` : Market_module_css_default.setChevron }, (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconChevronDownOutline14, { size: 14 }))), open ? (0, react.createElement)("div", { className: Market_module_css_default.setBody }, body) : null);
-		}
 		//#endregion
 		//#region src/client/index.ts
 		/**
@@ -7328,13 +7891,13 @@ window.__ModuleLoader__.load({
 				console.warn("[dsh-market] host ui-primitives missing " + gaps.join(", ") + " — market section disabled (dsh web >= 0.1.0-rc.6 required)");
 				return;
 			}
+			ctx.effect(() => installPluginInstallHashBridge(), "dsh-market: plugin install hash bridge");
 			ctx.effect(() => ctx.locale.register(NS, {
 				zh,
 				en
 			}), "dsh-market: dictionaries");
 			const t = ctx.locale.bind(NS);
 			const embedded = true;
-			let retireSection = null;
 			const renderMarket = Object.assign((owner = {}) => (0, react.createElement)(MarketSection, {
 				t,
 				locale: ctx.locale,
@@ -7369,7 +7932,7 @@ window.__ModuleLoader__.load({
 					label: () => t("tabAdvanced")
 				}
 			] });
-			if (embedded) ctx.slots.inject("settings.plugins.tab", () => ctx.slots.register({
+			ctx.slots.inject("settings.plugins.tab", () => ctx.slots.register({
 				name: "settings.plugins.tab",
 				id: "market",
 				order: 20,
@@ -7377,39 +7940,18 @@ window.__ModuleLoader__.load({
 				locale: NS,
 				inject: () => ({ t })
 			}, renderMarket));
-			else ctx.slots.inject("settings.section", () => {
-				const off = ctx.slots.register({
-					name: "settings.section",
-					id: "market",
-					order: 40,
-					label: () => t("nav"),
-					locale: NS,
-					inject: () => ({ t })
-				}, renderMarket);
-				if (typeof off === "function") retireSection = off;
-				return off;
-			});
-			if (!embedded) ctx.inject(["settingsScope"], (scoped) => {
-				scoped.slots.inject("settings.plugin.item", () => scoped.slots.register({
-					name: "settings.plugin.item",
-					key: NS,
-					locale: NS,
-					inject: () => ({ t })
-				}, () => (0, react.createElement)(SettingsCard, {
-					t,
-					onRemoved: () => {
-						const off = retireSection;
-						retireSection = null;
-						off?.();
-					}
-				})));
-			});
 			const Toast = () => (0, react.createElement)(InstallToast, { t });
 			ctx.slots.inject("shell.overlay", () => ctx.slots.register({
 				name: "shell.overlay",
 				id: "dsh-market-toast",
 				label: () => "dsh-market"
 			}, Toast));
+			const DirectInstaller = () => (0, react.createElement)(DirectInstallDialog, { t });
+			ctx.slots.inject("shell.overlay", () => ctx.slots.register({
+				name: "shell.overlay",
+				id: "dsh-market-direct-install",
+				label: () => "dsh-market direct install"
+			}, DirectInstaller));
 		}
 		//#endregion
 		exports.REQUIRED_PRIMITIVES = REQUIRED_PRIMITIVES;
@@ -7420,5 +7962,3 @@ window.__ModuleLoader__.load({
 		return module.exports;
 	}
 });
-
-//# sourceMappingURL=client.js.map

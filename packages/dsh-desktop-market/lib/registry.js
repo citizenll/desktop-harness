@@ -1,133 +1,277 @@
 /**
- * Registry access: the curated list from awesome-dsh-plugin.com, fetched
- * fresh on every request. See `loadRegistry` for why there is nothing
- * behind it any more.
- */
-import { configuredProxy, marketFetch } from './net.js';
-/**
- * Where the curated list comes from. Overridable through the process
- * environment ONLY — the layer-3 e2e points it at a local fixture catalog so
- * the install route can be driven end to end without publishing anything.
+ * Persistent, staged access to the curated plugin catalog.
  *
- * This does not weaken the install route's registry check. That check exists
- * to stop a malicious PAGE from POSTing an arbitrary source at the local
- * server; a page cannot set environment variables, and anyone who can set
- * this process's environment already controls the process. What the override
- * changes is WHICH list is curated, never WHETHER the check runs.
+ * The active catalog is read from the profile immediately after the first
+ * successful download. Remote checks happen in the background and stage a
+ * newer catalog until the user explicitly applies it, so opening the market
+ * never turns into a network loading screen again.
  */
-const REGISTRY_URL = process.env.DSHM_REGISTRY_URL ?? 'https://awesome-dsh-plugin.com/plugins.json';
-/**
- * How long to wait for the catalog.
- *
- * Generous on purpose. It used to be 4s with a bundled snapshot behind it,
- * so a slow link quietly became a 39%-smaller catalog. Now that a failure is
- * reported rather than papered over, cutting off a link that WOULD have
- * answered is the expensive mistake — 282KB over TLS from a far-away network
- * is not a 4-second job.
- */
+import { randomBytes } from 'node:crypto';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { configuredProxy, marketFetch } from "./net.js";
+const DEFAULT_REGISTRY_URL = 'https://awesome-dsh-plugin.com/plugins.json';
 const FETCH_TIMEOUT_MS = 15_000;
-/**
- * The catalog we were last served, with the validator identifying it.
- *
- * This is NOT the cache that was removed, and the difference is the whole
- * point. That cache SKIPPED the request for an hour and answered from
- * memory — it asserted freshness without ever asking. This asks the origin
- * every single time; the validator only lets the origin answer "still the
- * same" (304) instead of resending a megabyte. Freshness is verified on
- * every call either way, so `data` below is only ever returned when the
- * server has just confirmed it is current.
- *
- * In memory rather than on disk: a restart is rare enough that paying one
- * full download for it costs nothing, and a file would be one more thing
- * that can be found on a machine and mistaken for the catalog itself.
- *
- * Measured against the live origin (GitHub Pages behind Fastly, which
- * serves both `etag` and `last-modified`): 295 KB and 1.3s unconditional,
- * 0 bytes and 0.5s for a 304. The reporter whose fetch took 9.9s was
- * downloading the full 1.07 MB every time they opened the market.
- */
-let served = null;
-/**
- * Drop what we remember, so the next call is unconditional.
- *
- * Exists for tests: the memo is module state, and a spec that asserted a
- * 304 would otherwise leak a validator into the next one.
- */
-export function forgetCatalog() {
-    served = null;
+export const CATALOG_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const CACHE_FILE = 'catalog-v1.json';
+function isObject(value) {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+function isRegistry(value) {
+    if (!isObject(value))
+        return false;
+    return typeof value.updated === 'string'
+        && typeof value.count === 'number'
+        && isObject(value.categories)
+        && Array.isArray(value.plugins)
+        && value.plugins.length > 0;
+}
+function isSnapshot(value) {
+    if (!isObject(value))
+        return false;
+    return (typeof value.etag === 'string' || value.etag === null)
+        && (typeof value.modified === 'string' || value.modified === null)
+        && typeof value.fetchedAt === 'number'
+        && isRegistry(value.data);
+}
+function parseCache(value, source) {
+    if (!isObject(value)
+        || value.schema !== 1
+        || value.source !== source
+        || typeof value.checkedAt !== 'number'
+        || typeof value.attemptedAt !== 'number'
+        || !isSnapshot(value.active)
+        || (value.pending !== undefined && !isSnapshot(value.pending)))
+        return null;
+    return value;
+}
+function sameRegistry(left, right) {
+    if (left.updated !== right.updated || left.count !== right.count)
+        return false;
+    return JSON.stringify(left) === JSON.stringify(right);
+}
+async function writeFileAtomic(path, content) {
+    await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+    const temp = `${path}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
+    try {
+        await writeFile(temp, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+        await rename(temp, path);
+    }
+    catch (error) {
+        await rm(temp, { force: true }).catch(() => { });
+        throw error;
+    }
 }
 /**
- * The catalog, revalidated every time it is asked for.
- *
- * There used to be three answers here — live, a one-hour in-memory cache,
- * and a snapshot bundled into the npm package — and only the first was
- * correct. The other two were indistinguishable from it on screen, so a
- * machine that could not reach the registry browsed the publish-time file
- * (839 entries against 1367 live, and frozen forever for anyone on an older
- * release), while a machine that COULD reach it still saw an hour-old
- * listing of a catalog that grows by ~250 entries a day.
- *
- * For a catalog, stale is not a degraded answer, it is a wrong one: a plugin
- * published this morning reads as "does not exist". So there is one source
- * now, and a failure is a failure — the caller reports it and offers a
- * retry, which is a state the user can act on. In particular a network
- * failure is NEVER answered from `served`: an origin that cannot be reached
- * has not confirmed anything, and quietly handing back the last catalog
- * would rebuild exactly the fallback this replaced.
- * @throws when the catalog cannot be fetched or does not look like one.
+ * Create one catalog store for one profile. The cache belongs to the profile
+ * because a Desktop installation can host more than one isolated profile.
  */
-export async function loadRegistry() {
-    const started = Date.now();
-    let last;
-    // Two attempts. A catalog fetch crossing a long, lossy path fails
-    // transiently often enough that one retry is worth more than the second
-    // or two it costs — and with nothing behind this call any more, a
-    // transient failure is a market with no plugins in it.
-    for (let attempt = 0; attempt < 2; attempt++) {
+export function createCatalogStore(profileDirectory, options = {}) {
+    const source = options.sourceUrl ?? process.env.DSHM_REGISTRY_URL ?? DEFAULT_REGISTRY_URL;
+    const cachePath = options.cachePath === undefined
+        ? (profileDirectory === undefined ? null : join(profileDirectory, '.dsh-market', CACHE_FILE))
+        : options.cachePath;
+    const interval = options.checkIntervalMs ?? CATALOG_CHECK_INTERVAL_MS;
+    const fetcher = options.fetcher ?? marketFetch;
+    const now = options.now ?? Date.now;
+    let cache = null;
+    let loadedFromDisk = false;
+    let loading = null;
+    let checking = false;
+    let checkPromise = null;
+    let lastError = null;
+    const status = () => ({
+        checking,
+        updateAvailable: cache?.pending !== undefined,
+        activeUpdated: cache?.active.data.updated ?? null,
+        pendingUpdated: cache?.pending?.data.updated ?? null,
+        lastCheckedAt: cache === null || cache.checkedAt <= 0 ? null : new Date(cache.checkedAt).toISOString(),
+        error: lastError,
+    });
+    async function persist(strict = false) {
+        if (cachePath === null || cache === null)
+            return;
         try {
-            // ETag first: it is exact, while a date has one-second resolution and
-            // a catalog republished twice within the same second would validate
-            // as unchanged. Only one is sent — an origin given both must satisfy
-            // both, which turns a weak ETag match into an unnecessary 200.
-            const headers = {};
-            if (served?.etag != null)
-                headers['if-none-match'] = served.etag;
-            else if (served?.modified != null)
-                headers['if-modified-since'] = served.modified;
-            const res = await marketFetch(REGISTRY_URL, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), headers });
-            if (res.status === 304) {
-                // Only reachable when we sent a validator, so `served` is present.
-                // Guarded anyway: answering a 304 with nothing to reuse would
-                // otherwise surface as a confusing parse error on an empty body.
-                if (served === null)
-                    throw new Error('the catalog answered "not modified" with nothing to revalidate');
-                return served.data;
-            }
-            if (!res.ok)
-                throw new Error(`HTTP ${String(res.status)}`);
-            const data = (await res.json());
-            if (!Array.isArray(data.plugins) || data.plugins.length === 0)
-                throw new Error('the catalog came back empty');
-            served = { etag: res.headers.get('etag'), modified: res.headers.get('last-modified'), data };
-            return data;
+            await writeFileAtomic(cachePath, `${JSON.stringify(cache)}\n`);
         }
         catch (error) {
-            last = error;
+            lastError = `catalog cache could not be saved: ${error instanceof Error ? error.message : String(error)}`;
+            if (strict)
+                throw error;
         }
     }
-    throw new Error(describeFetchFailure(last, Date.now() - started));
+    async function readCached() {
+        if (loadedFromDisk || cachePath === null)
+            return null;
+        loadedFromDisk = true;
+        try {
+            return parseCache(JSON.parse(await readFile(cachePath, 'utf8')), source);
+        }
+        catch (error) {
+            if (error.code !== 'ENOENT') {
+                lastError = `catalog cache could not be read: ${error instanceof Error ? error.message : String(error)}`;
+            }
+            return null;
+        }
+    }
+    async function fetchRemote(validator) {
+        const started = now();
+        let last;
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                const headers = {};
+                if (validator?.etag != null)
+                    headers['if-none-match'] = validator.etag;
+                else if (validator?.modified != null)
+                    headers['if-modified-since'] = validator.modified;
+                const response = await fetcher(source, {
+                    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+                    headers,
+                });
+                if (response.status === 304) {
+                    if (validator === undefined)
+                        throw new Error('the catalog answered "not modified" without a validator');
+                    return { kind: 'not-modified' };
+                }
+                if (!response.ok)
+                    throw new Error(`HTTP ${String(response.status)}`);
+                const data = (await response.json());
+                if (!isRegistry(data))
+                    throw new Error('the catalog came back empty or malformed');
+                return {
+                    kind: 'data',
+                    snapshot: {
+                        etag: response.headers.get('etag'),
+                        modified: response.headers.get('last-modified'),
+                        fetchedAt: now(),
+                        data,
+                    },
+                };
+            }
+            catch (error) {
+                last = error;
+            }
+        }
+        throw new Error(describeFetchFailure(last, now() - started));
+    }
+    async function load() {
+        if (cache !== null)
+            return cache.active.data;
+        if (loading !== null)
+            return await loading;
+        loading = (async () => {
+            const disk = await readCached();
+            if (disk !== null) {
+                cache = disk;
+                return disk.active.data;
+            }
+            const remote = await fetchRemote();
+            if (remote.kind !== 'data')
+                throw new Error('the first catalog fetch returned no data');
+            const timestamp = now();
+            cache = {
+                schema: 1,
+                source,
+                checkedAt: timestamp,
+                attemptedAt: timestamp,
+                active: remote.snapshot,
+            };
+            lastError = null;
+            await persist();
+            return remote.snapshot.data;
+        })();
+        try {
+            return await loading;
+        }
+        finally {
+            loading = null;
+        }
+    }
+    function startCheck(force) {
+        if (cache === null)
+            return Promise.resolve(status());
+        if (checkPromise !== null)
+            return checkPromise;
+        const timestamp = now();
+        if (!force && timestamp - cache.attemptedAt < interval)
+            return Promise.resolve(status());
+        checking = true;
+        cache.attemptedAt = timestamp;
+        checkPromise = (async () => {
+            try {
+                const validator = cache.pending ?? cache.active;
+                const remote = await fetchRemote(validator);
+                cache.checkedAt = now();
+                if (remote.kind === 'data') {
+                    if (sameRegistry(remote.snapshot.data, cache.active.data)) {
+                        cache.active = remote.snapshot;
+                        delete cache.pending;
+                    }
+                    else {
+                        cache.pending = remote.snapshot;
+                    }
+                }
+                lastError = null;
+                await persist();
+            }
+            catch (error) {
+                lastError = error instanceof Error ? error.message : String(error);
+                await persist();
+            }
+            finally {
+                checking = false;
+                checkPromise = null;
+            }
+            return status();
+        })();
+        return checkPromise;
+    }
+    function scheduleCheck() {
+        if (cache === null)
+            return;
+        void startCheck(false);
+    }
+    async function checkForUpdate(force = true) {
+        await load();
+        return await startCheck(force);
+    }
+    async function applyUpdate() {
+        await load();
+        // A persisted pending update can be revalidated as soon as the market
+        // opens. Let that check finish before promoting it so the two atomic
+        // writes cannot race and resurrect an older cache document on disk.
+        if (checkPromise !== null)
+            await checkPromise;
+        if (cache?.pending === undefined)
+            return null;
+        const before = cache;
+        cache = {
+            ...cache,
+            active: cache.pending,
+        };
+        delete cache.pending;
+        lastError = null;
+        try {
+            await persist(true);
+        }
+        catch (error) {
+            cache = before;
+            throw error;
+        }
+        return cache.active.data;
+    }
+    return { load, scheduleCheck, checkForUpdate, applyUpdate, status };
 }
-/**
- * A catalog failure with the facts needed to classify it, in the message
- * itself.
- *
- * The market shows this string and the log export carries it, so it is the
- * whole of what a bug report will contain. "The operation was aborted due to
- * timeout" alone cannot distinguish a slow link from a blocked one from a
- * proxy this process cannot use — and Node's `fetch` ignores HTTP_PROXY
- * entirely (measured on Node 25), so a machine whose only route out is a
- * proxy fails here every time while every other tool on it works.
- */
+/** Compatibility entry point for consumers that do not own a profile path. */
+let defaultStore = createCatalogStore();
+export function loadRegistry() {
+    return defaultStore.load();
+}
+/** Reset the compatibility store between tests. */
+export function forgetCatalog() {
+    defaultStore = createCatalogStore();
+}
+/** Describe a catalog failure with enough network context for exported logs. */
 export function describeFetchFailure(error, elapsedMs) {
     const reason = error instanceof Error ? error.message : String(error);
     const proxy = configuredProxy();

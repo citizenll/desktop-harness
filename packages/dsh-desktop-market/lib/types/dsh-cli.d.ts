@@ -8,6 +8,7 @@
  */
 import type { ChildProcess } from 'node:child_process';
 import { type ProgressPhase } from './ndjson.ts';
+import { type InstallOutputLine } from './install-progress.ts';
 /**
  * The real Node executable for spawning children. On Android the kernel runs
  * node through the dynamic linker, so `process.execPath` is
@@ -93,6 +94,12 @@ export interface InstallResult {
     busy?: boolean;
     /** Package names pnpm reported as having ignored build scripts (ndjson). */
     ignoredBuilds?: string[];
+    /**
+     * Legacy Git dependencies converted to immutable archive pins while this
+     * command recovered the profile. Route-level rollback keeps these repairs
+     * even when the requested mutation itself later fails.
+     */
+    repairedDependencies?: Record<string, string>;
 }
 /** The shape every orchestration function takes to run plugin commands (injectable in tests). */
 export type PluginRunner = (profile: string, pluginArgs: string[]) => Promise<InstallResult>;
@@ -188,9 +195,22 @@ export interface InstallProgress {
     error: string | null;
     /** True from the moment the user asks to cancel until the run ends. */
     cancelling: boolean;
+    /** Client-provided id for one aggregate direct-install flow. */
+    outputSession: string;
+    /** Sanitized, bounded process output for the embedded install console. */
+    output: InstallOutputLine[];
 }
 /** Singleton progress state; the status route reads it, runDshPlugin writes it. */
 export declare const progress: InstallProgress;
+/**
+ * Start one route-wide output session. A direct install can run several pnpm
+ * commands (approval retry, prebuilt fallback, collection retargeting); their
+ * output must remain one continuous transcript instead of resetting at every
+ * child process.
+ */
+export declare function beginInstallOutputSession(session: string, target: string): void;
+/** End aggregation while retaining the final transcript for the last poll. */
+export declare function finishInstallOutputSession(session: string): void;
 /** Identifies this host process; the client scopes its pending-restart flags to it. */
 export declare const BOOT_ID: string;
 /**

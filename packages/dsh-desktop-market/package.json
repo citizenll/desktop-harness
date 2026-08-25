@@ -7,6 +7,10 @@
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
   "license": "MIT",
+  "scripts": {
+    "build:client": "tsdown && node scripts/normalize-client-banner.mjs",
+    "typecheck:client": "tsc --noEmit -p tsconfig.client.json"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/citizenll/desktop-harness.git",
@@ -48,6 +52,7 @@
     "src",
     "client",
     "scripts/normalize-client-banner.mjs",
+    "scripts/sort-class-maps.mjs",
     "tsconfig.json",
     "tsconfig.client.json",
     "tsdown.config.ts",

@@ -16,6 +16,39 @@ export declare const RELEASE_AGE_OVERRIDE = "--config.minimumReleaseAge=0";
  */
 export declare const FETCH_TIMEOUT_OVERRIDE = "--config.fetchTimeout=600000";
 /**
+ * Last-resort install mode for a git package whose lifecycle script was
+ * allowed and then failed. Git repositories often commit their production
+ * `lib/` output even though they also declare `prepare`; in that case the
+ * executable install script is not required to use the plugin. pnpm's
+ * package-scoped `allowBuilds: false` currently does not suppress git
+ * prepare scripts reliably, while this command flag does.
+ */
+export declare const IGNORE_SCRIPTS_OVERRIDE = "--ignore-scripts";
+export interface ExecutedGitPrepareFailure {
+    /** Package whose lifecycle script failed, when pnpm included its name. */
+    packageName: string | null;
+    repo: string;
+    commit: string;
+}
+/**
+ * Evidence identifying the exact Git checkout whose lifecycle script ran
+ * and failed. The codeload URL is emitted by pnpm itself, so the repository
+ * and immutable commit do not have to be guessed from the install request.
+ */
+export declare function parseExecutedGitPrepareFailure(result: Pick<InstallResult, 'exitCode' | 'timedOut' | 'cancelled' | 'busy' | 'stdout' | 'stderr'>): ExecutedGitPrepareFailure | null;
+/**
+ * True only when pnpm actually executed a git package's prepare/prepack
+ * pipeline and that pipeline failed. The separate NOT_ALLOWED error means
+ * the script never ran and must continue through the explicit approval flow.
+ */
+export declare function isExecutedGitPrepareFailure(result: Pick<InstallResult, 'exitCode' | 'timedOut' | 'cancelled' | 'busy' | 'stdout' | 'stderr'>): boolean;
+/**
+ * Build the one-shot retry argv that installs a git dependency's committed
+ * artifacts without lifecycle scripts. Null keeps the fallback constrained
+ * to `add` and to an explicit git target; arbitrary npm specs never enter it.
+ */
+export declare function gitPrebuiltFallbackArgs(pluginArgs: readonly string[]): string[] | null;
+/**
  * Run one plugin command with automatic recovery from three known pnpm traps:
  *
  * - pnpm-major drift (#20 bug 2): a modules directory built by a different
@@ -35,7 +68,7 @@ export declare const FETCH_TIMEOUT_OVERRIDE = "--config.fetchTimeout=600000";
  * appended to stderr so the UI shows an actionable message instead of a
  * wall of text (#20 bug 3). Cancelled runs are never recovered.
  */
-export declare function withHoistRecovery(run: PluginRunner, profile: string, pluginArgs: string[]): Promise<InstallResult>;
+export declare function withHoistRecovery(run: PluginRunner, profile: string, pluginArgs: string[], explicitDir?: string): Promise<InstallResult>;
 /**
  * Some registry entries point at collection repos whose actual plugin lives
  * in a subdirectory — the root has no package.json (or a workspace root with
@@ -96,12 +129,27 @@ export declare function isStaleUpdate(check: {
     beforeCommit: string | null;
     afterCommit: string | null;
 }): boolean;
+export interface BuildApprovalEvidence {
+    /** Bare package names suitable for the UI and ordinary npm approvals. */
+    packages: string[];
+    /** Exact commit-pinned selectors emitted by pnpm's git prepare guard. */
+    exactKeys: string[];
+}
+/**
+ * Trusted build-approval evidence from pnpm output.
+ *
+ * pnpm 10's git fetcher does not accept a bare package name (nor the stable
+ * `name@git+https://…` selector) for a source package that needs `prepare`.
+ * Its error contains the exact commit-pinned codeload selector that the
+ * allowlist matcher consumes. Preserve that server-observed value instead of
+ * trying to reconstruct it from user input; the commit changes over time.
+ */
+export declare function parseBuildApprovalEvidence(stdout: string, stderr: string): BuildApprovalEvidence;
 /**
  * The package pnpm's fetcher refused to prepare because its build script is
- * not allowlisted — `The git-hosted package "name@2.8.0" needs to execute
- * build scripts but is not in the "allowBuilds" allowlist.` Null when the
- * output is not this failure. Unlike ignored-builds, the package is NOT in
- * node_modules yet (the fetcher rejects before materialization, #68).
+ * not allowlisted. Null when the output is not this failure. Unlike ordinary
+ * ignored builds, the package is not in node_modules yet (the fetcher rejects
+ * before materialization).
  */
 export declare function parsePrepareNotAllowed(stdout: string, stderr: string): string | null;
 /**

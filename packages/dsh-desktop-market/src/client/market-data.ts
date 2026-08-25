@@ -4,7 +4,9 @@
  */
 
 import type { DiagnosticReportV1 } from '../diagnostics.ts'
+import type { InstallOutputLine } from '../install-progress-types.ts'
 export type { SharedHostPackageDependencyFinding } from '../diagnostics.ts'
+export type { InstallOutputLine } from '../install-progress-types.ts'
 
 /** Localized text keyed by language ('zh' / 'en'). */
 export type LocalizedText = Record<string, string | undefined>
@@ -85,6 +87,10 @@ export interface MarketStatus {
   size?: number | null
   /** True once the user asked to cancel and the host is killing the run. */
   cancelling?: boolean
+  /** Present on `/install-progress`; scopes output to one direct request. */
+  outputSession?: string
+  /** Sanitized bounded process transcript for the direct-install console. */
+  output?: InstallOutputLine[]
   /**
    * The route-level operation lock (#91): stays true through install
    * post-processing after pnpm already exited (progress.active false).
@@ -248,7 +254,9 @@ export function isMarketItself(plugin: Pick<RegistryPlugin, 'name' | 'npm'>): bo
 
 /**
  * The discover list: category filter, then the published-within window, then
- * search across name / owner / localized description, then the selected sort.
+ * search across names, package/repository identities and localized
+ * description, then the selected sort. Repository identity matters for the
+ * browser/deep-link entry points, whose natural input is `owner/repository`.
  * Pure — the section renders exactly this.
  */
 export function visiblePlugins(plugins: RegistryPlugin[], options: ListQuery): RegistryPlugin[] {
@@ -261,6 +269,10 @@ export function visiblePlugins(plugins: RegistryPlugin[], options: ListQuery): R
     const desc = (p.description && (p.description[options.lang] || p.description.en)) || ''
     return p.name.toLowerCase().includes(query)
       || p.owner.toLowerCase().includes(query)
+      || `${p.owner}/${p.name}`.toLowerCase().includes(query)
+      || p.url.toLowerCase().includes(query)
+      || (p.npm ?? '').toLowerCase().includes(query)
+      || (p.install ?? '').toLowerCase().includes(query)
       || desc.toLowerCase().includes(query)
   })
   // A github:-only entry has no npm package and therefore no download count
@@ -393,16 +405,24 @@ function addRepoIdentities(ids: Set<string>, values: readonly string[]): void {
   }
 }
 
+/** Repo identity carried directly by a legacy Git or immutable archive spec. */
+function dependencyGitHubSource(spec: string): { repo: string; subpath: string | null } | null {
+  const archive = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/archive\/[0-9a-f]{40,64}\.tar\.gz$/i.exec(spec)
+  if (archive !== null) return { repo: archive[1]!, subpath: null }
+  const git = /github:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:#path:\/([A-Za-z0-9_./-]+))?/i.exec(spec)
+  return git === null ? null : { repo: git[1]!, subpath: git[2] ?? null }
+}
+
 function depIdentities(name: string, spec: string, repoIdentities: readonly string[] = []): Set<string> {
   const ids = new Set<string>([name.toLowerCase()])
   // A scoped npm key usually mirrors owner/repo — expose that identity so an
   // npm-installed plugin still matches an entry whose npm field is unset.
   const scoped = /^@([^/]+)\/(.+)$/.exec(name)
   if (scoped !== null) ids.add(`${scoped[1]!.toLowerCase()}/${scoped[2]!.toLowerCase()}`)
-  const match = /github:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:#path:\/([A-Za-z0-9_./-]+))?/i.exec(spec)
-  if (match !== null) {
-    ids.add(match[1]!.toLowerCase())
-    if (match[2] !== undefined) ids.add(`${match[1]!.toLowerCase()}#path:/${match[2].toLowerCase()}`)
+  const source = dependencyGitHubSource(spec)
+  if (source !== null) {
+    ids.add(source.repo.toLowerCase())
+    if (source.subpath !== null) ids.add(`${source.repo.toLowerCase()}#path:/${source.subpath.toLowerCase()}`)
   }
   addRepoIdentities(ids, repoIdentities)
   return ids
@@ -415,10 +435,10 @@ function depIdentities(name: string, spec: string, repoIdentities: readonly stri
  */
 function depRepoIds(spec: string, repoIdentities: readonly string[] = []): Set<string> {
   const ids = new Set<string>()
-  const m = /github:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:#path:\/([A-Za-z0-9_./-]+))?/i.exec(spec)
-  if (m !== null) {
-    ids.add(m[1]!.toLowerCase())
-    if (m[2] !== undefined) ids.add(`${m[1]!.toLowerCase()}#path:/${m[2].toLowerCase()}`)
+  const source = dependencyGitHubSource(spec)
+  if (source !== null) {
+    ids.add(source.repo.toLowerCase())
+    if (source.subpath !== null) ids.add(`${source.repo.toLowerCase()}#path:/${source.subpath.toLowerCase()}`)
   }
   addRepoIdentities(ids, repoIdentities)
   return ids

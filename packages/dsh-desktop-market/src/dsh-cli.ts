@@ -14,6 +14,12 @@ import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { logEvent } from './log.ts'
 import { createProgressTracker, type ProgressPhase } from './ndjson.ts'
+import {
+  InstallOutputBuffer,
+  installOutputCandidates,
+  type InstallOutputLine,
+  type InstallOutputStream,
+} from './install-progress.ts'
 import { pluginArgsFor } from './pnpm-compat.ts'
 import { profileDir } from './profile.ts'
 
@@ -167,14 +173,15 @@ type SpawnShimOptions = SpawnOptions & { viaShell?: boolean }
 function spawnShim(file: string, args: readonly string[], options: SpawnShimOptions): ChildProcess {
   const { viaShell = false, ...spawnOptions } = options
   if (!viaShell) {
-    return spawn(file, [...args], { ...spawnOptions, shell: false })
+    return spawn(file, [...args], { ...spawnOptions, shell: false, windowsHide: true })
   }
   if (process.platform !== 'win32') {
-    return spawn(file, [...args], { ...spawnOptions, shell: false })
+    return spawn(file, [...args], { ...spawnOptions, shell: false, windowsHide: true })
   }
   return spawn(COMSPEC, ['/d', '/s', '/c', `"${cmdCommandLine([file, ...args])}"`], {
     ...spawnOptions,
     shell: false,
+    windowsHide: true,
     windowsVerbatimArguments: true,
   })
 }
@@ -210,6 +217,12 @@ export interface InstallResult {
   busy?: boolean
   /** Package names pnpm reported as having ignored build scripts (ndjson). */
   ignoredBuilds?: string[]
+  /**
+   * Legacy Git dependencies converted to immutable archive pins while this
+   * command recovered the profile. Route-level rollback keeps these repairs
+   * even when the requested mutation itself later fails.
+   */
+  repairedDependencies?: Record<string, string>
 }
 
 /** The shape every orchestration function takes to run plugin commands (injectable in tests). */
@@ -253,7 +266,10 @@ export interface DesktopPluginRuntime extends PluginCommandRuntime {
 export function killChild(child: ChildProcess): void {
   if (process.platform === 'win32' && child.pid !== undefined) {
     try {
-      spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], { stdio: 'ignore' })
+      spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      })
       return
     } catch { /* fall through */ }
   }
@@ -282,7 +298,10 @@ let activeDesktopOperation: ActiveDesktopOperation | null = null
 function killTree(child: ChildProcess): void {
   if (process.platform === 'win32' && child.pid !== undefined) {
     try {
-      spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], { stdio: 'ignore' })
+      spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      })
       return
     } catch { /* fall through */ }
   }
@@ -465,6 +484,10 @@ export interface InstallProgress {
   error: string | null
   /** True from the moment the user asks to cancel until the run ends. */
   cancelling: boolean
+  /** Client-provided id for one aggregate direct-install flow. */
+  outputSession: string
+  /** Sanitized, bounded process output for the embedded install console. */
+  output: InstallOutputLine[]
 }
 
 /** Singleton progress state; the status route reads it, runDshPlugin writes it. */
@@ -482,6 +505,56 @@ export const progress: InstallProgress = {
   ndjson: false,
   error: null,
   cancelling: false,
+  outputSession: '',
+  output: [],
+}
+
+const installOutput = new InstallOutputBuffer()
+let aggregateOutputSession = false
+let automaticOutputSession = 0
+
+function syncInstallOutput(): void {
+  progress.output = installOutput.snapshot()
+}
+
+function pushInstallOutput(stream: InstallOutputStream, text: string): void {
+  installOutput.push(stream, text)
+  syncInstallOutput()
+}
+
+/**
+ * Start one route-wide output session. A direct install can run several pnpm
+ * commands (approval retry, prebuilt fallback, collection retargeting); their
+ * output must remain one continuous transcript instead of resetting at every
+ * child process.
+ */
+export function beginInstallOutputSession(session: string, target: string): void {
+  aggregateOutputSession = true
+  installOutput.clear()
+  progress.outputSession = session
+  progress.output = []
+  progress.target = target
+  progress.startedAt = Date.now()
+  progress.active = false
+  progress.lastLine = ''
+  progress.phase = null
+  progress.done = 0
+  progress.total = null
+  progress.currentPackage = null
+  progress.downloaded = null
+  progress.size = null
+  progress.ndjson = false
+  progress.error = null
+  progress.cancelling = false
+}
+
+/** End aggregation while retaining the final transcript for the last poll. */
+export function finishInstallOutputSession(session: string): void {
+  if (progress.outputSession !== session) return
+  aggregateOutputSession = false
+  progress.active = false
+  progress.cancelling = false
+  syncInstallOutput()
 }
 
 /** Identifies this host process; the client scopes its pending-restart flags to it. */
@@ -513,15 +586,25 @@ function preparePluginArgs(profileDirectory: string, pluginArgs: readonly string
   if (!TARGET_RE.test(target)) {
     return { error: `unsafe plugin target rejected: ${JSON.stringify(target)}` }
   }
-  if (NDJSON_COMMANDS.has(args[0])) args = [...args, '--reporter=ndjson']
+  const command = args[0]
+  if (command !== undefined && NDJSON_COMMANDS.has(command)) args = [...args, '--reporter=ndjson']
   return { args, target }
 }
 
-/** Reset the singleton status snapshot before one operation starts. */
-function beginProgress(target: string): ReturnType<typeof createProgressTracker> {
+/** Reset command metrics while preserving a route-wide direct-install transcript. */
+function beginProgress(
+  target: string,
+  profile: string,
+  displayArgs: readonly string[],
+): ReturnType<typeof createProgressTracker> {
+  if (!aggregateOutputSession) {
+    automaticOutputSession += 1
+    installOutput.clear()
+    progress.outputSession = `command-${String(automaticOutputSession)}`
+    progress.startedAt = Date.now()
+  }
   progress.active = true
   progress.target = target
-  progress.startedAt = Date.now()
   progress.lastLine = ''
   progress.phase = null
   progress.done = 0
@@ -532,6 +615,7 @@ function beginProgress(target: string): ReturnType<typeof createProgressTracker>
   progress.ndjson = false
   progress.error = null
   progress.cancelling = false
+  pushInstallOutput('command', `dsh plugin --profile ${profile} ${displayArgs.join(' ')}`)
   return createProgressTracker()
 }
 
@@ -540,34 +624,57 @@ function beginProgress(target: string): ReturnType<typeof createProgressTracker>
  * per line on stdout, and chunk boundaries can split a line. Human fallback
  * lines (older pnpm without structured events) still update `lastLine`.
  */
-function makeProgressFeeder(tracker: ReturnType<typeof createProgressTracker>): (chunk: string) => void {
+function makeProgressFeeder(
+  tracker: ReturnType<typeof createProgressTracker>,
+  stream: 'stdout' | 'stderr',
+): { push(chunk: string): void; flush(): void } {
   let lineBuffer = ''
-  return (chunk: string): void => {
+
+  const consume = (line: string): void => {
+    const trimmed = line.trim()
+    if (trimmed === '') return
+    tracker.feed(trimmed)
+    const candidates = installOutputCandidates(trimmed, stream)
+    for (const candidate of candidates) installOutput.push(candidate.stream, candidate.text)
+    if (candidates.length > 0) {
+      progress.lastLine = candidates[candidates.length - 1]!.text.slice(0, 200)
+      syncInstallOutput()
+    }
+  }
+
+  const push = (chunk: string): void => {
     lineBuffer += chunk
     let nl: number
     while ((nl = lineBuffer.indexOf('\n')) !== -1) {
       const line = lineBuffer.slice(0, nl)
       lineBuffer = lineBuffer.slice(nl + 1)
-      const trimmed = line.trim()
-      if (trimmed === '') continue
-      tracker.feed(trimmed)
-      // Human lines never start with '{'; JSON lines are consumed by the tracker.
-      if (!trimmed.startsWith('{')) progress.lastLine = trimmed.slice(0, 200)
+      consume(line)
     }
+  }
+
+  return {
+    push,
+    flush: () => {
+      if (lineBuffer === '') return
+      consume(lineBuffer)
+      lineBuffer = ''
+    },
   }
 }
 
 /** Run one `dsh plugin --profile <p> …` command with timeout and progress tracking. */
 export function runDshPlugin(profile: string, pluginArgs: string[]): Promise<InstallResult> {
   const { file, args, cwd, viaShell } = dshArgv()
+  const displayArgs = [...pluginArgs]
   const prepared = preparePluginArgs(profileDir(profile), pluginArgs)
   if ('error' in prepared) {
     logEvent('error', 'install', prepared.error)
     return Promise.resolve({ exitCode: 1, timedOut: false, stdout: '', stderr: prepared.error, cancelled: false })
   }
   pluginArgs = prepared.args
-  const tracker = beginProgress(prepared.target)
-  const feed = makeProgressFeeder(tracker)
+  const tracker = beginProgress(prepared.target, profile, displayArgs)
+  const stdoutFeed = makeProgressFeeder(tracker, 'stdout')
+  const stderrFeed = makeProgressFeeder(tracker, 'stderr')
   return new Promise((resolvePromise) => {
     const child = spawnShim(file, [...args, 'plugin', '--profile', profile, ...pluginArgs], {
       cwd,
@@ -593,17 +700,21 @@ export function runDshPlugin(profile: string, pluginArgs: string[]): Promise<Ins
     child.stdout?.on('data', (chunk: Buffer) => {
       const text = chunk.toString()
       stdout = (stdout + text).slice(-256 * 1024)
-      feed(text)
+      stdoutFeed.push(text)
       syncProgress(tracker)
     })
     child.stderr?.on('data', (chunk: Buffer) => {
       const text = chunk.toString()
       stderr = (stderr + text).slice(-64 * 1024)
-      feed(text)
+      stderrFeed.push(text)
       syncProgress(tracker)
     })
     child.on('error', (error) => {
       clearTimeout(timer)
+      stdoutFeed.flush()
+      stderrFeed.flush()
+      syncProgress(tracker)
+      pushInstallOutput('stderr', error.message)
       progress.active = false
       progress.cancelling = false
       if (activeChild === child) activeChild = null
@@ -611,6 +722,9 @@ export function runDshPlugin(profile: string, pluginArgs: string[]): Promise<Ins
     })
     child.on('close', (code) => {
       clearTimeout(timer)
+      stdoutFeed.flush()
+      stderrFeed.flush()
+      syncProgress(tracker)
       progress.active = false
       progress.cancelling = false
       if (activeChild === child) activeChild = null
@@ -649,7 +763,7 @@ export function createDesktopPluginRuntime(
   const owner = Symbol('dsh-market desktop runtime')
   let closed = false
 
-  const runPlugin: PluginRunner = async (_profile, pluginArgs) => {
+  const runPlugin: PluginRunner = async (profile, pluginArgs) => {
     if (closed) {
       return {
         exitCode: 127,
@@ -659,12 +773,16 @@ export function createDesktopPluginRuntime(
         cancelled: false,
       }
     }
+    const displayArgs = [...pluginArgs]
     const prepared = preparePluginArgs(activeProfileDir, pluginArgs)
     if ('error' in prepared) {
       logEvent('error', 'install', prepared.error)
       return { exitCode: 1, timedOut: false, stdout: '', stderr: prepared.error, cancelled: false }
     }
 
+    const tracker = beginProgress(prepared.target, profile, displayArgs)
+    const stdoutFeed = makeProgressFeeder(tracker, 'stdout')
+    const stderrFeed = makeProgressFeeder(tracker, 'stderr')
     const abort = new AbortController()
     let handle: ReturnType<DesktopPnpmLike['runPlugin']>
     try {
@@ -672,6 +790,8 @@ export function createDesktopPluginRuntime(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       const busy = /another desktop pnpm operation is already running/i.test(message)
+      pushInstallOutput('stderr', message)
+      progress.active = false
       return {
         exitCode: 127,
         timedOut: false,
@@ -682,21 +802,19 @@ export function createDesktopPluginRuntime(
       }
     }
 
-    const tracker = beginProgress(prepared.target)
-    const feed = makeProgressFeeder(tracker)
     let stdout = ''
     let stderr = ''
     let timedOut = false
     const collectStdout = (chunk: string | Buffer): void => {
       const text = chunk.toString()
       stdout = (stdout + text).slice(-256 * 1024)
-      feed(text)
+      stdoutFeed.push(text)
       syncProgress(tracker)
     }
     const collectStderr = (chunk: string | Buffer): void => {
       const text = chunk.toString()
       stderr = (stderr + text).slice(-64 * 1024)
-      feed(text)
+      stderrFeed.push(text)
       syncProgress(tracker)
     }
     handle.stdout.on('data', collectStdout)
@@ -707,6 +825,9 @@ export function createDesktopPluginRuntime(
     const done = (async (): Promise<InstallResult> => {
       try {
         const outcome = await handle.done
+        stdoutFeed.flush()
+        stderrFeed.flush()
+        syncProgress(tracker)
         const failed = outcome.exitCode !== 0 || outcome.signal !== null || timedOut
         if (failed) progress.error = tracker.snapshot.error
         const ignoredBuilds = tracker.snapshot.ignoredBuilds
@@ -719,7 +840,11 @@ export function createDesktopPluginRuntime(
           ...(ignoredBuilds.length > 0 ? { ignoredBuilds } : {}),
         }
       } catch (error) {
+        stdoutFeed.flush()
+        stderrFeed.flush()
+        syncProgress(tracker)
         const message = error instanceof Error ? error.message : String(error)
+        pushInstallOutput('stderr', message)
         progress.error = tracker.snapshot.error
         return {
           exitCode: 127,

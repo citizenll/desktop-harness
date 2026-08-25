@@ -3,9 +3,10 @@
  * the source of truth — git HEAD for github installs, the npm latest
  * dist-tag for registry installs — with a TTL cache.
  */
-import { DIST_TAG } from './channels.js';
-import { marketFetch } from './net.js';
-import { profileDir, readInstalled, readInstalledVersion, readLockCommits } from './profile.js';
+import { DIST_TAG } from "./channels.js";
+import { marketFetch } from "./net.js";
+import { profileDir, readInstalled, readInstalledVersion, readLockCommits } from "./profile.js";
+import { parseGitHubDependencySpec } from "./sources.js";
 const UPDATES_TTL_MS = 30 * 60 * 1000;
 let updatesCache = null;
 const SEMVER = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/;
@@ -167,7 +168,7 @@ export async function fetchNpmLatest(name) {
     }
 }
 /** Per-plugin update checks; a failed check reports no update rather than failing the listing. */
-export async function checkUpdates(profile, force = false, explicitDir,
+export async function checkUpdates(profile, force = false, explicitDir, 
 /**
  * Packages that follow a release channel instead of plain `latest`. Only
  * ever the market itself: opting into early builds is volunteering to try
@@ -193,11 +194,11 @@ channelFor = new Map()) {
             result[name] = { kind: 'linked', version, current: null, latest: null, updateAvailable: false };
             return;
         }
-        const gh = /^(?:github:)?([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:#.*)?$/.exec(spec);
+        const github = parseGitHubDependencySpec(spec);
         try {
-            if (spec.startsWith('github:') && gh !== null) {
-                const current = lockCommits.get(gh[1].toLowerCase()) ?? null;
-                const head = (await fetchJson(`https://api.github.com/repos/${gh[1]}/commits/HEAD`));
+            if (github !== null) {
+                const current = github.commit ?? lockCommits.get(github.repo.toLowerCase()) ?? null;
+                const head = (await fetchJson(`https://api.github.com/repos/${github.repo}/commits/HEAD`));
                 const latest = typeof head.sha === 'string' ? head.sha : null;
                 result[name] = {
                     kind: 'github', version, current, latest,
@@ -222,7 +223,7 @@ channelFor = new Map()) {
             }
         }
         catch {
-            result[name] = { kind: spec.startsWith('github:') ? 'github' : 'npm', version, current: null, latest: null, updateAvailable: false };
+            result[name] = { kind: github === null ? 'npm' : 'github', version, current: null, latest: null, updateAvailable: false };
         }
     }));
     updatesCache = { key: cacheKey, at: Date.now(), data: result };

@@ -5,7 +5,7 @@ describe('DSH release train', () => {
   it('keeps dependencies and governed patches on one upstream release', async () => {
     await expect(checkDshReleaseTrain()).resolves.toMatchObject({
       version: '0.1.1-rc.1',
-      patches: 15
+      patches: 16
     })
   })
 })

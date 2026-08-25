@@ -2,6 +2,45 @@
  * Registry-source knowledge: how a curated registry entry's URL maps to an
  * installable pnpm target. Pure string logic, no I/O.
  */
+export interface GitHubDependencySource {
+    repo: string;
+    /** Present only for Desktop's immutable archive form. */
+    commit: string | null;
+    /** pnpm's GitHub collection selector; immutable archives are root-only. */
+    subpath: string | null;
+    kind: 'git' | 'archive';
+}
+/**
+ * Parse every GitHub dependency form Desktop persists or accepts from pnpm.
+ *
+ * The immutable `github.com/<repo>/archive/<sha>.tar.gz` form is deliberate:
+ * unlike a `github:` / codeload Git dependency, pnpm treats it as an ordinary
+ * integrity-pinned tarball and therefore does not replay the repository's
+ * `prepare` script during every later profile mutation.
+ */
+export declare function parseGitHubDependencySpec(spec: string): GitHubDependencySource | null;
+/** Immutable, integrity-lockable GitHub source for a repository commit. */
+export declare function githubArchiveSpec(repo: string, commit: string): string | null;
+export interface DirectInstallSource {
+    /** The exact user-facing source after whitespace normalization. */
+    source: string;
+    /** A package-manager target accepted by `dsh plugin add`. */
+    target: string;
+    /** Stable identity used by the duplicate and name-collision guards. */
+    name: string;
+    owner: string;
+    /** Canonical source URL when one exists; npm sources use their package page. */
+    url: string;
+    kind: 'github' | 'npm';
+}
+/**
+ * Resolve the deliberately bounded sources accepted by Desktop's direct
+ * install flow. This is a trust boundary, not a general pnpm-spec parser:
+ * local paths, arbitrary git hosts, scripts, tarballs and package aliases
+ * are rejected. The UI may receive a broader token, but only this function
+ * can turn it into a profile mutation target.
+ */
+export declare function directInstallSourceFor(input: unknown): DirectInstallSource | null;
 /**
  * Parse a registry source url: a github repo, optionally with a
  * `/tree/<branch>/<subpath>` suffix (how the curated list links monorepo

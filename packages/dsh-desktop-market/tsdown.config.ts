@@ -44,9 +44,9 @@ export default defineConfig({
   // Host types ship from lib/types (tsc); dts here would wrap the
   // banner/footer into .d.cts and break parsing.
   dts: false,
-  // Plugin code is fetched outside the host's module graph, so its own bundle
-  // carries the TS/TSX mapping consumed by browser profiling tools.
-  sourcemap: true,
+  // Desktop ships a committed production bundle; source maps are neither
+  // loaded by Harness nor retained in the staged runtime.
+  sourcemap: false,
   clean: false,
   external: [...CLIENT_EXTERNALS],
   // tsdown auto-externalizes package dependencies; anything NOT in the loader

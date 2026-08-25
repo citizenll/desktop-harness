@@ -1,6 +1,7 @@
+!include "LogicLib.nsh"
+
 !ifndef BUILD_UNINSTALLER
   !ifndef ONE_CLICK
-    !include "LogicLib.nsh"
     !include "nsDialogs.nsh"
 
     Var DshDirectoryPage
@@ -61,3 +62,25 @@
     FunctionEnd
   !endif
 !endif
+
+!macro customInstall
+  ${If} "${APP_FILENAME}" == "DSH Desktop"
+    DetailPrint "Registering the DSH Desktop command-line launcher..."
+    nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$INSTDIR\resources\dsh-cli\dsh-path.ps1" -BinPath "$INSTDIR\resources\dsh-cli"'
+    Pop $0
+    ${If} $0 != 0
+      DetailPrint "Unable to add the DSH Desktop CLI directory to the user PATH (exit $0)."
+    ${EndIf}
+  ${EndIf}
+!macroend
+
+!macro customUnInstall
+  ${If} "${APP_FILENAME}" == "DSH Desktop"
+    DetailPrint "Removing the DSH Desktop command-line launcher..."
+    nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$INSTDIR\resources\dsh-cli\dsh-path.ps1" -BinPath "$INSTDIR\resources\dsh-cli" -Remove'
+    Pop $0
+    ${If} $0 != 0
+      DetailPrint "Unable to remove the DSH Desktop CLI directory from the user PATH (exit $0)."
+    ${EndIf}
+  ${EndIf}
+!macroend

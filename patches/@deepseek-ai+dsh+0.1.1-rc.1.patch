@@ -11,3 +11,16 @@ index 04efa06..152e8bd 100644
      "commander": "^15.0.0",
      "js-yaml": "^4.2.0",
      "node-addon-require-builtin": "^0.1.4",
+diff --git a/node_modules/@deepseek-ai/dsh/lib/plugin-9h8shc4d.js b/node_modules/@deepseek-ai/dsh/lib/plugin-9h8shc4d.js
+--- a/node_modules/@deepseek-ai/dsh/lib/plugin-9h8shc4d.js
++++ b/node_modules/@deepseek-ai/dsh/lib/plugin-9h8shc4d.js
+@@ -108,7 +108,8 @@ async function runPluginCommand(profile, args) {
+ 	const result = spawnSync("pnpm", args.map((argument) => anchorPathSpec(argument, process.cwd())), {
+ 		cwd: dir,
+ 		stdio: "inherit",
+-		shell: process.platform === "win32"
++		shell: process.platform === "win32",
++		windowsHide: true
+ 	});
+ 	if (result.error !== void 0) {
+ 		if (result.error.code === "ENOENT") {

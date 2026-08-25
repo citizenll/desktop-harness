@@ -6,10 +6,11 @@
  */
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { classifyPnpmFailure } from './pnpm-compat.js';
-import { conflictingEntryIds, hasDshManifest, hasLoadableEntry, pluginSubdirs, profileDir, readInstalled, readProfileBundles } from './profile.js';
-import { logEvent } from './log.js';
-import { cleanOrphanedStore } from './store.js';
+import { classifyPnpmFailure } from "./pnpm-compat.js";
+import { conflictingEntryIds, hasDshManifest, hasLoadableEntry, pluginSubdirs, profileDir, readInstalled, readLockCommits, readManifestDeps, readProfileBundles, restoreManifestDeps } from "./profile.js";
+import { githubArchiveSpec, parseGitHubDependencySpec } from "./sources.js";
+import { logEvent } from "./log.js";
+import { cleanOrphanedStore } from "./store.js";
 /** One-shot bypass for pnpm's fresh-release hold; scoped to a single command. */
 export const RELEASE_AGE_OVERRIDE = '--config.minimumReleaseAge=0';
 /**
@@ -20,6 +21,152 @@ export const RELEASE_AGE_OVERRIDE = '--config.minimumReleaseAge=0';
  * this override once. Scoped to a single command like RELEASE_AGE_OVERRIDE.
  */
 export const FETCH_TIMEOUT_OVERRIDE = '--config.fetchTimeout=600000';
+/**
+ * Last-resort install mode for a git package whose lifecycle script was
+ * allowed and then failed. Git repositories often commit their production
+ * `lib/` output even though they also declare `prepare`; in that case the
+ * executable install script is not required to use the plugin. pnpm's
+ * package-scoped `allowBuilds: false` currently does not suppress git
+ * prepare scripts reliably, while this command flag does.
+ */
+export const IGNORE_SCRIPTS_OVERRIDE = '--ignore-scripts';
+/**
+ * Evidence identifying the exact Git checkout whose lifecycle script ran
+ * and failed. The codeload URL is emitted by pnpm itself, so the repository
+ * and immutable commit do not have to be guessed from the install request.
+ */
+export function parseExecutedGitPrepareFailure(result) {
+    if (result.exitCode === 0 || result.timedOut || result.cancelled || result.busy === true)
+        return null;
+    const output = `${result.stderr}\n${result.stdout}`.replace(/\\"/g, '"');
+    if (output.includes('ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED'))
+        return null;
+    if (!/(?:ERR_PNPM_PREPARE_PACKAGE|Failed to prepare git-hosted package fetched from)/i.test(output))
+        return null;
+    if (!/(?:npm-install|pnpm-install|\bprepare\b|\bprepack\b)/i.test(output)
+        || !/(?:Exit status\s+\d+|command failed|ELIFECYCLE)/i.test(output))
+        return null;
+    const fetched = /Failed to prepare git-hosted package fetched from\s+"https:\/\/codeload\.github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/tar\.gz\/([0-9a-f]{40,64})"/i.exec(output);
+    if (fetched === null)
+        return null;
+    const tail = output.slice((fetched.index ?? 0) + fetched[0].length);
+    const packageToken = /^\s*:\s*(\S+)\s+(?:npm-install|pnpm-install|prepare|prepack):/i.exec(tail)?.[1];
+    return {
+        packageName: packageToken === undefined ? null : barePackageName(packageToken),
+        repo: `${fetched[1]}/${fetched[2]}`,
+        commit: fetched[3].toLowerCase(),
+    };
+}
+/**
+ * True only when pnpm actually executed a git package's prepare/prepack
+ * pipeline and that pipeline failed. The separate NOT_ALLOWED error means
+ * the script never ran and must continue through the explicit approval flow.
+ */
+export function isExecutedGitPrepareFailure(result) {
+    if (parseExecutedGitPrepareFailure(result) !== null)
+        return true;
+    if (result.exitCode === 0 || result.timedOut || result.cancelled || result.busy === true)
+        return false;
+    const output = `${result.stderr}\n${result.stdout}`;
+    if (output.includes('ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED'))
+        return false;
+    if (output.includes('ERR_PNPM_PREPARE_PACKAGE'))
+        return true;
+    return /Failed to prepare git-hosted package fetched from/i.test(output)
+        && /(?:npm-install|pnpm-install|\bprepare\b|\bprepack\b)/i.test(output)
+        && /(?:Exit status\s+\d+|command failed|ELIFECYCLE)/i.test(output);
+}
+const installSucceeded = (result) => result.exitCode === 0 && !result.timedOut && !result.cancelled && result.busy !== true;
+/**
+ * Replace one root Git dependency with an immutable GitHub archive at the
+ * exact commit pnpm resolved, then reconcile the lockfile without scripts.
+ *
+ * This is the durable half of the committed-artifact fallback. Merely using
+ * `--ignore-scripts` once leaves `github:owner/repo` in package.json; pnpm
+ * replays that repository's broken `prepare` on every unrelated add/remove.
+ * An archive URL retains source identity and updateability while becoming a
+ * normal integrity-pinned tarball, so later profile mutations stay isolated.
+ */
+async function stabilizeGitDependency(run, profile, snapshot, repo, commit, packageName, explicitDir) {
+    const root = profileDir(profile, explicitDir);
+    const candidates = Object.entries(snapshot).filter(([name, spec]) => {
+        if (packageName !== null && name !== packageName)
+            return false;
+        const source = parseGitHubDependencySpec(spec);
+        return source !== null
+            && source.kind === 'git'
+            && source.subpath === null
+            && source.repo.toLowerCase() === repo.toLowerCase()
+            && hasLoadableEntry(root, name);
+    });
+    if (candidates.length !== 1)
+        return { repair: null, failure: null };
+    const [name] = candidates[0];
+    const archive = githubArchiveSpec(repo, commit);
+    if (archive === null)
+        return { repair: null, failure: null };
+    const pinned = { ...snapshot, [name]: archive };
+    restoreManifestDeps(profile, pinned, explicitDir);
+    const reconcile = await run(profile, ['install', '--no-frozen-lockfile', IGNORE_SCRIPTS_OVERRIDE]);
+    if (installSucceeded(reconcile)) {
+        logEvent('info', 'install-repair', `${name}: pinned committed artifacts to immutable archive ${archive}`);
+        return { repair: { name, spec: archive }, failure: null };
+    }
+    restoreManifestDeps(profile, snapshot, explicitDir);
+    const detail = (reconcile.stderr || reconcile.stdout).trim().slice(-1200);
+    logEvent('error', 'install-repair', `${name}: immutable archive reconciliation failed — ${detail}`);
+    return {
+        repair: null,
+        failure: {
+            ...reconcile,
+            stderr: `${reconcile.stderr}${reconcile.stderr ? '\n\n' : ''}The plugin's committed artifacts were usable, but its dependency could not be pinned to an immutable GitHub archive. The original manifest was restored. / 插件的已提交产物可用，但无法将依赖固定到不可变的 GitHub 归档，已恢复原始配置。`,
+        },
+    };
+}
+/** Pin a successful root-Git `--ignore-scripts` add before it can poison later mutations. */
+async function stabilizeNoScriptGitAdd(run, profile, pluginArgs, before, explicitDir) {
+    if (pluginArgs[0] !== 'add' || !pluginArgs.includes(IGNORE_SCRIPTS_OVERRIDE)) {
+        return { repair: null, failure: null };
+    }
+    const target = pluginArgs.at(-1);
+    if (target === undefined)
+        return { repair: null, failure: null };
+    const source = parseGitHubDependencySpec(target);
+    if (source === null || source.kind !== 'git' || source.subpath !== null) {
+        return { repair: null, failure: null };
+    }
+    const current = readManifestDeps(profile, explicitDir);
+    const matching = Object.entries(current).filter(([name, spec]) => {
+        const installedSource = parseGitHubDependencySpec(spec);
+        return installedSource !== null
+            && installedSource.kind === 'git'
+            && installedSource.subpath === null
+            && installedSource.repo.toLowerCase() === source.repo.toLowerCase()
+            && hasLoadableEntry(profileDir(profile, explicitDir), name);
+    });
+    const added = matching.filter(([name]) => before[name] === undefined);
+    const candidates = added.length === 1 ? added : matching;
+    if (candidates.length !== 1)
+        return { repair: null, failure: null };
+    const commit = readLockCommits(profile, explicitDir).get(source.repo.toLowerCase()) ?? null;
+    if (commit === null)
+        return { repair: null, failure: null };
+    return stabilizeGitDependency(run, profile, current, source.repo, commit, candidates[0][0], explicitDir);
+}
+/**
+ * Build the one-shot retry argv that installs a git dependency's committed
+ * artifacts without lifecycle scripts. Null keeps the fallback constrained
+ * to `add` and to an explicit git target; arbitrary npm specs never enter it.
+ */
+export function gitPrebuiltFallbackArgs(pluginArgs) {
+    if (pluginArgs[0] !== 'add' || pluginArgs.includes(IGNORE_SCRIPTS_OVERRIDE))
+        return null;
+    const target = pluginArgs.at(-1);
+    if (target === undefined || !/^(?:github:|git\+|git:|https?:\/\/(?:www\.)?github\.com\/)/i.test(target)) {
+        return null;
+    }
+    return ['add', IGNORE_SCRIPTS_OVERRIDE, ...pluginArgs.slice(1)];
+}
 /**
  * Run one plugin command with automatic recovery from three known pnpm traps:
  *
@@ -40,9 +187,36 @@ export const FETCH_TIMEOUT_OVERRIDE = '--config.fetchTimeout=600000';
  * appended to stderr so the UI shows an actionable message instead of a
  * wall of text (#20 bug 3). Cancelled runs are never recovered.
  */
-export async function withHoistRecovery(run, profile, pluginArgs) {
+export async function withHoistRecovery(run, profile, pluginArgs, explicitDir) {
+    const manifestBefore = readManifestDeps(profile, explicitDir);
+    const repairedDependencies = {};
     let result = await run(profile, pluginArgs);
-    const ok = (r) => r.exitCode === 0 && !r.timedOut && !r.cancelled;
+    const ok = installSucceeded;
+    if (!ok(result) && !result.cancelled && (pluginArgs[0] === 'add' || pluginArgs[0] === 'remove')) {
+        const evidence = parseExecutedGitPrepareFailure(result);
+        const requestedSource = pluginArgs[0] === 'add'
+            ? parseGitHubDependencySpec(pluginArgs.at(-1) ?? '')
+            : null;
+        // A Git add failing its OWN prepare belongs to the install route's
+        // committed-artifact fallback. This recovery is for an unrelated,
+        // already-installed Git dependency that pnpm replayed while processing
+        // the requested mutation.
+        const requestedGitFailed = evidence !== null
+            && requestedSource !== null
+            && requestedSource.kind === 'git'
+            && requestedSource.repo.toLowerCase() === evidence.repo.toLowerCase();
+        if (evidence !== null && !requestedGitFailed) {
+            const stabilized = await stabilizeGitDependency(run, profile, manifestBefore, evidence.repo, evidence.commit, evidence.packageName, explicitDir);
+            if (stabilized.repair !== null) {
+                repairedDependencies[stabilized.repair.name] = stabilized.repair.spec;
+                logEvent('warn', 'install-repair', `${stabilized.repair.name}: an existing Git dependency replayed a broken lifecycle script; profile repaired, retrying requested command once`);
+                result = await run(profile, pluginArgs);
+            }
+            else if (stabilized.failure !== null) {
+                result = stabilized.failure;
+            }
+        }
+    }
     if (!ok(result) && !result.cancelled) {
         const failure = classifyPnpmFailure(`${result.stderr}\n${result.stdout}`);
         if (failure?.code === 'hoist-pattern-diff') {
@@ -76,6 +250,18 @@ export async function withHoistRecovery(run, profile, pluginArgs) {
             logEvent('warn', 'install', `pnpm's per-request fetch timeout aborted a large download — retrying once with ${FETCH_TIMEOUT_OVERRIDE}`);
             result = await run(profile, [pluginArgs[0], FETCH_TIMEOUT_OVERRIDE, ...pluginArgs.slice(1)]);
         }
+    }
+    if (ok(result)) {
+        const stabilized = await stabilizeNoScriptGitAdd(run, profile, pluginArgs, manifestBefore, explicitDir);
+        if (stabilized.repair !== null) {
+            repairedDependencies[stabilized.repair.name] = stabilized.repair.spec;
+        }
+        else if (stabilized.failure !== null) {
+            result = stabilized.failure;
+        }
+    }
+    if (Object.keys(repairedDependencies).length > 0) {
+        result = { ...result, repairedDependencies };
     }
     if (!ok(result) && !result.cancelled) {
         // A failed, timed-out, or killed run never finishes pnpm's staging, so
@@ -205,27 +391,63 @@ export function isStaleUpdate(check) {
         ? check.beforeCommit !== null && check.afterCommit === check.beforeCommit
         : check.beforeVersion !== null && check.afterVersion === check.beforeVersion;
 }
+const PACKAGE_NAME_RE = /^(@[A-Za-z0-9-~][A-Za-z0-9._~-]*\/)?[A-Za-z0-9-~][A-Za-z0-9._~-]*$/;
+const PACKAGE_NAME_SOURCE = String.raw `(?:@[A-Za-z0-9-~][A-Za-z0-9._~-]*\/)?[A-Za-z0-9-~][A-Za-z0-9._~-]*`;
+const EXACT_GITHUB_BUILD_KEY_RE = new RegExp(String.raw `(${PACKAGE_NAME_SOURCE}@https:\/\/codeload\.github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/tar\.gz\/[0-9a-f]{40,64}(?:#path:\/[A-Za-z0-9_./-]+)?)`, 'gi');
+function barePackageName(value) {
+    const raw = value.trim();
+    const at = raw.lastIndexOf('@');
+    const name = at > 0 ? raw.slice(0, at) : raw;
+    return PACKAGE_NAME_RE.test(name) ? name : null;
+}
+function validExactBuildKey(value) {
+    const pathMarker = value.indexOf('#path:/');
+    if (pathMarker < 0)
+        return true;
+    const subpath = value.slice(pathMarker + '#path:/'.length);
+    return subpath !== '' && !subpath.split('/').some(segment => segment === '' || segment === '.' || segment === '..');
+}
+/**
+ * Trusted build-approval evidence from pnpm output.
+ *
+ * pnpm 10's git fetcher does not accept a bare package name (nor the stable
+ * `name@git+https://…` selector) for a source package that needs `prepare`.
+ * Its error contains the exact commit-pinned codeload selector that the
+ * allowlist matcher consumes. Preserve that server-observed value instead of
+ * trying to reconstruct it from user input; the commit changes over time.
+ */
+export function parseBuildApprovalEvidence(stdout, stderr) {
+    const text = `${stdout}\n${stderr}`.replace(/\\"/g, '"');
+    const packages = new Set(parseIgnoredBuilds(stdout, stderr));
+    const exactKeys = new Set();
+    for (const match of text.matchAll(/git-hosted package "([^"]+)" needs to execute build scripts/g)) {
+        const name = barePackageName(match[1] ?? '');
+        if (name !== null)
+            packages.add(name);
+    }
+    for (const match of text.matchAll(EXACT_GITHUB_BUILD_KEY_RE)) {
+        const key = match[1];
+        if (key === undefined || !validExactBuildKey(key))
+            continue;
+        const split = key.indexOf('@https://');
+        const name = split > 0 ? key.slice(0, split) : '';
+        if (!PACKAGE_NAME_RE.test(name))
+            continue;
+        exactKeys.add(key);
+        packages.add(name);
+    }
+    return { packages: [...packages], exactKeys: [...exactKeys] };
+}
 /**
  * The package pnpm's fetcher refused to prepare because its build script is
- * not allowlisted — `The git-hosted package "name@2.8.0" needs to execute
- * build scripts but is not in the "allowBuilds" allowlist.` Null when the
- * output is not this failure. Unlike ignored-builds, the package is NOT in
- * node_modules yet (the fetcher rejects before materialization, #68).
+ * not allowlisted. Null when the output is not this failure. Unlike ordinary
+ * ignored builds, the package is not in node_modules yet (the fetcher rejects
+ * before materialization).
  */
 export function parsePrepareNotAllowed(stdout, stderr) {
-    // The market always runs pnpm with --reporter=ndjson, so this sentence
-    // usually arrives inside a JSON string with its quotes escaped (#113):
-    //   … git-hosted package \"pkg@1.0.0\" needs to execute build scripts …
-    // Unescape before matching, or the ndjson path — the ONLY path in
-    // production — silently returns null and the approve banner never shows.
     const text = `${stdout}\n${stderr}`.replace(/\\"/g, '"');
-    const m = /git-hosted package "([^"]+)" needs to execute build scripts/.exec(text);
-    if (m === null)
-        return null;
-    // Strip the trailing @version — the name itself may be scoped (@scope/pkg).
-    const raw = m[1].trim();
-    const at = raw.lastIndexOf('@');
-    return at > 0 ? raw.slice(0, at) : raw;
+    const match = /git-hosted package "([^"]+)" needs to execute build scripts/.exec(text);
+    return match === null ? null : barePackageName(match[1] ?? '');
 }
 /**
  * Package names pnpm reported as having their build scripts ignored

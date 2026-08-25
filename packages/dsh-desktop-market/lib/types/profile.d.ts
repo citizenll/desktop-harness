@@ -42,10 +42,11 @@ export declare function readInstalledVersion(profile: string, name: string, expl
 /** The installed package manifest, or null when absent or malformed. */
 export declare function readInstalledManifest(profile: string, name: string, explicitDir?: string): unknown | null;
 /**
- * Strong repository identities for a locally linked dependency (#141).
- * Explicit github: specs already carry this evidence; only link:/file: need
- * filesystem discovery. This compatibility wrapper returns only declared
- * package.json identities; Git origins are exposed separately as hints.
+ * Strong repository identities for an installed dependency (#141).
+ * Explicit GitHub specs (including Desktop's immutable archive pins) carry
+ * their own evidence; link:/file: dependencies need filesystem discovery.
+ * This compatibility wrapper returns only declared identities; Git origins
+ * are exposed separately as hints.
  */
 export declare function readInstalledRepoIdentities(profile: string, name: string, spec: string, explicitDir?: string): string[];
 export interface InstalledRepoEvidence {
@@ -58,7 +59,7 @@ export interface InstalledRepoEvidence {
  * disambiguation hint because a checkout may legitimately point at a fork.
  */
 export declare function readInstalledRepoEvidence(profile: string, name: string, spec: string, explicitDir?: string): InstalledRepoEvidence;
-/** Pinned commit per `owner/repo` from the profile lockfile's codeload tarball URLs. */
+/** Pinned commit per `owner/repo` from Git or immutable archive lockfile URLs. */
 export declare function readLockCommits(profile: string, explicitDir?: string): Map<string, string>;
 /** True when the installed package's manifest declares a dsh plugin surface. */
 export declare function hasDshManifest(dir: string): boolean;

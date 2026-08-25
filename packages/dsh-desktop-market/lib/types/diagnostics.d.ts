@@ -1,7 +1,7 @@
 /** Versioned, read-only diagnostics shared by the host route and client. */
-export declare const DIAGNOSTIC_SCHEMA: 'dsh-market/diagnostics/v1';
+export declare const DIAGNOSTIC_SCHEMA: "dsh-market/diagnostics/v1";
 /** Conservative first set of known, identity-sensitive host contracts. */
-export declare const KNOWN_SHARED_HOST_PACKAGES: readonly ['@deepseek-ai/cordis', '@deepseek-ai/dsh-attachment', '@deepseek-ai/dsh-llm', '@deepseek-ai/dsh-system-prompt', '@deepseek-ai/dsh-tools'];
+export declare const KNOWN_SHARED_HOST_PACKAGES: readonly ["@deepseek-ai/cordis", "@deepseek-ai/dsh-attachment", "@deepseek-ai/dsh-llm", "@deepseek-ai/dsh-system-prompt", "@deepseek-ai/dsh-tools"];
 export interface PackageManifestFact {
     packageName: string;
     manifest: unknown;

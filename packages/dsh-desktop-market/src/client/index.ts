@@ -8,6 +8,7 @@
 import { createElement as h } from 'react'
 import * as primitives from '@deepseek-ai/dsh-client-ui-primitives'
 import { en, zh } from './locales.ts'
+import { DirectInstallDialog } from './DirectInstallDialog.tsx'
 import { InstallToast } from './InstallToast.tsx'
 import {
   MarketSection,
@@ -16,6 +17,7 @@ import {
 } from './MarketSection.tsx'
 import { SettingsCard } from './SettingsCard.tsx'
 import type { ThemeSnapshot, Translate } from './market-data.ts'
+import { installPluginInstallHashBridge } from './plugin-install-request.ts'
 
 const NS = 'dsh-market'
 
@@ -111,6 +113,8 @@ export function apply(ctx: MarketClientContext): void {
     return
   }
 
+  ctx.effect(() => installPluginInstallHashBridge(), 'dsh-market: plugin install hash bridge')
+
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-market: dictionaries')
   const t = ctx.locale.bind(NS)
   // This package is only shipped by DSH Desktop. Keep one stable placement
@@ -201,4 +205,11 @@ export function apply(ctx: MarketClientContext): void {
     id: 'dsh-market-toast',
     label: () => 'dsh-market',
   }, Toast))
+
+  const DirectInstaller = () => h(DirectInstallDialog, { t })
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+    name: 'shell.overlay',
+    id: 'dsh-market-direct-install',
+    label: () => 'dsh-market direct install',
+  }, DirectInstaller))
 }

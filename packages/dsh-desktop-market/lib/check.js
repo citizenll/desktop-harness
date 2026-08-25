@@ -28,7 +28,7 @@ import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { JSON_SCHEMA, Type, load } from 'js-yaml';
-import { INBOX_BUNDLES, readBundleRules, suggestOrder, validateOrder } from './order.js';
+import { INBOX_BUNDLES, readBundleRules, suggestOrder, validateOrder } from "./order.js";
 /** js-yaml dialect for `!!js` scalars — identical to dsh-app-boot's entryListSchema. */
 const jsExpr = new Type('tag:yaml.org,2002:js', {
     kind: 'scalar',

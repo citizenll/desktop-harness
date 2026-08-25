@@ -26,8 +26,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { buildBundleLayers, composeLayers, findDshInstallDir, parsePatchFile, } from './check.js';
-import { mergeOrder, readBundleStack } from './order.js';
+import { buildBundleLayers, composeLayers, findDshInstallDir, parsePatchFile, } from "./check.js";
+import { mergeOrder, readBundleStack } from "./order.js";
 /**
  * Replay the profile composition with `newCommunityOrder` (the candidate
  * community-bundle order; official bundles keep their exact positions) and

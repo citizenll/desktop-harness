@@ -2,8 +2,8 @@
  * dsh-market host entry: mounts the market's HTTP routes once the profile
  * composes the webServer and shell services.
  */
-import { createDesktopPluginRuntime } from './dsh-cli.js';
-import { mountMarketRoutes } from './routes.js';
+import { createDesktopPluginRuntime } from "./dsh-cli.js";
+import { mountMarketRoutes } from "./routes.js";
 export const name = 'dsh-market';
 /**
  * Resolve the host's `agents` inventory lazily — at request time, not at
