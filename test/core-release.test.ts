@@ -4,11 +4,17 @@ import { describe, expect, it } from 'vitest'
 
 const projectRoot = path.resolve(import.meta.dirname, '..')
 
+function normalizeNewlines(value: string): string {
+  return value.replaceAll('\r\n', '\n')
+}
+
 describe('independent Core release contract', () => {
   it('publishes one signed immutable generation for every Desktop target', async () => {
-    const workflow = await readFile(
-      path.join(projectRoot, '.github', 'workflows', 'core-release.yml'),
-      'utf8'
+    const workflow = normalizeNewlines(
+      await readFile(
+        path.join(projectRoot, '.github', 'workflows', 'core-release.yml'),
+        'utf8'
+      )
     )
 
     for (const target of ['win32-x64', 'linux-x64', 'darwin-x64', 'darwin-arm64']) {

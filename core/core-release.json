@@ -1,5 +1,5 @@
 {
   "schemaVersion": 1,
-  "generation": 2,
+  "generation": 3,
   "releaseNotes": "更新内置验证器，并支持从新版 Desktop 安装包安全准备和激活内核。"
 }

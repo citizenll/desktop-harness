@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest'
 import { patchPath, projectRoot } from './patch-path'
 
 async function source(...segments: string[]): Promise<string> {
-  return readFile(path.join(projectRoot, ...segments), 'utf8')
+  return readFile(path.join(projectRoot, ...segments), 'utf8').then(value =>
+    value.replaceAll('\r\n', '\n')
+  )
 }
 
 describe('Windows child-process visibility', () => {
