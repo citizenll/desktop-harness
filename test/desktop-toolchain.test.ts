@@ -16,7 +16,7 @@ describe('desktop toolchain', () => {
     await rm(testDir, { recursive: true, force: true })
   })
 
-  it('owns the PATH inherited by Harness and enables Electron Node mode', () => {
+  it('owns the PATH inherited by Harness and removes Electron Node mode', () => {
     const shimDirectory = 'C:\\Users\\tester\\AppData\\Roaming\\dsh-desktop\\harness\\.desktop-bin'
     const nodeExecutablePath = 'C:\\Program Files\\DSH Desktop\\node\\node.exe'
     const environment = buildDesktopToolchainEnvironment({
@@ -44,7 +44,7 @@ describe('desktop toolchain', () => {
     expect(environment.DSH_HOME).toContain('dsh-desktop\\harness')
     expect(environment.COREPACK_ENABLE_STRICT).toBe('0')
     expect(environment).not.toHaveProperty('corepack_enable_strict')
-    expect(environment.ELECTRON_RUN_AS_NODE).toBe('1')
+    expect(environment).not.toHaveProperty('ELECTRON_RUN_AS_NODE')
   })
 
   it('ignores an unrelated ancestor Yarn declaration and verifies packaged pnpm', async () => {
@@ -79,7 +79,7 @@ describe('desktop toolchain', () => {
     expect(repaired.pnpmVersion).toBe('10.34.5')
     expect(shim).toContain(process.execPath)
     expect(shim).toContain('pnpm.cjs')
-    expect(shim).toContain('ELECTRON_RUN_AS_NODE=1')
+    expect(shim).not.toContain('ELECTRON_RUN_AS_NODE')
   }, 20_000)
 
   it('detects common managers from PATH without running them', async () => {

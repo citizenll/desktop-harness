@@ -1,11 +1,17 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { UpdateStatus } from '../shared/contracts'
+import type { CoreUpdateStatus } from '../shared/core-update'
 import {
   isUpdateDismissed,
   shouldShowUpdate,
   updateMessage,
   type UpdateLocale
 } from './update-view'
+import {
+  coreUpdateMessage,
+  isCoreUpdateDismissed,
+  shouldShowCoreUpdate
+} from './core-update-view'
 import { isPluginLoadError } from './plugin-error-view'
 import { installAppDialog } from './app-dialog'
 import { installMobilePanel } from './mobile-panel'
@@ -26,17 +32,35 @@ installAppDialog({ document, ipcRenderer, locale })
 let host: HTMLDivElement | undefined
 let content: HTMLDivElement | undefined
 let currentStatus: UpdateStatus | undefined
+let currentCoreStatus: CoreUpdateStatus | undefined
 let dismissedVersion: string | null = null
 let dismissedTransientPhase: UpdateStatus['phase'] | null = null
+let dismissedCoreGeneration: number | null = null
+let dismissedCoreTransientPhase: CoreUpdateStatus['phase'] | null = null
 let installing = false
+let coreOperation = false
 let receivedStatusEvent = false
+let receivedCoreStatusEvent = false
 let phoneConnected = false
 let mobileStatusTimer: number | undefined
 let bootFailureTriggered = false
 let bootFailureTimer: number | undefined
+let rendererReadyTimer: number | undefined
+let rendererStateReported = false
 const pendingBootFailureMessages: string[] = []
 
 const BOOT_FAILURE_SETTLE_MS = 400
+const RENDERER_READY_SETTLE_MS = 800
+
+function reportRendererState(state: 'ready' | 'failed', message?: string): void {
+  if (rendererStateReported) return
+  rendererStateReported = true
+  ipcRenderer.send('harness:renderer-state', {
+    state,
+    origin: window.location.origin,
+    ...(message ? { message } : {})
+  })
+}
 
 function publishPluginInstallRequest(payload: unknown): void {
   const source = normalizePluginInstallSource(
@@ -107,6 +131,7 @@ function queueBootFailure(message?: string): void {
     if (!errorText) return
 
     bootFailureTriggered = true
+    reportRendererState('failed', errorText)
     void ipcRenderer.invoke('harness:open-recovery', errorText)
   }, BOOT_FAILURE_SETTLE_MS)
 }
@@ -117,9 +142,32 @@ function checkBootFailureInDom(): void {
   queueBootFailure(errorText)
 }
 
+function checkRendererReadyInDom(): void {
+  if (rendererStateReported || bootFailureTriggered) return
+  if (currentBootFailureText()) {
+    queueBootFailure(currentBootFailureText())
+    return
+  }
+  if (!document.querySelector('[data-dsh-sidebar-root]')) {
+    if (rendererReadyTimer !== undefined) window.clearTimeout(rendererReadyTimer)
+    rendererReadyTimer = undefined
+    return
+  }
+  rendererReadyTimer ??= window.setTimeout(() => {
+    rendererReadyTimer = undefined
+    const failure = currentBootFailureText()
+    if (failure) {
+      queueBootFailure(failure)
+      return
+    }
+    if (document.querySelector('[data-dsh-sidebar-root]')) reportRendererState('ready')
+  }, RENDERER_READY_SETTLE_MS)
+}
+
 const domObserver = new MutationObserver(() => {
   mountMobileButton()
   checkBootFailureInDom()
+  checkRendererReadyInDom()
 })
 
 contextBridge.exposeInMainWorld('dshDesktopDirectoryPicker', {
@@ -184,6 +232,7 @@ function initializeUi(): void {
   mount()
   mountMobileButton()
   checkBootFailureInDom()
+  checkRendererReadyInDom()
   domObserver.observe(document.documentElement, {
     childList: true,
     subtree: true
@@ -241,6 +290,7 @@ function mount(): void {
   const style = document.createElement('style')
   style.textContent = styles
   content = document.createElement('div')
+  content.className = 'stack'
   shadow.append(style, content)
   document.documentElement.appendChild(host)
   render()
@@ -256,20 +306,52 @@ function applyStatus(status: UpdateStatus): void {
   render()
 }
 
-function render(): void {
-  if (!host || !content || !currentStatus) return
+function applyCoreStatus(status: CoreUpdateStatus): void {
+  currentCoreStatus = status
+  if (host) {
+    host.dataset.coreUpdatePhase = status.phase
+    host.dataset.coreUpdateManual = String(status.manual)
+  }
+  if (!['downloading', 'verifying', 'activating'].includes(status.phase)) {
+    coreOperation = false
+  }
+  render()
+}
 
+function render(): void {
+  if (!host || !content) return
+
+  const cards: HTMLElement[] = []
   if (
-    !shouldShowUpdate(currentStatus) ||
-    isUpdateDismissed(currentStatus, dismissedVersion, dismissedTransientPhase)
+    currentStatus &&
+    shouldShowUpdate(currentStatus) &&
+    !isUpdateDismissed(currentStatus, dismissedVersion, dismissedTransientPhase)
   ) {
+    cards.push(renderDesktopUpdateCard(currentStatus))
+  }
+  if (
+    currentCoreStatus &&
+    shouldShowCoreUpdate(currentCoreStatus) &&
+    !isCoreUpdateDismissed(
+      currentCoreStatus,
+      dismissedCoreGeneration,
+      dismissedCoreTransientPhase
+    )
+  ) {
+    cards.push(renderCoreUpdateCard(currentCoreStatus))
+  }
+
+  if (cards.length === 0) {
     host.style.display = 'none'
     content.replaceChildren()
     return
   }
 
   host.style.display = 'block'
-  const status = currentStatus
+  content.replaceChildren(...cards)
+}
+
+function renderDesktopUpdateCard(status: UpdateStatus): HTMLElement {
   const card = element('aside', 'card')
   card.setAttribute('aria-live', 'polite')
   card.setAttribute('aria-label', locale === 'zh' ? 'DSH Desktop 更新' : 'DSH Desktop update')
@@ -340,7 +422,99 @@ function render(): void {
   }
 
   card.appendChild(row)
-  content.replaceChildren(card)
+  return card
+}
+
+function renderCoreUpdateCard(status: CoreUpdateStatus): HTMLElement {
+  const card = element('aside', 'card')
+  card.setAttribute('aria-live', 'polite')
+  card.setAttribute('aria-label', locale === 'zh' ? 'DSH 内核更新' : 'DSH Core update')
+
+  const row = element('div', 'row')
+  const indicator = element(
+    'span',
+    ['checking', 'downloading', 'verifying', 'activating'].includes(status.phase)
+      ? 'spinner'
+      : 'dot'
+  )
+  indicator.setAttribute('aria-hidden', 'true')
+  row.appendChild(indicator)
+
+  const body = element('div', 'body')
+  const message = element('p', 'message')
+  message.textContent = coreUpdateMessage(status, locale)
+  body.appendChild(message)
+
+  const detailParts: string[] = []
+  if (status.phase === 'error' && status.message) detailParts.push(status.message)
+  if (status.phase === 'available' && status.releaseNotes) detailParts.push(status.releaseNotes)
+  if (status.phase === 'available' && status.source === 'embedded') {
+    detailParts.push(
+      locale === 'zh'
+        ? '该内核已包含在当前安装包中，无需联网下载。'
+        : 'This Core is included with the installed app and requires no network download.'
+    )
+  }
+  if (status.phase === 'available' && status.source !== 'embedded' && status.downloadSize) {
+    const size = formatDownloadSize(status.downloadSize)
+    detailParts.push(locale === 'zh' ? `下载大小：${size}` : `Download size: ${size}`)
+  }
+  if (detailParts.length > 0) {
+    const detail = element('p', 'detail')
+    detail.textContent = detailParts.join('\n')
+    body.appendChild(detail)
+  }
+
+  if (status.phase === 'downloading') {
+    const progress = element('div', 'progress')
+    progress.setAttribute('role', 'progressbar')
+    progress.setAttribute('aria-valuemin', '0')
+    progress.setAttribute('aria-valuemax', '100')
+    progress.setAttribute('aria-valuenow', String(Math.round(status.percent ?? 0)))
+    const value = element('div', 'progressValue')
+    value.style.width = `${status.percent ?? 0}%`
+    progress.appendChild(value)
+    body.appendChild(progress)
+  }
+
+  if (status.phase === 'available' || status.phase === 'staged') {
+    const actions = element('div', 'actions')
+    const primary = button(
+      status.phase === 'available'
+        ? status.source === 'embedded'
+          ? locale === 'zh' ? '准备内核' : 'Prepare Core'
+          : locale === 'zh' ? '下载内核' : 'Download Core'
+        : locale === 'zh' ? '激活并重启 Harness' : 'Activate and restart Harness',
+      'primary'
+    )
+    primary.disabled = coreOperation
+    primary.addEventListener('click', () => {
+      coreOperation = true
+      render()
+      const channel = status.phase === 'available'
+        ? 'core-updates:download'
+        : 'core-updates:activate'
+      void ipcRenderer.invoke(channel).catch((error: unknown) => {
+        coreOperation = false
+        console.error('[core-updater] operation failed', error)
+        render()
+      })
+    })
+    const later = button(locale === 'zh' ? '稍后' : 'Later', 'secondary')
+    later.addEventListener('click', dismissCurrentCore)
+    actions.append(primary, later)
+    body.appendChild(actions)
+  }
+
+  row.appendChild(body)
+  if (!['downloading', 'verifying', 'activating'].includes(status.phase)) {
+    const close = button('×', 'close')
+    close.setAttribute('aria-label', locale === 'zh' ? '关闭' : 'Close')
+    close.addEventListener('click', dismissCurrentCore)
+    row.appendChild(close)
+  }
+  card.appendChild(row)
+  return card
 }
 
 function dismissCurrent(): void {
@@ -351,6 +525,20 @@ function dismissCurrent(): void {
     dismissedTransientPhase = currentStatus.phase
   }
   render()
+}
+
+function dismissCurrentCore(): void {
+  if (!currentCoreStatus) return
+  if (currentCoreStatus.availableGeneration !== undefined) {
+    dismissedCoreGeneration = currentCoreStatus.availableGeneration
+  } else {
+    dismissedCoreTransientPhase = currentCoreStatus.phase
+  }
+  render()
+}
+
+function formatDownloadSize(bytes: number): string {
+  return `${(bytes / 1024 / 1024).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`
 }
 
 function isBusy(status: UpdateStatus): boolean {
@@ -376,6 +564,7 @@ function button(label: string, className: string): HTMLButtonElement {
 const styles = `
   :host { color-scheme: light dark; }
   * { box-sizing: border-box; }
+  .stack { display: grid; gap: 10px; }
   .card {
     color: var(--dsw-alias-label-primary, #202124);
     background: var(--dsw-alias-bg-layer-1, rgba(255, 255, 255, 0.98));
@@ -397,6 +586,7 @@ const styles = `
     overflow: hidden;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+    white-space: pre-line;
   }
   .dot {
     width: 10px;
@@ -514,6 +704,18 @@ void ipcRenderer
     if (!receivedStatusEvent) applyStatus(status)
   })
   .catch((error: unknown) => console.warn('[updater] unable to read update status', error))
+
+ipcRenderer.on('core-updates:status-changed', (_event, status: CoreUpdateStatus) => {
+  receivedCoreStatusEvent = true
+  applyCoreStatus(status)
+})
+
+void ipcRenderer
+  .invoke('core-updates:status')
+  .then((status: CoreUpdateStatus) => {
+    if (!receivedCoreStatusEvent) applyCoreStatus(status)
+  })
+  .catch((error: unknown) => console.warn('[core-updater] unable to read update status', error))
 
 if (document.readyState === 'loading') {
   window.addEventListener('DOMContentLoaded', initializeUi, { once: true })

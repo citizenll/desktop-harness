@@ -36,7 +36,7 @@ describe('Desktop plugin install entry points', () => {
     expect(webBridge).toContain("params.get('dsh-plugin-install')")
     expect(webBridge).toContain('await this.onInstallRequest(source)')
     expect(developmentConfig).toContain('protocols: []')
-    expect(developmentConfig).toContain('extraResources: []')
+    expect(developmentConfig).toContain("entry.to !== 'dsh-cli'")
   })
 
   it('bridges protocol and CLI requests into a dedicated direct-install dialog', async () => {
@@ -117,9 +117,17 @@ describe('Desktop plugin install entry points', () => {
       'utf8'
     )
 
-    expect(manifest.build.win.extraResources).toEqual([
-      { from: 'build/dsh-cli', to: 'dsh-cli', filter: ['**/*'] }
-    ])
+    expect(manifest.build.win.extraResources).toEqual(
+      expect.arrayContaining([
+        { from: '.core-runtime/distribution/core-runner', to: 'core-runner', filter: ['**/*'] },
+        {
+          from: '.core-runtime/distribution/core-baseline',
+          to: 'core-baseline',
+          filter: ['**/*']
+        },
+        { from: 'build/dsh-cli', to: 'dsh-cli', filter: ['**/*'] }
+      ])
+    )
     expect(installer).toContain('!macro customInstall')
     expect(installer).toContain('!macro customUnInstall')
     expect(installer).toContain('dsh-path.ps1')

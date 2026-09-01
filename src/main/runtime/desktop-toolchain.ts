@@ -84,19 +84,19 @@ export async function ensureDesktopToolchainShims(
   if (platform === 'win32') {
     await writeFile(
       join(directory, 'pnpm.cmd'),
-      `@chcp 65001 >nul\r\n@echo off\r\n@set "ELECTRON_RUN_AS_NODE=1"\r\n"${options.nodeExecutablePath}" "${options.pnpmEntryPath}" %*\r\n`,
+      `@chcp 65001 >nul\r\n@echo off\r\n"${options.nodeExecutablePath}" "${options.pnpmEntryPath}" %*\r\n`,
       'utf8'
     )
     await writeFile(
       join(directory, 'node.cmd'),
-      `@chcp 65001 >nul\r\n@echo off\r\n@set "ELECTRON_RUN_AS_NODE=1"\r\n"${options.nodeExecutablePath}" %*\r\n`,
+      `@chcp 65001 >nul\r\n@echo off\r\n"${options.nodeExecutablePath}" %*\r\n`,
       'utf8'
     )
   } else {
     const pnpmPath = join(directory, 'pnpm')
     await writeFile(
       pnpmPath,
-      `#!/bin/sh\nELECTRON_RUN_AS_NODE=1 exec ${shellQuote(options.nodeExecutablePath)} ${shellQuote(options.pnpmEntryPath)} "$@"\n`,
+      `#!/bin/sh\nexec ${shellQuote(options.nodeExecutablePath)} ${shellQuote(options.pnpmEntryPath)} "$@"\n`,
       { encoding: 'utf8', mode: 0o755 }
     )
     await chmod(pnpmPath, 0o755)
@@ -104,7 +104,7 @@ export async function ensureDesktopToolchainShims(
     const nodePath = join(directory, 'node')
     await writeFile(
       nodePath,
-      `#!/bin/sh\nELECTRON_RUN_AS_NODE=1 exec ${shellQuote(options.nodeExecutablePath)} "$@"\n`,
+      `#!/bin/sh\nexec ${shellQuote(options.nodeExecutablePath)} "$@"\n`,
       { encoding: 'utf8', mode: 0o755 }
     )
     await chmod(nodePath, 0o755)
@@ -142,7 +142,6 @@ export function buildDesktopToolchainEnvironment(options: {
   const nextPath = pathParts.join(pathDelimiter)
 
   result.DSH_HOME = options.dshHome
-  result.ELECTRON_RUN_AS_NODE = '1'
   result.NO_COLOR = '1'
   // DSH Desktop invokes its pinned pnpm directly. An unrelated package.json in
   // an ancestor directory (for example C:\Users\name\package.json declaring

@@ -38,14 +38,14 @@ describe('desktop plugin runtime', () => {
       const nodeCmd = await readFile(join(binDir, 'node.cmd'), 'utf8')
       expect(pnpmCmd).toContain(process.execPath)
       expect(pnpmCmd).toContain('pnpm')
-      expect(pnpmCmd).toContain('ELECTRON_RUN_AS_NODE=1')
+      expect(pnpmCmd).not.toContain('ELECTRON_RUN_AS_NODE')
       expect(nodeCmd).toContain(process.execPath)
     } else {
       const pnpmScript = await readFile(join(binDir, 'pnpm'), 'utf8')
       const nodeScript = await readFile(join(binDir, 'node'), 'utf8')
       expect(pnpmScript).toContain(process.execPath)
       expect(pnpmScript).toContain('pnpm')
-      expect(pnpmScript).toContain('ELECTRON_RUN_AS_NODE=1')
+      expect(pnpmScript).not.toContain('ELECTRON_RUN_AS_NODE')
       expect(nodeScript).toContain(process.execPath)
     }
   })
@@ -110,7 +110,9 @@ describe('desktop plugin runtime', () => {
     expect(invocation.path.split(process.platform === 'win32' ? ';' : ':')[0]).toBe(
       binDirectory
     )
-    expect(buildPnpmEnvironment(binDirectory, environment).ELECTRON_RUN_AS_NODE).toBe('1')
+    expect(buildPnpmEnvironment(binDirectory, environment)).not.toHaveProperty(
+      'ELECTRON_RUN_AS_NODE'
+    )
 
     const next = service.runPlugin(['install'], root)
     await expect(next.done).resolves.toEqual({ exitCode: 0, signal: null })
@@ -140,8 +142,12 @@ describe('desktop plugin runtime', () => {
     const lockfile = JSON.parse(await readFile(join(projectRoot, 'package-lock.json'), 'utf8'))
     const dshVersion = manifest.dependencies['@deepseek-ai/dsh']
     const marketRoot = join(projectRoot, 'packages', 'dsh-desktop-market')
+    const verifierRoot = join(projectRoot, 'packages', 'dsh-desktop-verifier')
     const marketManifest = JSON.parse(
       await readFile(join(marketRoot, 'package.json'), 'utf8')
+    )
+    const verifierManifest = JSON.parse(
+      await readFile(join(verifierRoot, 'package.json'), 'utf8')
     )
     const desktopPatch = await readFile(join(projectRoot, 'build', 'dsh-desktop.patch.yml'), 'utf8')
     const dshPatch = await readFile(
@@ -161,6 +167,8 @@ describe('desktop plugin runtime', () => {
       'utf8'
     )
     const marketHost = await readFile(join(marketRoot, 'src', 'index.ts'), 'utf8')
+    const verifierClient = await readFile(join(verifierRoot, 'client', 'client.js'), 'utf8')
+    const verifierHost = await readFile(join(verifierRoot, 'lib', 'index.js'), 'utf8')
     const hostClient = await readFile(
       join(
         projectRoot,
@@ -179,6 +187,9 @@ describe('desktop plugin runtime', () => {
     expect(manifest.dependencies['dsh-desktop-plugin-runtime']).toBe(
       'file:packages/dsh-desktop-plugin-runtime'
     )
+    expect(manifest.dependencies['dsh-desktop-verifier']).toBe(
+      'file:packages/dsh-desktop-verifier'
+    )
     expect(manifest.dependencies.dshmarket).toBeUndefined()
     expect(marketManifest).toMatchObject({
       name: 'dsh-desktop-market',
@@ -186,8 +197,17 @@ describe('desktop plugin runtime', () => {
       private: true
     })
     expect(marketManifest.peerDependencies).toEqual({ '@deepseek-ai/cordis': '^4.0.1' })
+    expect(verifierManifest).toMatchObject({
+      name: 'dsh-desktop-verifier',
+      version: '0.1.0',
+      private: true,
+      main: 'lib/index.js'
+    })
+    expect(verifierManifest.peerDependencies).toEqual({ '@deepseek-ai/cordis': '^4.0.1' })
     expect(lockfile.packages['packages/dsh-desktop-market']?.version).toBe('0.1.0')
     expect(lockfile.packages['node_modules/dsh-desktop-market']?.link).toBe(true)
+    expect(lockfile.packages['packages/dsh-desktop-verifier']?.version).toBe('0.1.0')
+    expect(lockfile.packages['node_modules/dsh-desktop-verifier']?.link).toBe(true)
     expect(lockfile.packages['node_modules/dshmarket']).toBeUndefined()
     expect(existsSync(join(projectRoot, 'patches', 'dshmarket+1.17.0.patch'))).toBe(false)
     expect(manifest.dependencies['dsh-desktop-market-installer']).toBeUndefined()
@@ -198,9 +218,15 @@ describe('desktop plugin runtime', () => {
 
     expect(desktopPatch).toContain('name: dsh-desktop-plugin-runtime')
     expect(desktopPatch).toContain('name: dsh-desktop-market')
+    expect(desktopPatch).toContain('name: dsh-desktop-verifier')
     expect(desktopPatch).toContain('inject: [desktopProfiles]')
     expect(desktopPatch).not.toContain('market-installer')
     expect(dshPatch).toContain('+    "dsh-desktop-market": "0.1.0",')
+    expect(dshPatch).toContain('+    "dsh-desktop-verifier": "0.1.0",')
+    expect(verifierHost).toContain("const name = 'dsh-desktop-verifier'")
+    expect(verifierClient).toContain('id: "dsh-desktop-verifier"')
+    expect(verifierClient).toContain('conversation.input.right')
+    expect(verifierClient).toContain('conversation.input.dock')
     expect(marketClient).toContain('id: "dsh-desktop-market"')
     expect(marketClient).toContain('const embedded = true')
     expect(marketClient).not.toContain('marketPlacement === "plugins"')

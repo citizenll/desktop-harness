@@ -40,26 +40,26 @@ export async function ensurePnpmShim(home = dshHome()) {
   if (process.platform === 'win32') {
     await writeFile(
       join(directory, 'pnpm.cmd'),
-      `@chcp 65001 >nul\r\n@echo off\r\n@set "ELECTRON_RUN_AS_NODE=1"\r\n"${executable}" "${pnpmEntry}" %*\r\n`,
+      `@chcp 65001 >nul\r\n@echo off\r\n"${executable}" "${pnpmEntry}" %*\r\n`,
       'utf8'
     )
     await writeFile(
       join(directory, 'node.cmd'),
-      `@chcp 65001 >nul\r\n@echo off\r\n@set "ELECTRON_RUN_AS_NODE=1"\r\n"${executable}" %*\r\n`,
+      `@chcp 65001 >nul\r\n@echo off\r\n"${executable}" %*\r\n`,
       'utf8'
     )
   } else {
     const pnpmPath = join(directory, 'pnpm')
     await writeFile(
       pnpmPath,
-      `#!/bin/sh\nELECTRON_RUN_AS_NODE=1 exec ${shellQuote(executable)} ${shellQuote(pnpmEntry)} "$@"\n`,
+      `#!/bin/sh\nexec ${shellQuote(executable)} ${shellQuote(pnpmEntry)} "$@"\n`,
       { encoding: 'utf8', mode: 0o755 }
     )
     await chmod(pnpmPath, 0o755)
     const nodePath = join(directory, 'node')
     await writeFile(
       nodePath,
-      `#!/bin/sh\nELECTRON_RUN_AS_NODE=1 exec ${shellQuote(executable)} "$@"\n`,
+      `#!/bin/sh\nexec ${shellQuote(executable)} "$@"\n`,
       { encoding: 'utf8', mode: 0o755 }
     )
     await chmod(nodePath, 0o755)
@@ -100,8 +100,6 @@ export function buildPnpmEnvironment(
   for (const key of Object.keys(result)) {
     if (key.toUpperCase() === 'ELECTRON_RUN_AS_NODE') delete result[key]
   }
-  result.ELECTRON_RUN_AS_NODE = '1'
-
   const seen = new Set()
   const paths = [binDirectory, dirname(executablePath), ...processPath(environment).split(delimiter)]
     .map((entry) => entry.trim())

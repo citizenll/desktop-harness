@@ -13,6 +13,9 @@
     - id: dsh-desktop-plugin-runtime
       name: dsh-desktop-plugin-runtime
 
+    - id: dsh-desktop-verifier
+      name: dsh-desktop-verifier
+
     - id: dsh-market
       name: dsh-desktop-market
       inject: [desktopProfiles]

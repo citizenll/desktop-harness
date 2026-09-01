@@ -38,7 +38,14 @@ jobs:
         run: npm version --no-git-tag-version --allow-same-version "${{ github.ref_name }}"
       - run: npm ci
       - run: npm test
-      - run: npm run typecheck
+      - run: npm run typecheck:host
+      - run: npm --prefix packages/dsh-desktop-market run typecheck:client
+      - run: npm --prefix packages/dsh-desktop-verifier run typecheck
+      - name: Prepare immutable published Core baseline
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run core:baseline:published
       - name: Detect Apple release signing configuration
         id: apple_signing
         if: startsWith(github.ref, 'refs/tags/v')
@@ -95,11 +102,13 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v') && steps.apple_signing.outputs.enabled == 'true'
         env:
           CSC_KEYCHAIN: ${{ steps.signing_keychain.outputs.keychain }}
+          DSH_USE_PUBLISHED_CORE_BASELINE: '1'
         run: npm run package:mac:arm64
       - name: Build unsigned Apple Silicon verification package
         if: ${{ !startsWith(github.ref, 'refs/tags/v') || steps.apple_signing.outputs.enabled != 'true' }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          DSH_USE_PUBLISHED_CORE_BASELINE: ${{ startsWith(github.ref, 'refs/tags/v') && '1' || '' }}
         run: npm run package:mac:arm64
       - name: Preserve Apple Silicon update metadata
         run: mv dist/latest-mac.yml dist/latest-mac-arm64.yml
@@ -175,7 +184,14 @@ jobs:
         run: npm version --no-git-tag-version --allow-same-version "${{ github.ref_name }}"
       - run: npm ci
       - run: npm test
-      - run: npm run typecheck
+      - run: npm run typecheck:host
+      - run: npm --prefix packages/dsh-desktop-market run typecheck:client
+      - run: npm --prefix packages/dsh-desktop-verifier run typecheck
+      - name: Prepare immutable published Core baseline
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run core:baseline:published
       - name: Detect Apple release signing configuration
         id: apple_signing
         if: startsWith(github.ref, 'refs/tags/v')
@@ -232,11 +248,13 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v') && steps.apple_signing.outputs.enabled == 'true'
         env:
           CSC_KEYCHAIN: ${{ steps.signing_keychain.outputs.keychain }}
+          DSH_USE_PUBLISHED_CORE_BASELINE: '1'
         run: npm run package:mac:x64
       - name: Build unsigned Intel verification package
         if: ${{ !startsWith(github.ref, 'refs/tags/v') || steps.apple_signing.outputs.enabled != 'true' }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          DSH_USE_PUBLISHED_CORE_BASELINE: ${{ startsWith(github.ref, 'refs/tags/v') && '1' || '' }}
         run: npm run package:mac:x64
       - name: Preserve Intel update metadata
         run: mv dist/latest-mac.yml dist/latest-mac-x64.yml
@@ -310,9 +328,18 @@ jobs:
         run: npm version --no-git-tag-version --allow-same-version "${{ github.ref_name }}"
       - run: npm ci
       - run: npm test
-      - run: npm run typecheck
+      - run: npm run typecheck:host
+      - run: npm --prefix packages/dsh-desktop-market run typecheck:client
+      - run: npm --prefix packages/dsh-desktop-verifier run typecheck
+      - name: Prepare immutable published Core baseline
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run core:baseline:published
       - name: Build Windows release package
         if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          DSH_USE_PUBLISHED_CORE_BASELINE: '1'
         run: npm run package:win
       - name: Build isolated Windows development package
         if: github.event_name == 'workflow_dispatch'
@@ -458,8 +485,17 @@ jobs:
         run: npm version --no-git-tag-version --allow-same-version "${{ github.ref_name }}"
       - run: npm ci
       - run: npm test
-      - run: npm run typecheck
+      - run: npm run typecheck:host
+      - run: npm --prefix packages/dsh-desktop-market run typecheck:client
+      - run: npm --prefix packages/dsh-desktop-verifier run typecheck
+      - name: Prepare immutable published Core baseline
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run core:baseline:published
       - name: Build Linux release packages
+        env:
+          DSH_USE_PUBLISHED_CORE_BASELINE: ${{ startsWith(github.ref, 'refs/tags/v') && '1' || '' }}
         run: npm run package:linux
       - name: Verify Linux release assets
         run: |

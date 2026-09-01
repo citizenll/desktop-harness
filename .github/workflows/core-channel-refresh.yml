@@ -1,0 +1,60 @@
+name: Refresh DSH Core Channel
+
+on:
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Verify the currently published stable generation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p current-channel
+          gh release download core-channel-stable \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern channel.json \
+            --dir current-channel
+          node scripts/verify-core-channel-release.mjs \
+            current-channel/channel.json \
+            current-channel/release.json
+      - name: Download governed artifact descriptors
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          generation="$(node -p "require('./current-channel/release.json').generation")"
+          release="core-g$generation"
+          for target in win32-x64 linux-x64 darwin-x64 darwin-arm64; do
+            mkdir -p "core-artifacts/$target"
+            gh release download "$release" \
+              --repo "$GITHUB_REPOSITORY" \
+              --pattern "artifact-$target.json" \
+              --dir "core-artifacts/$target"
+            mv "core-artifacts/$target/artifact-$target.json" "core-artifacts/$target/artifact.json"
+            archive="$(node -p "require('./core-artifacts/$target/artifact.json').archive.fileName")"
+            gh release download "$release" \
+              --repo "$GITHUB_REPOSITORY" \
+              --pattern "$archive" \
+              --dir "core-artifacts/$target"
+          done
+      - name: Re-sign unexpired channel
+        env:
+          CORE_UPDATE_PRIVATE_KEY: ${{ secrets.CORE_UPDATE_PRIVATE_KEY }}
+          CORE_RELEASE_FILE: current-channel/release.json
+        run: node scripts/create-core-channel.mjs core-artifacts core-artifacts/channel.json
+      - name: Replace stable channel asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload core-channel-stable core-artifacts/channel.json --clobber --repo "$GITHUB_REPOSITORY"

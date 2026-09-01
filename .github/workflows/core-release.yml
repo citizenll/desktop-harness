@@ -1,0 +1,219 @@
+name: Release DSH Core
+
+on:
+  push:
+    tags:
+      - 'core-g*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: win32-x64
+            os: windows-2022
+          - target: linux-x64
+            os: ubuntu-24.04
+          - target: darwin-x64
+            os: macos-15-intel
+          - target: darwin-arm64
+            os: macos-15
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: node scripts/verify-core-release-tag.mjs
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck:host
+      - run: npm --prefix packages/dsh-desktop-market run typecheck:client
+      - run: npm --prefix packages/dsh-desktop-verifier run typecheck
+      - name: Require Apple signing and notarization configuration
+        if: startsWith(matrix.target, 'darwin-')
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.DESKTOP_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.DESKTOP_CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_CONTENT: ${{ secrets.DESKTOP_APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.DESKTOP_APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.DESKTOP_APPLE_API_ISSUER }}
+          APPLE_TEAM_ID: ${{ secrets.DESKTOP_APPLE_TEAM_ID }}
+        run: |
+          required=(CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY_CONTENT APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_TEAM_ID)
+          missing=()
+          for name in "${required[@]}"; do
+            test -n "${!name}" || missing+=("$name")
+          done
+          if [ "${#missing[@]}" -ne 0 ]; then
+            echo "::error::Core publishing requires Apple signing. Missing: ${missing[*]}"
+            exit 1
+          fi
+      - name: Prepare Apple notarization key
+        if: startsWith(matrix.target, 'darwin-')
+        shell: bash
+        env:
+          APPLE_API_KEY_CONTENT: ${{ secrets.DESKTOP_APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.DESKTOP_APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.DESKTOP_APPLE_API_ISSUER }}
+          APPLE_TEAM_ID: ${{ secrets.DESKTOP_APPLE_TEAM_ID }}
+        run: |
+          key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+          printf '%s' "$APPLE_API_KEY_CONTENT" > "$key_path"
+          chmod 600 "$key_path"
+          echo "APPLE_API_KEY=$key_path" >> "$GITHUB_ENV"
+          echo "APPLE_API_KEY_ID=$APPLE_API_KEY_ID" >> "$GITHUB_ENV"
+          echo "APPLE_API_ISSUER=$APPLE_API_ISSUER" >> "$GITHUB_ENV"
+          echo "APPLE_TEAM_ID=$APPLE_TEAM_ID" >> "$GITHUB_ENV"
+      - name: Prepare macOS signing keychain
+        if: startsWith(matrix.target, 'darwin-')
+        id: signing_keychain
+        env:
+          CSC_LINK: ${{ secrets.DESKTOP_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.DESKTOP_CSC_KEY_PASSWORD }}
+        run: node scripts/prepare-macos-signing-keychain.mjs
+      - name: Build governed Core artifact
+        env:
+          CSC_KEYCHAIN: ${{ steps.signing_keychain.outputs.keychain }}
+        run: npm run core:package
+      - name: Verify reproducible immutable archive
+        run: npm run core:verify-reproducible
+      - name: Smoke test staged Core
+        run: node scripts/smoke-core-runtime.mjs
+      - name: Verify and notarize macOS Core code
+        if: startsWith(matrix.target, 'darwin-')
+        shell: bash
+        run: |
+          artifact_root=".core-runtime/work/${{ matrix.target }}/artifact"
+          while IFS= read -r -d '' candidate; do
+            if file -b "$candidate" | grep -q 'Mach-O'; then
+              codesign --verify --strict --verbose=2 "$candidate"
+            fi
+          done < <(find "$artifact_root" -type f -print0)
+          runner=".core-runtime/distribution/core-runner/node"
+          runner_entitlements="$RUNNER_TEMP/core-runner-entitlements.plist"
+          codesign -d --entitlements :- "$runner" > "$runner_entitlements" 2>/dev/null
+          test "$(plutil -extract com.apple.security.cs.allow-jit raw -o - "$runner_entitlements")" = "true"
+          if plutil -extract com.apple.security.cs.disable-library-validation raw -o - "$runner_entitlements" >/dev/null 2>&1; then
+            echo "::error::Core Runner must keep Library Validation enabled."
+            exit 1
+          fi
+          notary_zip="$RUNNER_TEMP/dsh-core-${{ matrix.target }}.zip"
+          ditto -c -k --keepParent "$artifact_root" "$notary_zip"
+          xcrun notarytool submit "$notary_zip" \
+            --key "$APPLE_API_KEY" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER" \
+            --wait \
+            --no-s3-acceleration
+      - name: Remove temporary signing keychain
+        if: always() && startsWith(matrix.target, 'darwin-')
+        shell: bash
+        env:
+          SIGNING_KEYCHAIN: ${{ steps.signing_keychain.outputs.keychain }}
+          SIGNING_CERTIFICATE: ${{ steps.signing_keychain.outputs.certificate }}
+          SIGNING_KEYCHAIN_LIST: ${{ steps.signing_keychain.outputs.keychain_list }}
+        run: |
+          if [ -n "$SIGNING_KEYCHAIN_LIST" ] && [ -f "$SIGNING_KEYCHAIN_LIST" ]; then
+            keychains=()
+            while IFS= read -r keychain; do
+              test -z "$keychain" || keychains+=("$keychain")
+            done < "$SIGNING_KEYCHAIN_LIST"
+            security list-keychains -d user -s "${keychains[@]}"
+            rm -f "$SIGNING_KEYCHAIN_LIST"
+          fi
+          test -z "$SIGNING_KEYCHAIN" || security delete-keychain "$SIGNING_KEYCHAIN" || rm -f "$SIGNING_KEYCHAIN"
+          test -z "$SIGNING_CERTIFICATE" || rm -f "$SIGNING_CERTIFICATE"
+          test -z "$APPLE_API_KEY" || rm -f "$APPLE_API_KEY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: core-${{ matrix.target }}
+          retention-days: 1
+          path: .core-runtime/distribution/core-release/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish signed stable channel
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: core-*
+          path: core-artifacts
+      - name: Normalize target directories
+        run: |
+          for target in win32-x64 linux-x64 darwin-x64 darwin-arm64; do
+            source="core-artifacts/core-$target"
+            test -f "$source/artifact.json"
+            mkdir -p "core-artifacts/$target"
+            mv "$source"/* "core-artifacts/$target/"
+            rmdir "$source"
+          done
+      - name: Sign stable channel
+        env:
+          CORE_UPDATE_PRIVATE_KEY: ${{ secrets.CORE_UPDATE_PRIVATE_KEY }}
+        run: node scripts/create-core-channel.mjs core-artifacts core-artifacts/channel.json
+      - name: Assemble immutable release assets
+        run: |
+          mkdir release-assets
+          cp core-artifacts/channel.json release-assets/channel.json
+          for target in win32-x64 linux-x64 darwin-x64 darwin-arm64; do
+            cp core-artifacts/$target/dsh-core-*.tar.gz release-assets/
+            cp core-artifacts/$target/artifact.json "release-assets/artifact-$target.json"
+          done
+      - name: Publish immutable Core generation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Immutable Core release $GITHUB_REF_NAME already exists."
+            exit 1
+          fi
+          gh release create "$GITHUB_REF_NAME" release-assets/* \
+            --verify-tag \
+            --latest=false \
+            --title "DSH Core $GITHUB_REF_NAME" \
+            --notes-file <(node -p "require('./core/core-release.json').releaseNotes") \
+            --repo "$GITHUB_REPOSITORY"
+      - name: Advance stable Core channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view core-channel-stable --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload core-channel-stable core-artifacts/channel.json --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create core-channel-stable core-artifacts/channel.json \
+              --target "$GITHUB_SHA" \
+              --prerelease \
+              --latest=false \
+              --title 'DSH Core stable channel' \
+              --notes 'Machine-readable signed stable Core channel. Do not install this release directly.' \
+              --repo "$GITHUB_REPOSITORY"
+          fi
+      - name: Remove intermediate artifacts
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate "/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" \
+            --jq '.artifacts[].id' |
+            while read -r artifact_id; do
+              test -z "$artifact_id" || gh api --method DELETE "/repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id"
+            done

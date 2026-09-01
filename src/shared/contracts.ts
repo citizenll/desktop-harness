@@ -14,6 +14,8 @@ export interface RuntimeSnapshot {
   launchDirectory?: string
   logs: string[]
   url?: string
+  coreGeneration?: number
+  coreVersion?: string
 }
 
 export type UpdatePhase =

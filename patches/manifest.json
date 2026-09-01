@@ -113,7 +113,7 @@
     {
       "package": "@deepseek-ai/dsh",
       "file": "@deepseek-ai+dsh+0.1.1-rc.1.patch",
-      "intent": "Expose the two Desktop-owned runtime packages to DSH module resolution and hide the direct pnpm child used by plugin commands on Windows.",
+      "intent": "Expose the three Desktop-owned runtime packages to DSH module resolution and hide the direct pnpm child used by plugin commands on Windows.",
       "tests": [
         "test/plugin-runtime.test.js",
         "test/node-module-fallback.test.ts",

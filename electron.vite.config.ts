@@ -2,7 +2,7 @@ import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin({ exclude: ['tar'] })],
     build: {
       minify: true,
       sourcemap: false,

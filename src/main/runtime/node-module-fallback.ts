@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url'
 export interface NodeWorkerModuleFallbackOptions {
   applicationPath: string
   hookPath: string
+  nodeModulesPath?: string
   environment?: NodeJS.ProcessEnv
   platform?: NodeJS.Platform
 }
@@ -44,9 +45,7 @@ export function prependNodeModuleSearchPath(
  *
  * ESM package imports use the synchronous resolve hook. DSH also has package
  * scanners based on createRequire(profile/cordis.yml); those bypass ESM hooks,
- * so NODE_PATH must point directly at app.asar/node_modules. The profile's
- * compatibility junctions cannot be traversed when their Windows target is
- * inside an ASAR archive.
+ * so NODE_PATH must point directly at the selected Core's node_modules.
  */
 export function configureNodeWorkerModuleFallback(
   options: NodeWorkerModuleFallbackOptions
@@ -60,7 +59,7 @@ export function configureNodeWorkerModuleFallback(
 
   environment.DSH_DESKTOP_MODULE_FALLBACK_URL = fallbackUrl
   environment.NODE_PATH = prependNodeModuleSearchPath(
-    join(options.applicationPath, 'node_modules'),
+    options.nodeModulesPath ?? join(options.applicationPath, 'node_modules'),
     environment.NODE_PATH,
     platform
   )

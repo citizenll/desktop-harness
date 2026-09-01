@@ -1,4 +1,4 @@
-import type { ChildProcessWithoutNullStreams, SpawnOptionsWithoutStdio } from 'node:child_process'
+import type { ChildProcess, SpawnOptions } from 'node:child_process'
 import { createWriteStream, existsSync, type WriteStream } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { createServer } from 'node:net'
@@ -8,21 +8,20 @@ import type {
   RuntimePhase,
   RuntimeSnapshot
 } from '../../shared/contracts'
+import type { CoreRuntimePaths } from '../core/core-store'
 import { prepareDesktopToolchain } from './desktop-toolchain'
+import { configureNodeWorkerModuleFallback } from './node-module-fallback'
 
 export interface HarnessRuntimeOptions {
-  dshEntryPath: string
   nodeExecutablePath: string
-  nodeEntryPath: string
-  pnpmEntryPath: string
-  dshPatchPath: string
+  resolveCoreRuntime(): CoreRuntimePaths
   dshHome: string
   logPath: string
   launchProcess(
     executablePath: string,
     args: string[],
-    options: SpawnOptionsWithoutStdio
-  ): ChildProcessWithoutNullStreams
+    options: SpawnOptions
+  ): ChildProcess
   startupTimeoutMs?: number
   onChanged(snapshot: RuntimeSnapshot): void
 }
@@ -44,12 +43,18 @@ export function buildHarnessArguments(port: number, patchPath?: string): string[
 export function buildHarnessSpawnOptions(
   launchDirectory: string,
   dshHome: string,
+  coreRuntime: Pick<
+    CoreRuntimePaths,
+    'runtimeRoot' | 'nodeModulesPath' | 'moduleFallbackHookPath' | 'descriptor'
+  >,
   platform: NodeJS.Platform = process.platform,
   environment: NodeJS.ProcessEnv = process.env
-): SpawnOptionsWithoutStdio {
+): SpawnOptions {
   const parentEnvironment = { ...environment }
   for (const key of Object.keys(parentEnvironment)) {
     if (key.toUpperCase() === 'ELECTRON_RUN_AS_NODE') delete parentEnvironment[key]
+    if (key.toUpperCase() === 'NODE_OPTIONS') delete parentEnvironment[key]
+    if (key.toUpperCase() === 'NODE_PATH') delete parentEnvironment[key]
   }
   const pathValue =
     (platform === 'win32' ? environment.Path : environment.PATH) ??
@@ -59,16 +64,25 @@ export function buildHarnessSpawnOptions(
   const childEnvironment: NodeJS.ProcessEnv = {
     ...parentEnvironment,
     DSH_HOME: dshHome,
-    ELECTRON_RUN_AS_NODE: '1',
+    DSH_DESKTOP_CORE_ID: coreRuntime.descriptor.coreId,
+    DSH_DESKTOP_CORE_GENERATION: String(coreRuntime.descriptor.generation),
+    DSH_DESKTOP_CORE_PROTOCOL: String(coreRuntime.descriptor.desktopProtocol),
     NO_COLOR: '1',
     PATH: pathValue
   }
   if (platform === 'win32') childEnvironment.Path = pathValue
+  configureNodeWorkerModuleFallback({
+    applicationPath: coreRuntime.runtimeRoot,
+    hookPath: coreRuntime.moduleFallbackHookPath,
+    nodeModulesPath: coreRuntime.nodeModulesPath,
+    environment: childEnvironment,
+    platform
+  })
 
   return {
     cwd: launchDirectory,
     env: childEnvironment,
-    stdio: ['pipe', 'pipe', 'pipe'],
+    stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
     windowsHide: true
   }
 }
@@ -102,13 +116,14 @@ export function updateReadyStability(
 }
 
 export class HarnessRuntime {
-  private child?: ChildProcessWithoutNullStreams
+  private child?: ChildProcess
   private logStream?: WriteStream
   private phase: RuntimePhase = 'idle'
   private message = 'Harness is not running.'
   private failureKind?: RuntimeFailureKind
   private launchDirectory?: string
   private url?: string
+  private coreRuntime?: CoreRuntimePaths
   private readonly logLines: string[] = []
 
   constructor(private readonly options: HarnessRuntimeOptions) {}
@@ -120,37 +135,43 @@ export class HarnessRuntime {
       failureKind: this.failureKind,
       launchDirectory: this.launchDirectory,
       url: this.url,
+      coreGeneration: this.coreRuntime?.descriptor.generation,
+      coreVersion: this.coreRuntime?.descriptor.dshVersion,
       logs: [...this.logLines]
     }
   }
 
-  async start(launchDirectory: string): Promise<void> {
+  async start(
+    launchDirectory: string,
+    selectedCore: CoreRuntimePaths = this.options.resolveCoreRuntime()
+  ): Promise<void> {
     await this.stop()
     this.launchDirectory = launchDirectory
     this.url = undefined
+    this.coreRuntime = selectedCore
 
-    if (!existsSync(this.options.dshEntryPath)) {
-      this.setState('failed', `Harness entry was not found: ${this.options.dshEntryPath}`)
+    if (!existsSync(selectedCore.dshEntryPath)) {
+      this.setState('failed', `Harness entry was not found: ${selectedCore.dshEntryPath}`)
       return
     }
     if (!existsSync(this.options.nodeExecutablePath)) {
       this.setState('failed', `Bundled Node.js runtime was not found: ${this.options.nodeExecutablePath}`)
       return
     }
-    if (!existsSync(this.options.nodeEntryPath)) {
-      this.setState('failed', `Harness diagnostic entry was not found: ${this.options.nodeEntryPath}`)
+    if (!existsSync(selectedCore.nodeEntryPath)) {
+      this.setState('failed', `Harness diagnostic entry was not found: ${selectedCore.nodeEntryPath}`)
       return
     }
-    if (!existsSync(this.options.pnpmEntryPath)) {
+    if (!existsSync(selectedCore.pnpmEntryPath)) {
       this.setState(
         'failed',
-        `Bundled pnpm was not found: ${this.options.pnpmEntryPath}`,
+        `Bundled pnpm was not found: ${selectedCore.pnpmEntryPath}`,
         'package-manager'
       )
       return
     }
-    if (!existsSync(this.options.dshPatchPath)) {
-      this.setState('failed', `DSH Desktop patch was not found: ${this.options.dshPatchPath}`)
+    if (!existsSync(selectedCore.dshPatchPath)) {
+      this.setState('failed', `DSH Desktop patch was not found: ${selectedCore.dshPatchPath}`)
       return
     }
 
@@ -165,7 +186,7 @@ export class HarnessRuntime {
       const toolchain = await prepareDesktopToolchain({
         dshHome: this.options.dshHome,
         nodeExecutablePath: this.options.nodeExecutablePath,
-        pnpmEntryPath: this.options.pnpmEntryPath,
+        pnpmEntryPath: selectedCore.pnpmEntryPath,
         environment: process.env
       })
       toolchainEnvironment = toolchain.environment
@@ -184,10 +205,10 @@ export class HarnessRuntime {
     const port = await reservePort()
     const url = `http://127.0.0.1:${port}`
     const args = buildNodeArguments(
-      this.options.nodeEntryPath,
-      this.options.dshEntryPath,
+      selectedCore.nodeEntryPath,
+      selectedCore.dshEntryPath,
       port,
-      this.options.dshPatchPath
+      selectedCore.dshPatchPath
     )
     const startupTimeoutMs =
       this.options.startupTimeoutMs ?? (process.platform === 'win32' ? 120_000 : 45_000)
@@ -195,9 +216,12 @@ export class HarnessRuntime {
     this.writeLog(`\n[desktop] starting ${new Date().toISOString()}`)
     this.writeLog(`[desktop] launch directory ${launchDirectory}`)
     this.writeLog(`[desktop] endpoint ${url}`)
+    this.writeLog(
+      `[desktop] core ${selectedCore.descriptor.coreId} generation ${selectedCore.descriptor.generation}`
+    )
     this.setState('starting', 'Starting DeepSeek Harness…')
 
-    let child: ChildProcessWithoutNullStreams
+    let child: ChildProcess
     try {
       child = this.options.launchProcess(
         this.options.nodeExecutablePath,
@@ -205,6 +229,7 @@ export class HarnessRuntime {
         buildHarnessSpawnOptions(
           launchDirectory,
           this.options.dshHome,
+          selectedCore,
           process.platform,
           toolchainEnvironment
         )
@@ -217,9 +242,29 @@ export class HarnessRuntime {
     }
     this.child = child
 
-    child.stdout.on('data', (chunk: Buffer) => this.writeChunk('stdout', chunk))
-    child.stderr.on('data', (chunk: Buffer) => this.writeChunk('stderr', chunk))
-    child.once('spawn', () => this.writeLog('[desktop] Electron Node worker started'))
+    let protocolReady = false
+    child.stdout?.on('data', (chunk: Buffer) => this.writeChunk('stdout', chunk))
+    child.stderr?.on('data', (chunk: Buffer) => this.writeChunk('stderr', chunk))
+    child.on('message', (message: unknown) => {
+      if (
+        typeof message === 'object' &&
+        message !== null &&
+        'type' in message &&
+        message.type === 'dsh-core-ready' &&
+        'protocol' in message &&
+        message.protocol === selectedCore.descriptor.desktopProtocol &&
+        'coreId' in message &&
+        message.coreId === selectedCore.descriptor.coreId &&
+        'generation' in message &&
+        message.generation === selectedCore.descriptor.generation &&
+        'modules' in message &&
+        message.modules === selectedCore.descriptor.runnerAbi
+      ) {
+        protocolReady = true
+        this.writeLog('[desktop] Core protocol handshake completed')
+      }
+    })
+    child.once('spawn', () => this.writeLog('[desktop] Core Runner started'))
     child.once('error', (error) => {
       this.writeLog(`[node] ${error.stack ?? error.message}`)
       if (this.child !== child) return
@@ -249,6 +294,7 @@ ${cause}`
     const ready = await waitUntilReady(
       url,
       () => this.child === child && child.exitCode === null,
+      () => protocolReady,
       startupTimeoutMs
     ).finally(() => clearInterval(progressTimer))
 
@@ -282,7 +328,7 @@ ${cause}`
     this.setState('idle', 'Harness is not running.')
   }
 
-  private async stopChild(child: ChildProcessWithoutNullStreams): Promise<void> {
+  private async stopChild(child: ChildProcess): Promise<void> {
     if (child.exitCode !== null) return
     const exitPromise = new Promise<boolean>((resolve) =>
       child.once('exit', () => resolve(true))
@@ -519,6 +565,7 @@ async function reservePort(): Promise<number> {
 async function waitUntilReady(
   url: string,
   isAlive: () => boolean,
+  hasProtocolHandshake: () => boolean,
   timeoutMs: number
 ): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
@@ -529,7 +576,7 @@ async function waitUntilReady(
       const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(1_000) })
       const stability = updateReadyStability(
         readySince,
-        response.status >= 200 && response.status < 500,
+        hasProtocolHandshake() && response.status >= 200 && response.status < 500,
         Date.now(),
         stabilityWindowMs
       )

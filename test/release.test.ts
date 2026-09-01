@@ -59,15 +59,19 @@ describe('GitHub release contract', () => {
       build: {
         artifactName: string
         asar: { smartUnpack: boolean }
-        asarUnpack: string[]
+        asarUnpack?: string[]
         compression: string
         directories: { app: string }
         files: string[]
-        win: { target: Array<{ target: string; arch: string[] }> }
+        win: {
+          target: Array<{ target: string; arch: string[] }>
+          extraResources: Array<{ from: string; to: string }>
+        }
         linux: {
           icon: string
           category: string
           syncDesktopName: boolean
+          extraResources: Array<{ from: string; to: string }>
           target: Array<{ target: string; arch: string[] }>
         }
         appImage: { artifactName: string }
@@ -81,14 +85,14 @@ describe('GitHub release contract', () => {
     expect(packageJson.build.asar).toEqual({ smartUnpack: false })
     expect(packageJson.build.compression).toBe('normal')
     expect(packageJson.build.directories.app).toBe('.runtime')
-    expect(packageJson.build.files).toEqual([
-      'out/**/*',
-      'resources/**/*',
-      'node_modules/**/*',
-      'package.json'
-    ])
-    expect(packageJson.build.asarUnpack).toContain('node_modules/**/*.node')
-    expect(packageJson.build.asarUnpack).toContain('node_modules/**/*.exe')
+    expect(packageJson.build.files).toEqual(['out/**/*', 'resources/**/*', 'package.json'])
+    expect(packageJson.build.asarUnpack).toBeUndefined()
+    expect(packageJson.build.win.extraResources).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ to: 'core-runner' }),
+        expect.objectContaining({ to: 'core-baseline' })
+      ])
+    )
     expect(packageJson.build.nsis.artifactName).toBe(
       'dsh-desktop-windows-${arch}-setup.${ext}'
     )
@@ -97,6 +101,12 @@ describe('GitHub release contract', () => {
     expect(packageJson.build.linux.icon).toBe('build/icon.png')
     expect(packageJson.build.linux.category).toBe('Development')
     expect(packageJson.build.linux.syncDesktopName).toBe(true)
+    expect(packageJson.build.linux.extraResources).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ to: 'core-runner' }),
+        expect.objectContaining({ to: 'core-baseline' })
+      ])
+    )
     expect(packageJson.build.linux.target).toEqual([
       { target: 'AppImage', arch: ['x64'] },
       { target: 'deb', arch: ['x64'] }
@@ -130,8 +140,9 @@ describe('GitHub release contract', () => {
     )
 
     expect(main).toContain("desktopResourcePath('splash.html')")
-    expect(main).toContain("desktopResourcePath('runtime-module-fallback.mjs')")
-    expect(main).toContain('configureNodeWorkerModuleFallback({')
+    expect(main).toContain("join(process.resourcesPath, 'core-runner'")
+    expect(main).toContain("baselineDirectory: join(process.resourcesPath, 'core-baseline')")
+    expect(main).toContain('resolveCoreRuntime: currentCoreRuntime')
     expect(main).toContain('await showSplash()')
     expect(splash).toContain('正在启动 DSH Desktop')
     expect(splash).toContain('Starting DSH Desktop')
@@ -184,6 +195,7 @@ describe('GitHub release contract', () => {
     expect(packageJson.dependencies.node).toBeUndefined()
     expect(packageJson.dependencies.qrcode).toBeUndefined()
     expect(packageJson.devDependencies['electron-updater']).toBeTruthy()
+    expect(packageJson.devDependencies.node).toBe('22.23.2')
     expect(packageJson.devDependencies.qrcode).toBeTruthy()
     expect(packageJson.build.publish).toEqual([
       { provider: 'github', owner: 'citizenll', repo: 'desktop-harness' }
@@ -218,6 +230,10 @@ describe('GitHub release contract', () => {
       path.join(projectRoot, 'scripts', 'prepare-runtime.mjs'),
       'utf8'
     )
+    const stagedBuilderConfig = await readFile(
+      path.join(projectRoot, 'electron-builder.staged.cjs'),
+      'utf8'
+    )
     for (const script of [
       'package:mac',
       'package:mac:arm64',
@@ -228,12 +244,18 @@ describe('GitHub release contract', () => {
       expect(packageJson.scripts[script]).toContain('--publish never')
       expect(packageJson.scripts[script]).toContain('build:runtime')
       expect(packageJson.scripts[script]).toContain('runtime:verify')
+      expect(packageJson.scripts[script]).toContain('--projectDir .runtime')
+      expect(packageJson.scripts[script]).toContain('electron-builder.staged.cjs')
     }
     expect(packageJson.scripts['runtime:stage']).toContain('prepare-runtime.mjs')
     expect(packageJson.scripts['runtime:verify']).toContain('verify-packaged-runtime.mjs')
     expect(runtimeVerifier).toContain("path.basename(directory).toLowerCase() === 'resources'")
     expect(packageJson.desktopName).toBe('io.dsh.desktop.desktop')
-    expect(runtimeStager).toContain('desktopName: sourceManifest.desktopName')
+    expect(runtimeStager).toContain('desktopName: source.desktopName')
+    expect(runtimeStager).toContain("path.join(runtimeRoot, 'package-lock.json')")
+    expect(stagedBuilderConfig).toContain('electronVersion: electronPackage.version')
+    expect(stagedBuilderConfig).toContain('const { app: _sourceAppDirectory')
+    expect(stagedBuilderConfig).toContain('absoluteExtraResources')
   })
 
   it('packages an isolated development channel from the current workspace', async () => {
@@ -253,7 +275,7 @@ describe('GitHub release contract', () => {
     expect(packageJson.scripts['package:dev:win']).toContain('--publish never')
     expect(developmentConfig).toContain("appId: 'io.dsh.desktop.dev'")
     expect(developmentConfig).toContain("productName: 'DSH Desktop Dev'")
-    expect(developmentConfig).toContain("output: 'dist-dev'")
+    expect(developmentConfig).toContain("output: path.resolve(__dirname, 'dist-dev')")
     expect(developmentConfig).toContain("dshDesktopChannel: 'development'")
     expect(developmentConfig).toContain(
       "artifactName: 'dsh-desktop-dev-windows-${arch}-setup.${ext}'"

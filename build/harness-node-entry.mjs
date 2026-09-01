@@ -1,6 +1,8 @@
 import { pathToFileURL } from 'node:url'
 
 const [dshEntryPath, ...dshArguments] = process.argv.slice(2)
+const desktopProtocol = Number(process.env.DSH_DESKTOP_CORE_PROTOCOL)
+const coreId = process.env.DSH_DESKTOP_CORE_ID
 
 function report(label, value) {
   process.stderr.write(`[harness-node] ${label}: ${value}\n`)
@@ -16,7 +18,26 @@ process.stdout.write(`[harness-node] execPath=${process.execPath}\n`)
 process.stdout.write(`[harness-node] cwd=${process.cwd()}\n`)
 process.stdout.write(`[harness-node] DSH_HOME=${process.env.DSH_HOME ?? ''}\n`)
 
-if (!dshEntryPath) {
+if (!Number.isSafeInteger(desktopProtocol) || desktopProtocol < 1 || !coreId) {
+  report('startup error', 'missing Desktop Core protocol metadata')
+  process.exitCode = 1
+} else if (typeof process.send !== 'function') {
+  report('startup error', 'Desktop Core IPC channel is unavailable')
+  process.exitCode = 1
+} else {
+  process.send({
+    type: 'dsh-core-ready',
+    protocol: desktopProtocol,
+    coreId,
+    generation: Number(process.env.DSH_DESKTOP_CORE_GENERATION),
+    node: process.version,
+    modules: process.versions.modules
+  })
+}
+
+if (process.exitCode !== undefined) {
+  // The Host/Core contract is mandatory; never start an unmanaged Harness.
+} else if (!dshEntryPath) {
   report('startup error', 'missing DSH entry path')
   process.exitCode = 1
 } else {

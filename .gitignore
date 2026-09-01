@@ -3,6 +3,8 @@ out/
 dist/
 dist-dev/
 .runtime/
+.core-runtime/
+.core-secrets/
 dist-asar-test/
 .DS_Store
 *.log

@@ -1,6 +1,9 @@
 import { listPackage } from '@electron/asar'
+import { createHash } from 'node:crypto'
+import { createReadStream } from 'node:fs'
 import { readFile, readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
+import { list as listTar } from 'tar'
 
 const outputRoot = path.resolve(process.argv[2] ?? 'dist')
 
@@ -49,6 +52,21 @@ async function collectStats(root) {
   return { files, bytes }
 }
 
+async function sha256File(target) {
+  const hash = createHash('sha256')
+  let size = 0
+  await new Promise((resolve, reject) => {
+    const stream = createReadStream(target)
+    stream.on('data', (chunk) => {
+      size += chunk.length
+      hash.update(chunk)
+    })
+    stream.once('error', reject)
+    stream.once('end', resolve)
+  })
+  return { size, sha256: hash.digest('hex') }
+}
+
 function formatBytes(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MiB`
 }
@@ -63,69 +81,99 @@ const entries = listPackage(archive, { isPack: false }).map((entry) =>
   `/${entry.replaceAll('\\', '/').replace(/^\/+/, '')}`
 )
 const entrySet = new Set(entries)
-const required = [
+for (const required of [
   '/out/main/index.js',
   '/out/preload/index.cjs',
-  '/node_modules/@deepseek-ai/dsh/lib/bin.js',
-  '/node_modules/pnpm/bin/pnpm.cjs',
-  '/node_modules/dsh-desktop-market/lib/index.js',
-  '/node_modules/dsh-desktop-market/client/client.js',
-  '/node_modules/dsh-desktop-plugin-runtime/index.js',
-  '/resources/harness-node-entry.mjs',
-  '/resources/runtime-module-fallback.mjs',
-  '/resources/dsh-desktop.patch.yml',
   '/resources/splash.html',
   '/resources/brand.png',
+  '/resources/logo-light.png',
+  '/resources/logo-dark.png',
   '/resources/plugin-recovery.html',
-  '/resources/icon.png'
-]
-for (const entry of required) {
-  if (!entrySet.has(entry)) throw new Error(`Packaged runtime is missing ${entry}.`)
+  '/resources/icon.png',
+  '/resources/core-update-public-key.pem'
+]) {
+  if (!entrySet.has(required)) throw new Error(`Packaged Host is missing ${required}.`)
 }
 
-const forbidden = entries.filter(
+const forbiddenHostEntry = entries.find(
   (entry) =>
-    entry.startsWith('/node_modules/node/') ||
-    entry === '/node_modules/node' ||
-    entry.startsWith('/node_modules/@img/sharp-wasm32/') ||
-    entry.startsWith('/node_modules/@mixmark-io/domino/test/') ||
-    entry.startsWith('/node_modules/dsh-desktop-market-installer/') ||
-    entry === '/node_modules/dsh-desktop-market-installer' ||
-    entry.startsWith('/node_modules/dsh-desktop-market/src/') ||
-    entry === '/node_modules/dsh-desktop-market/src' ||
-    entry.startsWith('/node_modules/dsh-desktop-market/scripts/') ||
-    entry === '/node_modules/dsh-desktop-market/scripts' ||
-    entry === '/node_modules/dsh-desktop-market/tsconfig.json' ||
-    entry === '/node_modules/dsh-desktop-market/tsconfig.client.json' ||
-    entry === '/node_modules/dsh-desktop-market/tsdown.config.ts' ||
-    entry === '/node_modules/dsh-desktop-market/UPSTREAM.md' ||
-    entry.startsWith('/node_modules/dshmarket/src/') ||
-    entry === '/node_modules/dshmarket/src' ||
-    entry.startsWith('/node_modules/openai/src/') ||
-    entry.startsWith('/node_modules/zod/src/') ||
+    entry === '/node_modules' ||
+    entry.startsWith('/node_modules/') ||
     entry.startsWith('/packages/') ||
     entry.startsWith('/patches/') ||
     entry === '/package-lock.json' ||
-    /\.(?:d\.(?:ts|mts|cts)|map|pdb|tsbuildinfo)$/iu.test(entry) ||
-    /\/(?:coverage|\.github|\.storybook|\.vscode)(?:\/|$)/iu.test(entry) ||
-    /\/(?:readme|changelog|history|contributing|security|code_of_conduct|governance|news|release-notes)(?:\.[^/]+)?\.md$/iu.test(
-      entry
-    )
+    entry.endsWith('/harness-node-entry.mjs') ||
+    entry.endsWith('/runtime-module-fallback.mjs') ||
+    entry.endsWith('/dsh-desktop.patch.yml')
 )
-if (forbidden.length > 0) {
-  throw new Error(`Packaged runtime contains non-runtime files, starting with ${forbidden[0]}.`)
-}
-
-const archiveStats = await stat(archive)
-const unpackedRoot = `${archive}.unpacked`
-const unpacked = await collectStats(unpackedRoot)
-if (unpacked.files > 500) {
-  throw new Error(
-    `Packaged runtime has ${unpacked.files.toLocaleString('en-US')} loose app files; expected at most 500.`
-  )
+if (forbiddenHostEntry) {
+  throw new Error(`Packaged Host contains Core-owned content: ${forbiddenHostEntry}.`)
 }
 
 const resourcesRoot = path.dirname(archive)
+const runnerRoot = path.join(resourcesRoot, 'core-runner')
+const runnerExecutable = path.join(runnerRoot, process.platform === 'win32' ? 'node.exe' : 'node')
+const runnerMetadata = JSON.parse(await readFile(path.join(runnerRoot, 'runner.json'), 'utf8'))
+if (
+  runnerMetadata.schemaVersion !== 1 ||
+  runnerMetadata.platform !== process.platform ||
+  runnerMetadata.arch !== process.arch ||
+  typeof runnerMetadata.abi !== 'string'
+) {
+  throw new Error('Packaged Core Runner metadata does not match the target.')
+}
+if (!(await stat(runnerExecutable)).isFile()) {
+  throw new Error('Packaged Core Runner executable is missing.')
+}
+
+const baselineRoot = path.join(resourcesRoot, 'core-baseline')
+const baseline = JSON.parse(await readFile(path.join(baselineRoot, 'manifest.json'), 'utf8'))
+if (
+  baseline.core?.platform !== process.platform ||
+  baseline.core?.arch !== process.arch ||
+  baseline.core?.runnerAbi !== runnerMetadata.abi ||
+  baseline.archive?.format !== 'tar.gz' ||
+  baseline.archive?.url !== undefined
+) {
+  throw new Error('Packaged Core baseline manifest is incompatible with the Runner.')
+}
+const baselineArchive = path.join(baselineRoot, baseline.archive.fileName)
+const baselineDigest = await sha256File(baselineArchive)
+if (
+  baselineDigest.size !== baseline.archive.size ||
+  baselineDigest.sha256 !== baseline.archive.sha256
+) {
+  throw new Error('Packaged Core baseline archive does not match its manifest.')
+}
+const baselineEntries = new Set()
+await listTar({
+  file: baselineArchive,
+  gzip: true,
+  strict: true,
+  onentry: (entry) => baselineEntries.add(entry.path.replaceAll('\\', '/').replace(/\/$/u, ''))
+})
+for (const required of [
+  'core.json',
+  'runtime/node_modules/@deepseek-ai/dsh/lib/bin.js',
+  'runtime/node_modules/pnpm/bin/pnpm.cjs',
+  'runtime/node_modules/dsh-desktop-market/lib/index.js',
+  'runtime/node_modules/dsh-desktop-market/client/client.js',
+  'runtime/node_modules/dsh-desktop-plugin-runtime/index.js',
+  'runtime/node_modules/dsh-desktop-verifier/lib/index.js',
+  'runtime/node_modules/dsh-desktop-verifier/client/client.js',
+  'runtime/resources/harness-node-entry.mjs',
+  'runtime/resources/runtime-module-fallback.mjs',
+  'runtime/resources/dsh-desktop.patch.yml'
+]) {
+  if (!baselineEntries.has(required)) throw new Error(`Core baseline is missing ${required}.`)
+}
+
+const archiveStats = await stat(archive)
+const unpacked = await collectStats(`${archive}.unpacked`)
+if (unpacked.files > 20) {
+  throw new Error(`Packaged Host has ${unpacked.files} loose app files; expected at most 20.`)
+}
+
 if (process.platform === 'win32' && path.basename(outputRoot).toLowerCase() === 'dist') {
   for (const file of ['dsh.cmd', 'dsh.ps1', 'dsh-path.ps1']) {
     const target = path.join(resourcesRoot, 'dsh-cli', file)
@@ -145,9 +193,10 @@ if (process.platform === 'win32' && path.basename(outputRoot).toLowerCase() === 
     }
   }
 }
+
 const applicationRoot = path.dirname(resourcesRoot)
 const installed = await collectStats(applicationRoot)
-console.log(`Verified packaged runtime: ${path.relative(process.cwd(), archive)}`)
+console.log(`Verified packaged Host: ${path.relative(process.cwd(), archive)}`)
 console.log(
-  `app.asar ${formatBytes(archiveStats.size)}; native unpack ${unpacked.files.toLocaleString('en-US')} files / ${formatBytes(unpacked.bytes)}; installed image ${installed.files.toLocaleString('en-US')} files / ${formatBytes(installed.bytes)}.`
+  `app.asar ${formatBytes(archiveStats.size)}; Core baseline ${formatBytes(baselineDigest.size)}; native unpack ${unpacked.files} files / ${formatBytes(unpacked.bytes)}; installed image ${installed.files.toLocaleString('en-US')} files / ${formatBytes(installed.bytes)}.`
 )

@@ -1,6 +1,6 @@
 {
   "name": "dsh-desktop",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A cross-platform desktop shell for DeepSeek Harness.",
   "private": true,
   "type": "module",
@@ -26,25 +26,33 @@
   "scripts": {
     "postinstall": "patch-package && node scripts/install-brand-assets.mjs && install-electron --no",
     "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "build": "npm run verifier:build && electron-vite build",
     "market:build": "npm --prefix packages/dsh-desktop-market run build:client",
+    "verifier:build": "npm --prefix packages/dsh-desktop-verifier run build",
     "build:runtime": "npm run build && npm run runtime:stage",
     "runtime:stage": "node scripts/prepare-runtime.mjs",
+    "core:stage": "npm run verifier:build && node scripts/prepare-core-runtime.mjs --stage-only",
+    "core:package": "npm run verifier:build && node scripts/prepare-core-runtime.mjs",
+    "core:package-staged": "node scripts/prepare-core-runtime.mjs --package-only",
+    "core:verify-reproducible": "node scripts/verify-core-reproducibility.mjs",
+    "core:baseline:published": "node scripts/prepare-published-core-baseline.mjs",
+    "core:key:generate": "node scripts/generate-core-signing-key.mjs",
     "runtime:verify": "node scripts/verify-packaged-runtime.mjs dist",
     "icons:generate": "node scripts/generate-app-icons.mjs",
     "preview": "electron-vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.node.json && npm --prefix packages/dsh-desktop-market run typecheck:client",
+    "typecheck:host": "tsc --noEmit -p tsconfig.host.json",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && npm --prefix packages/dsh-desktop-market run typecheck:client && npm --prefix packages/dsh-desktop-verifier run typecheck",
     "check:dsh": "node scripts/check-dsh-release-train.mjs",
     "test": "npm run check:dsh && vitest run",
     "test:watch": "vitest",
-    "package:dir": "npm run build:runtime && electron-builder --dir && npm run runtime:verify",
-    "package:dev:dir": "npm run build:runtime && electron-builder --dir --config electron-builder.dev.cjs && node scripts/verify-packaged-runtime.mjs dist-dev",
-    "package:dev:win": "node scripts/verify-target.mjs win32 x64 && npm run build:runtime && electron-builder --win --x64 --publish never --config electron-builder.dev.cjs && node scripts/verify-packaged-runtime.mjs dist-dev",
-    "package:mac": "npm run build:runtime && electron-builder --mac --publish never && npm run runtime:verify",
-    "package:mac:arm64": "node scripts/verify-target.mjs darwin arm64 && npm run build:runtime && electron-builder --mac --arm64 --publish never && npm run runtime:verify",
-    "package:mac:x64": "node scripts/verify-target.mjs darwin x64 && npm run build:runtime && electron-builder --mac --x64 --publish never && npm run runtime:verify",
-    "package:win": "node scripts/verify-target.mjs win32 x64 && npm run build:runtime && electron-builder --win --x64 --publish never && npm run runtime:verify",
-    "package:linux": "node scripts/verify-target.mjs linux x64 && npm run build:runtime && electron-builder --linux --x64 --publish never && npm run runtime:verify"
+    "package:dir": "npm run build:runtime && electron-builder --dir --projectDir .runtime --config ../electron-builder.staged.cjs && npm run runtime:verify",
+    "package:dev:dir": "npm run build:runtime && electron-builder --dir --projectDir .runtime --config ../electron-builder.dev.cjs && node scripts/verify-packaged-runtime.mjs dist-dev",
+    "package:dev:win": "node scripts/verify-target.mjs win32 x64 && npm run build:runtime && electron-builder --win --x64 --publish never --projectDir .runtime --config ../electron-builder.dev.cjs && node scripts/verify-packaged-runtime.mjs dist-dev",
+    "package:mac": "npm run build:runtime && electron-builder --mac --publish never --projectDir .runtime --config ../electron-builder.staged.cjs && npm run runtime:verify",
+    "package:mac:arm64": "node scripts/verify-target.mjs darwin arm64 && npm run build:runtime && electron-builder --mac --arm64 --publish never --projectDir .runtime --config ../electron-builder.staged.cjs && npm run runtime:verify",
+    "package:mac:x64": "node scripts/verify-target.mjs darwin x64 && npm run build:runtime && electron-builder --mac --x64 --publish never --projectDir .runtime --config ../electron-builder.staged.cjs && npm run runtime:verify",
+    "package:win": "node scripts/verify-target.mjs win32 x64 && npm run build:runtime && electron-builder --win --x64 --publish never --projectDir .runtime --config ../electron-builder.staged.cjs && npm run runtime:verify",
+    "package:linux": "node scripts/verify-target.mjs linux x64 && npm run build:runtime && electron-builder --linux --x64 --publish never --projectDir .runtime --config ../electron-builder.staged.cjs && npm run runtime:verify"
   },
   "dependencies": {
     "@deepseek-ai/cordis-plugin-group": "1.0.1",
@@ -70,6 +78,7 @@
     "@deepseek-ai/dsh-workflow": "0.1.1-rc.1",
     "dsh-desktop-market": "file:packages/dsh-desktop-market",
     "dsh-desktop-plugin-runtime": "file:packages/dsh-desktop-plugin-runtime",
+    "dsh-desktop-verifier": "file:packages/dsh-desktop-verifier",
     "pnpm": "10.34.5",
     "react": "18.3.1",
     "react-dom": "18.3.1"
@@ -85,8 +94,10 @@
     "electron-updater": "^6.8.9",
     "electron-vite": "5.0.0",
     "lightningcss": "1.33.0",
+    "node": "22.23.2",
     "patch-package": "^8.0.1",
     "qrcode": "^1.5.4",
+    "tar": "7.5.22",
     "tsdown": "0.21.1",
     "typescript": "5.9.3",
     "vite": "7.3.6",
@@ -110,14 +121,6 @@
     "asar": {
       "smartUnpack": false
     },
-    "asarUnpack": [
-      "node_modules/**/*.node",
-      "node_modules/**/*.dll",
-      "node_modules/**/*.exe",
-      "node_modules/**/*.so",
-      "node_modules/**/*.dylib",
-      "node_modules/**/*.wasm"
-    ],
     "npmRebuild": false,
     "compression": "normal",
     "electronLanguages": [
@@ -135,7 +138,6 @@
     "files": [
       "out/**/*",
       "resources/**/*",
-      "node_modules/**/*",
       "package.json"
     ],
     "publish": [
@@ -151,6 +153,22 @@
       "icon": "build/icon.icns",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
+      "extraResources": [
+        {
+          "from": ".core-runtime/distribution/core-runner",
+          "to": "core-runner",
+          "filter": [
+            "**/*"
+          ]
+        },
+        {
+          "from": ".core-runtime/distribution/core-baseline",
+          "to": "core-baseline",
+          "filter": [
+            "**/*"
+          ]
+        }
+      ],
       "target": [
         "dmg",
         "zip"
@@ -163,6 +181,20 @@
       "icon": "build/icon.ico",
       "verifyUpdateCodeSignature": false,
       "extraResources": [
+        {
+          "from": ".core-runtime/distribution/core-runner",
+          "to": "core-runner",
+          "filter": [
+            "**/*"
+          ]
+        },
+        {
+          "from": ".core-runtime/distribution/core-baseline",
+          "to": "core-baseline",
+          "filter": [
+            "**/*"
+          ]
+        },
         {
           "from": "build/dsh-cli",
           "to": "dsh-cli",
@@ -185,6 +217,22 @@
       "category": "Development",
       "maintainer": "citizenll",
       "syncDesktopName": true,
+      "extraResources": [
+        {
+          "from": ".core-runtime/distribution/core-runner",
+          "to": "core-runner",
+          "filter": [
+            "**/*"
+          ]
+        },
+        {
+          "from": ".core-runtime/distribution/core-baseline",
+          "to": "core-baseline",
+          "filter": [
+            "**/*"
+          ]
+        }
+      ],
       "target": [
         {
           "target": "AppImage",

@@ -1,13 +1,14 @@
-const packageJson = require('./package.json')
+const path = require('node:path')
+const stagedConfig = require('./electron-builder.staged.cjs')
 
 module.exports = {
-  ...packageJson.build,
+  ...stagedConfig,
   appId: 'io.dsh.desktop.dev',
   productName: 'DSH Desktop Dev',
   protocols: [],
   directories: {
-    ...packageJson.build.directories,
-    output: 'dist-dev'
+    ...stagedConfig.directories,
+    output: path.resolve(__dirname, 'dist-dev')
   },
   extraMetadata: {
     name: 'dsh-desktop-dev',
@@ -15,12 +16,14 @@ module.exports = {
     dshDesktopChannel: 'development'
   },
   nsis: {
-    ...packageJson.build.nsis,
+    ...stagedConfig.nsis,
     artifactName: 'dsh-desktop-dev-windows-${arch}-setup.${ext}'
   },
   win: {
-    ...packageJson.build.win,
-    extraResources: []
+    ...stagedConfig.win,
+    extraResources: stagedConfig.win.extraResources.filter(
+      (entry) => entry.to !== 'dsh-cli'
+    )
   },
   publish: null
 }

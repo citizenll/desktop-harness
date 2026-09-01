@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { join } from 'node:path'
-import { appendFileSync, existsSync, readFileSync } from 'node:fs'
+import { appendFileSync, readFileSync } from 'node:fs'
 import { parse } from 'yaml'
 import {
   app,
@@ -51,8 +51,23 @@ import {
   type DesktopMenuCommand
 } from '../shared/desktop-menu'
 import { buildPluginRecoveryViewModel } from './plugin-recovery-view'
-import { configureNodeWorkerModuleFallback } from './runtime/node-module-fallback'
 import { PluginInstallWebBridge } from './plugin-install-web-bridge'
+import {
+  CoreRuntimeStore,
+  createDevelopmentCoreRuntime,
+  type CoreRuntimePaths,
+  type StagedCoreRuntime
+} from './core/core-store'
+import { CoreUpdateManager } from './core/core-update-manager'
+import {
+  assertRunnerTarget,
+  createDevelopmentCoreDescriptor,
+  queryCoreRunnerMetadata,
+  readCoreRunnerMetadata,
+  type CoreRunnerMetadata
+} from './core/core-runtime-bootstrap'
+import type { CoreCompatibility } from './core/core-manifest'
+import type { CoreUpdateStatus } from '../shared/core-update'
 import {
   DSH_DESKTOP_PLUGIN_INSTALL_CHANNEL,
   parseDesktopPluginInstallUrl,
@@ -96,6 +111,19 @@ const pendingPluginInstallSources: string[] = []
 const pendingPluginInstallErrors: PluginInstallIntentErrorCode[] = []
 let foregroundReleaseTimer: ReturnType<typeof setTimeout> | undefined
 let desktopDialogSequence = 0
+let coreRuntime: CoreRuntimePaths
+let coreRunnerPath: string
+let coreCompatibility: CoreCompatibility
+let coreStore: CoreRuntimeStore | undefined
+let coreUpdateManager: CoreUpdateManager | undefined
+let coreActivationOperation: Promise<boolean> | undefined
+let coreActivationInProgress = false
+let coreRendererValidation: {
+  origin: string
+  generation: number
+  timer: NodeJS.Timeout
+  resolve(result: { ready: boolean; message?: string }): void
+} | undefined
 
 interface PendingDesktopDialog {
   webContentsId: number
@@ -445,27 +473,6 @@ async function syncNativeTheme(window: BrowserWindow): Promise<void> {
   applyWindowChromeTheme(window, isDark)
 }
 
-function dshEntryPath(): string {
-  return join(app.getAppPath(), 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js')
-}
-
-function bundledNodePath(): string {
-  // Electron exposes the same embedded Node runtime used by its utility
-  // processes when ELECTRON_RUN_AS_NODE=1. Reusing it avoids shipping a second
-  // 80+ MiB Node executable and keeps native addons on Electron's ABI.
-  return process.execPath
-}
-
-function bundledPnpmEntryPath(): string {
-  const root = join(app.getAppPath(), 'node_modules', 'pnpm', 'bin')
-  const candidates = [join(root, 'pnpm.cjs'), join(root, 'pnpm.mjs')]
-  return candidates.find((candidate) => existsSync(candidate)) ?? join(root, 'pnpm.cjs')
-}
-
-function harnessNodeEntryPath(): string {
-  return desktopResourcePath('harness-node-entry.mjs')
-}
-
 function desktopResourcePath(name: string): string {
   return app.isPackaged
     ? join(app.getAppPath(), 'resources', name)
@@ -477,14 +484,64 @@ function desktopIconPath(): string {
 }
 
 function dshBrandLogoPath(variant: 'light' | 'dark'): string {
+  return desktopResourcePath(`logo-${variant}.png`)
+}
+
+function currentCoreRuntime(): CoreRuntimePaths {
+  return coreStore?.current() ?? coreRuntime
+}
+
+function packagedCoreRunnerPath(): string {
   return join(
-    app.getAppPath(),
-    'node_modules',
-    '@deepseek-ai',
-    'dsh-web-frontend',
-    'dist',
-    `dsh-desktop-logo-${variant}.png`
+    process.resourcesPath,
+    'core-runner',
+    process.platform === 'win32' ? 'node.exe' : 'node'
   )
+}
+
+async function initializeCoreRuntime(): Promise<void> {
+  if (!app.isPackaged) {
+    const developmentRunnerPath = join(
+      app.getAppPath(),
+      'node_modules',
+      'node',
+      'bin',
+      process.platform === 'win32' ? 'node.exe' : 'node'
+    )
+    const runner = await queryCoreRunnerMetadata(developmentRunnerPath)
+    assertRunnerTarget(runner)
+    coreRunnerPath = developmentRunnerPath
+    coreCompatibility = compatibilityForRunner(runner)
+    coreRuntime = createDevelopmentCoreRuntime({
+      projectRoot: app.getAppPath(),
+      descriptor: await createDevelopmentCoreDescriptor({
+        projectRoot: app.getAppPath(),
+        runner
+      })
+    })
+    return
+  }
+
+  coreRunnerPath = packagedCoreRunnerPath()
+  const runner = await readCoreRunnerMetadata(
+    join(process.resourcesPath, 'core-runner', 'runner.json')
+  )
+  assertRunnerTarget(runner)
+  coreCompatibility = compatibilityForRunner(runner)
+  coreStore = new CoreRuntimeStore({
+    root: join(app.getPath('userData'), 'core-runtime'),
+    baselineDirectory: join(process.resourcesPath, 'core-baseline'),
+    compatibility: coreCompatibility
+  })
+  coreRuntime = await coreStore.initialize()
+}
+
+function compatibilityForRunner(runner: CoreRunnerMetadata): CoreCompatibility {
+  return {
+    platform: runner.platform,
+    arch: runner.arch,
+    runnerAbi: runner.abi
+  }
 }
 
 function harnessLocale(): 'en' | 'zh' {
@@ -629,6 +686,35 @@ async function openHarness(url: string): Promise<void> {
   focusDesktopWindow(hasPendingPluginInstall)
 }
 
+function finishCoreRendererValidation(result: { ready: boolean; message?: string }): void {
+  const pending = coreRendererValidation
+  if (!pending) return
+  coreRendererValidation = undefined
+  clearTimeout(pending.timer)
+  pending.resolve(result)
+}
+
+function beginCoreRendererValidation(
+  url: string,
+  generation: number,
+  timeoutMs = 30_000
+): Promise<{ ready: boolean; message?: string }> {
+  finishCoreRendererValidation({
+    ready: false,
+    message: 'The previous Core renderer validation was superseded.'
+  })
+  const origin = new URL(url).origin
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      finishCoreRendererValidation({
+        ready: false,
+        message: 'The candidate Core renderer did not become ready in time.'
+      })
+    }, timeoutMs)
+    coreRendererValidation = { origin, generation, timer, resolve }
+  })
+}
+
 async function showSplash(): Promise<void> {
   const window = mainWindow && !mainWindow.isDestroyed() ? mainWindow : createWindow()
   const navigationVersion = ++mainWindowNavigationVersion
@@ -640,6 +726,7 @@ async function showSplash(): Promise<void> {
 }
 
 function launchHarness(): Promise<void> {
+  if (coreActivationOperation) return coreActivationOperation.then(() => undefined)
   if (harnessLaunchOperation) return harnessLaunchOperation
 
   harnessLaunchOperation = (async () => {
@@ -651,12 +738,115 @@ function launchHarness(): Promise<void> {
   return harnessLaunchOperation
 }
 
+function activateCoreRuntime(
+  candidate: StagedCoreRuntime,
+  previous: CoreRuntimePaths,
+  commit: () => Promise<void>
+): Promise<boolean> {
+  if (coreActivationOperation) return coreActivationOperation
+
+  coreActivationOperation = (async () => {
+    if (harnessLaunchOperation) await harnessLaunchOperation
+    coreActivationInProgress = true
+    let committed = false
+    try {
+      await runtime.start(launchDirectory, candidate)
+      const candidateSnapshot = runtime.snapshot()
+      if (
+        candidateSnapshot.phase !== 'ready' ||
+        candidateSnapshot.coreGeneration !== candidate.descriptor.generation ||
+        !candidateSnapshot.url
+      ) {
+        throw new Error(candidateSnapshot.message || 'The candidate Core backend did not become ready.')
+      }
+
+      const rendererValidation = beginCoreRendererValidation(
+        candidateSnapshot.url,
+        candidate.descriptor.generation
+      )
+      await openHarness(candidateSnapshot.url)
+      const renderer = await rendererValidation
+      if (!renderer.ready) {
+        throw new Error(renderer.message || 'The candidate Core renderer did not become ready.')
+      }
+      const validatedSnapshot = runtime.snapshot()
+      if (
+        validatedSnapshot.phase !== 'ready' ||
+        validatedSnapshot.coreGeneration !== candidate.descriptor.generation ||
+        validatedSnapshot.url !== candidateSnapshot.url
+      ) {
+        throw new Error('The candidate Core stopped before activation could be committed.')
+      }
+
+      await commit()
+      committed = true
+      return true
+    } catch (error) {
+      finishCoreRendererValidation({ ready: false })
+      if (!committed) {
+        await runtime.start(launchDirectory, previous).catch((rollbackError: unknown) => {
+          console.error('[core-updater] failed to restart the committed Core', rollbackError)
+        })
+      }
+      throw error
+    } finally {
+      coreActivationInProgress = false
+      const snapshot = runtime.snapshot()
+      if (snapshot.phase === 'ready' && snapshot.url) {
+        await openHarness(snapshot.url).catch(showUnexpectedError)
+      } else if (snapshot.phase === 'failed' && !quitting) {
+        queueMicrotask(() => void showRuntimeFailure(snapshot))
+      }
+    }
+  })().finally(() => {
+    coreActivationOperation = undefined
+  })
+  return coreActivationOperation
+}
+
+async function checkAllUpdates(): Promise<void> {
+  const checks: Promise<unknown>[] = [checkForUpdates(true)]
+  if (coreUpdateManager) checks.push(coreUpdateManager.check(true))
+  await Promise.all(checks)
+}
+
 function restartHarness(): Promise<void> {
   if (failureRecoveryVisible) resolvePluginRecoveryAction('restart')
   return launchHarness()
 }
 
 function registerHarnessHandlers(): void {
+  ipcMain.removeAllListeners('harness:renderer-state')
+  ipcMain.on('harness:renderer-state', (event, payload: unknown) => {
+    if (
+      !mainWindow ||
+      mainWindow.isDestroyed() ||
+      event.sender !== mainWindow.webContents ||
+      event.senderFrame !== mainWindow.webContents.mainFrame ||
+      !coreRendererValidation ||
+      typeof payload !== 'object' ||
+      payload === null
+    ) {
+      return
+    }
+    const state = 'state' in payload ? payload.state : undefined
+    const origin = 'origin' in payload ? payload.origin : undefined
+    const message = 'message' in payload ? payload.message : undefined
+    const snapshot = runtime.snapshot()
+    if (
+      (state !== 'ready' && state !== 'failed') ||
+      typeof origin !== 'string' ||
+      origin !== coreRendererValidation.origin ||
+      snapshot.coreGeneration !== coreRendererValidation.generation
+    ) {
+      return
+    }
+    finishCoreRendererValidation({
+      ready: state === 'ready',
+      ...(typeof message === 'string' && message ? { message } : {})
+    })
+  })
+
   ipcMain.removeHandler('harness:restart')
   ipcMain.handle('harness:restart', async (event) => {
     if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) {
@@ -704,6 +894,22 @@ function assertTrustedMainWindowEvent(event: IpcMainInvokeEvent): void {
   }
 }
 
+function assertTrustedHarnessEvent(event: IpcMainInvokeEvent): void {
+  assertTrustedMainWindowEvent(event)
+  const harnessUrl = runtime?.snapshot().url
+  if (!harnessUrl) {
+    throw new Error('This action is only available while Harness is running.')
+  }
+  const senderFrame = event.senderFrame
+  if (!senderFrame) {
+    throw new Error('This action requires an active Harness frame.')
+  }
+  const senderOrigin = new URL(senderFrame.url).origin
+  if (senderOrigin !== new URL(harnessUrl).origin) {
+    throw new Error('This action is only available from the active Harness origin.')
+  }
+}
+
 async function executeDesktopMenuCommand(command: DesktopMenuCommand): Promise<void> {
   const window = mainWindow
   if (!window || window.isDestroyed()) return
@@ -720,7 +926,7 @@ async function executeDesktopMenuCommand(command: DesktopMenuCommand): Promise<v
       shell.showItemInFolder(join(app.getPath('logs'), 'harness.log'))
       break
     case 'check-for-updates':
-      await checkForUpdates(true)
+      await checkAllUpdates()
       break
     case 'undo':
       contents.undo()
@@ -868,7 +1074,7 @@ async function showPluginRecovery(options?: {
         initialLogs: recoveryLogs ?? snapshot.logs,
         readLatestLogs: followRendererLogs ? () => rendererPluginFailureLogs : undefined,
         excludedPlugins: removedPlugins,
-        slotProviderNodeModulesPaths: [join(app.getAppPath(), 'node_modules')],
+        slotProviderNodeModulesPaths: [currentCoreRuntime().nodeModulesPath],
         timeoutMs: waitForRendererEvidence ? PLUGIN_RECOVERY_EVIDENCE_TIMEOUT_MS : 0
       })
       appendPluginRecoveryDetectionLog(detection.plugins)
@@ -896,9 +1102,9 @@ async function showPluginRecovery(options?: {
             const result = await removeProfilePluginWithDsh(
               {
                 dshHome,
-                dshEntryPath: dshEntryPath(),
-                nodeExecutablePath: bundledNodePath(),
-                pnpmEntryPath: bundledPnpmEntryPath(),
+                dshEntryPath: currentCoreRuntime().dshEntryPath,
+                nodeExecutablePath: coreRunnerPath,
+                pnpmEntryPath: currentCoreRuntime().pnpmEntryPath,
                 environment: process.env
               },
               pluginName
@@ -1079,7 +1285,7 @@ function installMenu(): void {
               {
                 label: checkForUpdatesLabel,
                 accelerator: 'CmdOrCtrl+U',
-                click: () => void checkForUpdates(true).catch(showUnexpectedError)
+                click: () => void checkAllUpdates().catch(showUnexpectedError)
               },
               { type: 'separator' as const },
               { role: 'hide' as const },
@@ -1116,7 +1322,7 @@ function installMenu(): void {
               {
                 label: checkForUpdatesLabel,
                 accelerator: 'CmdOrCtrl+U',
-                click: () => void checkForUpdates(true).catch(showUnexpectedError)
+                click: () => void checkAllUpdates().catch(showUnexpectedError)
               }
             ]),
         ...(process.platform === 'darwin'
@@ -1194,15 +1400,62 @@ async function showMobilePairing(): Promise<void> {
   window.webContents.send('mobile:show-panel', { url: panelUrl.href })
 }
 
+function registerUnavailableCoreUpdateHandlers(): void {
+  const status: CoreUpdateStatus = {
+    phase: 'unsupported',
+    currentGeneration: coreRuntime.descriptor.generation,
+    currentVersion: coreRuntime.descriptor.dshVersion,
+    manual: false,
+    message: 'Independent Core updates are only available in packaged builds.'
+  }
+  for (const channel of [
+    'core-updates:status',
+    'core-updates:check',
+    'core-updates:download',
+    'core-updates:activate'
+  ]) {
+    ipcMain.removeHandler(channel)
+  }
+  ipcMain.handle('core-updates:status', (event) => {
+    assertTrustedHarnessEvent(event)
+    return status
+  })
+  ipcMain.handle('core-updates:check', (event) => {
+    assertTrustedHarnessEvent(event)
+    return status
+  })
+  ipcMain.handle('core-updates:download', (event) => {
+    assertTrustedHarnessEvent(event)
+    throw new Error(status.message)
+  })
+  ipcMain.handle('core-updates:activate', (event) => {
+    assertTrustedHarnessEvent(event)
+    throw new Error(status.message)
+  })
+}
+
+function initializeCoreUpdateManager(): void {
+  if (!coreStore) {
+    registerUnavailableCoreUpdateHandlers()
+    return
+  }
+  coreUpdateManager = new CoreUpdateManager({
+    store: coreStore,
+    compatibility: coreCompatibility,
+    publicKeyPath: desktopResourcePath('core-update-public-key.pem'),
+    downloadDirectory: join(app.getPath('userData'), 'core-runtime', 'staging', 'downloads'),
+    activate: activateCoreRuntime,
+    assertTrustedEvent: assertTrustedHarnessEvent
+  })
+  coreUpdateManager.registerHandlers()
+}
+
 async function bootstrap(): Promise<void> {
   if (process.platform === 'darwin') app.dock?.setIcon(desktopIconPath())
   registerDesktopProtocol()
   registerDesktopDialogHandlers()
-  configureNodeWorkerModuleFallback({
-    applicationPath: app.getAppPath(),
-    hookPath: desktopResourcePath('runtime-module-fallback.mjs')
-  })
   launchDirectory = await ensureLaunchRoot(app.getPath('userData'))
+  await initializeCoreRuntime()
   const dshHome = join(app.getPath('userData'), 'harness')
   try {
     const marketMigration = await migrateEmbeddedMarketProfile(dshHome)
@@ -1229,20 +1482,19 @@ async function bootstrap(): Promise<void> {
     console.warn('[desktop] could not migrate DeepSeek Vision model metadata', error)
   }
   registerUpdateHandlers()
+  initializeCoreUpdateManager()
   createWindow()
   runtime = new HarnessRuntime({
-    dshEntryPath: dshEntryPath(),
-    nodeExecutablePath: bundledNodePath(),
-    nodeEntryPath: harnessNodeEntryPath(),
-    pnpmEntryPath: bundledPnpmEntryPath(),
-    dshPatchPath: desktopResourcePath('dsh-desktop.patch.yml'),
+    nodeExecutablePath: coreRunnerPath,
+    resolveCoreRuntime: currentCoreRuntime,
     dshHome,
     logPath: join(app.getPath('logs'), 'harness.log'),
     launchProcess: (executablePath, args, options) => spawn(executablePath, args, options),
     onChanged: (snapshot) => {
       if (snapshot.phase === 'ready' && snapshot.url) {
-        void openHarness(snapshot.url).catch(showUnexpectedError)
-      } else if (snapshot.phase === 'failed') {
+        coreUpdateManager?.start()
+        if (!coreActivationInProgress) void openHarness(snapshot.url).catch(showUnexpectedError)
+      } else if (snapshot.phase === 'failed' && !coreActivationInProgress) {
         void showRuntimeFailure(snapshot)
       }
     }
@@ -1305,6 +1557,13 @@ async function bootstrap(): Promise<void> {
     assertTrustedMainWindowEvent(event)
     const message = typeof frontendErrorMessage === 'string' ? frontendErrorMessage : undefined
     if (message) appendRendererPluginFailureLog(message)
+    if (coreActivationInProgress) {
+      finishCoreRendererValidation({
+        ready: false,
+        message: message || 'The candidate Core renderer failed during startup.'
+      })
+      return { ok: true }
+    }
     const logs = [...rendererPluginFailureLogs]
     appendRendererPluginRecoveryLog(logs)
     if (failureRecoveryVisible) {
@@ -1339,6 +1598,7 @@ async function bootstrap(): Promise<void> {
   if (!developmentBuild) {
     startUpdateManager({
       prepareToInstall: async () => {
+        coreUpdateManager?.stop()
         await Promise.all([runtime.stop(), pluginInstallWebBridge?.stop()])
         quitting = true
         stopUpdateManager()
@@ -1393,6 +1653,7 @@ if (!singleInstance) {
     event.preventDefault()
     quitting = true
     stopUpdateManager()
+    coreUpdateManager?.stop()
     void Promise.all([
       runtime.stop(),
       mobileBridge?.stop(),

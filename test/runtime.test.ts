@@ -60,13 +60,34 @@ describe('Harness launch contract', () => {
     ])
   })
 
-  it('launches Harness through Electron Node mode', () => {
+  it('launches Harness through the governed standalone Core Runner', () => {
+    const coreRuntime = {
+      runtimeRoot: 'C:\\ProgramData\\DSH\\core\\runtime',
+      nodeModulesPath: 'C:\\ProgramData\\DSH\\core\\runtime\\node_modules',
+      moduleFallbackHookPath: 'C:\\ProgramData\\DSH\\core\\runtime\\resources\\runtime-module-fallback.mjs',
+      descriptor: {
+        schemaVersion: 1 as const,
+        generation: 7,
+        coreId: 'dsh-core-g7-win32-x64',
+        dshVersion: '0.1.1-rc.1',
+        patchsetHash: 'a'.repeat(64),
+        desktopProtocol: 1 as const,
+        runnerVersion: 'v22.23.2',
+        runnerAbi: '127',
+        dataSchema: 1 as const,
+        platform: 'win32' as const,
+        arch: 'x64'
+      }
+    }
     const options = buildHarnessSpawnOptions(
       'C:\\Users\\tester\\AppData\\Roaming\\dsh-desktop\\launch-root',
       'C:\\Users\\tester\\AppData\\Roaming\\dsh-desktop\\harness',
+      coreRuntime,
       'win32',
       {
         ELECTRON_RUN_AS_NODE: '1',
+        NODE_OPTIONS: '--require=C:\\user-hook.js',
+        NODE_PATH: 'C:\\user-modules',
         PATH: 'fallback-path',
         Path: 'windows-path'
       }
@@ -74,20 +95,25 @@ describe('Harness launch contract', () => {
 
     expect(options).toMatchObject({
       cwd: 'C:\\Users\\tester\\AppData\\Roaming\\dsh-desktop\\launch-root',
-      stdio: ['pipe', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
       windowsHide: true,
       env: {
         DSH_HOME: 'C:\\Users\\tester\\AppData\\Roaming\\dsh-desktop\\harness',
-        ELECTRON_RUN_AS_NODE: '1',
+        DSH_DESKTOP_CORE_ID: 'dsh-core-g7-win32-x64',
+        DSH_DESKTOP_CORE_GENERATION: '7',
+        DSH_DESKTOP_CORE_PROTOCOL: '1',
         NO_COLOR: '1',
         PATH: 'windows-path',
         Path: 'windows-path'
       }
     })
-    expect(options.env?.ELECTRON_RUN_AS_NODE).toBe('1')
+    expect(options.env).not.toHaveProperty('ELECTRON_RUN_AS_NODE')
+    expect(options.env?.NODE_PATH).toBe(coreRuntime.nodeModulesPath)
+    expect(options.env?.NODE_OPTIONS).toContain('runtime-module-fallback.mjs')
+    expect(options.env?.NODE_OPTIONS).not.toContain('user-hook')
   })
 
-  it('passes the internal-loader flag directly to the Electron Node worker', () => {
+  it('passes the internal-loader flag directly to the Core Runner', () => {
     expect(
       buildNodeArguments(
         'C:\\app\\harness-node-entry.mjs',

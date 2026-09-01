@@ -68,6 +68,9 @@ export async function checkDshReleaseTrain(root = projectRoot) {
   if (manifest.dependencies?.['dsh-desktop-market'] !== 'file:packages/dsh-desktop-market') {
     failures.push('dsh-desktop-market must be consumed from packages/dsh-desktop-market.')
   }
+  if (manifest.dependencies?.['dsh-desktop-verifier'] !== 'file:packages/dsh-desktop-verifier') {
+    failures.push('dsh-desktop-verifier must be consumed from packages/dsh-desktop-verifier.')
+  }
   const marketManifest = await readJson(
     path.join(root, 'packages', 'dsh-desktop-market', 'package.json')
   )
@@ -76,6 +79,21 @@ export async function checkDshReleaseTrain(root = projectRoot) {
   )
   if (forbiddenMarketPeers.length > 0) {
     failures.push(`The Desktop market has DSH peer dependencies: ${forbiddenMarketPeers.join(', ')}.`)
+  }
+  const verifierManifest = await readJson(
+    path.join(root, 'packages', 'dsh-desktop-verifier', 'package.json')
+  )
+  if (verifierManifest.name !== 'dsh-desktop-verifier' || verifierManifest.version !== '0.1.0') {
+    failures.push('The Desktop verifier package identity must remain dsh-desktop-verifier@0.1.0.')
+  }
+  if (verifierManifest.main !== 'lib/index.js' || verifierManifest.exports?.['./client'] !== './client/client.js') {
+    failures.push('The Desktop verifier must expose its governed host and client artifacts.')
+  }
+  const forbiddenVerifierPeers = Object.keys(verifierManifest.peerDependencies ?? {}).filter((name) =>
+    DSH_PACKAGE.test(name)
+  )
+  if (forbiddenVerifierPeers.length > 0) {
+    failures.push(`The Desktop verifier has DSH peer dependencies: ${forbiddenVerifierPeers.join(', ')}.`)
   }
 
   const patchDirectory = path.join(root, 'patches')

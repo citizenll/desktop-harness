@@ -41,6 +41,9 @@ export function mountWindowsTitlebar(options: TitlebarMountOptions): void {
   bar.className = 'bar'
   const safeArea = document.createElement('div')
   safeArea.className = 'safeArea'
+  const dragRegion = document.createElement('div')
+  dragRegion.className = 'dragRegion'
+  dragRegion.setAttribute('aria-hidden', 'true')
   const menuButton = document.createElement('button')
   menuButton.className = 'menuButton'
   menuButton.type = 'button'
@@ -95,7 +98,7 @@ export function mountWindowsTitlebar(options: TitlebarMountOptions): void {
   })
   window.addEventListener('blur', () => closeMenu(false))
 
-  safeArea.append(menuButton, menu)
+  safeArea.append(dragRegion, menuButton, menu)
   bar.appendChild(safeArea)
   shadow.append(style, bar)
   document.body.appendChild(host)
@@ -406,13 +409,12 @@ const titlebarStyles = `
     align-items: stretch;
     pointer-events: none;
   }
-  .safeArea::before {
-    content: "";
+  .dragRegion {
     position: absolute;
     top: 0;
     right: 44px;
-    height: 5px;
     left: var(${SIDEBAR_WIDTH_PROPERTY}, 280px);
+    height: 14px;
     pointer-events: auto;
     -webkit-app-region: drag;
   }

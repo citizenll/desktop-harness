@@ -1,7 +1,7 @@
 import { lstat, readFile, rm } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
-import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { parse, stringify } from 'yaml'
+import { writeFileAtomic } from './atomic-file'
 
 const MARKET_PACKAGE = 'dshmarket'
 

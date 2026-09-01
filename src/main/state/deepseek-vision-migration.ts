@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { isMap, isSeq, parseDocument } from 'yaml'
+import { writeFileAtomic } from './atomic-file'
 
 const OFFICIAL_VISION_MODEL = 'deepseek-v4-flash-vision-exp'
 const OFFICIAL_VISION_MODALITIES = ['text', 'image'] as const

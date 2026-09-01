@@ -1,0 +1,60 @@
+{
+  "name": "dsh-desktop-verifier",
+  "version": "0.1.0",
+  "description": "First-party best-of-three response verification for DSH Desktop.",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "license": "MIT",
+  "scripts": {
+    "build": "npm run build:host && npm run build:client",
+    "build:host": "tsc -p tsconfig.json",
+    "build:client": "tsdown && node scripts/normalize-client-banner.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.client.json",
+    "typecheck:client": "tsc --noEmit -p tsconfig.client.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/citizenll/desktop-harness.git",
+    "directory": "packages/dsh-desktop-verifier"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "^3.18.1",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-primitives"
+      ],
+      "platform": "web"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": "./client/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "src",
+    "client",
+    "scripts",
+    "tsconfig.json",
+    "tsconfig.client.json",
+    "tsdown.config.ts",
+    "LICENSE",
+    "UPSTREAM.md"
+  ]
+}
